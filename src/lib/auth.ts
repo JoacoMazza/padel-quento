@@ -17,27 +17,38 @@ export const authOptions: NextAuthOptions = {
         const email = credentials?.email?.trim().toLowerCase();
         const password = credentials?.password;
         if (!email || !password) {
+          console.warn("[Auth] Intento de login con email o contraseña vacíos.");
           return null;
         }
 
-        const dataSource = await getDataSource();
-        const users = dataSource.getRepository(User);
-        const user = await users.findOne({ where: { email } });
-        if (!user) {
+        try {
+          const dataSource = await getDataSource();
+          const users = dataSource.getRepository(User);
+          const user = await users.findOne({ where: { email } });
+
+          if (!user) {
+            console.warn(`[Auth] No se encontró usuario con el email: ${email}`);
+            return null;
+          }
+
+          const matches = await bcrypt.compare(password, user.passwordHash);
+          if (!matches) {
+            console.warn(`[Auth] Contraseña incorrecta para el email: ${email}`);
+            return null;
+          }
+
+          console.log(`[Auth] Login exitoso para el usuario: ${user.email}`);
+          return {
+            id: String(user.id),
+            email: user.email,
+            name: `${user.names} ${user.lastnames}`,
+          };
+        } catch (error) {
+          console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);
           return null;
         }
-
-        const matches = await bcrypt.compare(password, user.passwordHash);
-        if (!matches) {
-          return null;
-        }
-
-        return {
-          id: String(user.id),
-          email: user.email,
-          name: `${user.names} ${user.lastnames}`,
-        };
       },
+
     }),
   ],
   session: { strategy: "jwt" },

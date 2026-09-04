@@ -63,7 +63,9 @@ export async function registerPlayer(
     });
 
     await players.save(player);
+    console.log(`[Register] Jugador guardado exitosamente en BD: ${email}`);
   } catch (error) {
+
     if (isUniqueViolation(error)) {
       return { message: DUPLICATE_EMAIL_MESSAGE };
     }

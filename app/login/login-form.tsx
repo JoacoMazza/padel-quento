@@ -44,22 +44,22 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-4">
       {registered ? (
-        <p className="rounded-md border border-court/30 bg-court/10 px-3 py-2 text-sm text-court-dark">
-          Cuenta creada. Iniciá sesión para entrar.
+        <p className="rounded-lg border border-primary/30 bg-primary-light px-3.5 py-2.5 text-sm font-medium text-primary">
+          Cuenta creada con éxito. Iniciá sesión para entrar.
         </p>
       ) : null}
 
       {error ? (
         <p
           role="alert"
-          className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+          className="rounded-lg border border-danger/30 bg-danger-light px-3.5 py-2.5 text-sm font-medium text-danger"
         >
           {error}
         </p>
       ) : null}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium">
+        <label htmlFor="email" className="text-sm font-medium text-foreground">
           Email
         </label>
         <input
@@ -68,12 +68,13 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none ring-court/30 focus:ring-2"
+          placeholder="tu@email.com"
+          className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium">
+        <label htmlFor="password" className="text-sm font-medium text-foreground">
           Contraseña
         </label>
         <input
@@ -82,24 +83,26 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none ring-court/30 focus:ring-2"
+          placeholder="••••••••"
+          className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 h-11 rounded-full bg-court text-sm font-semibold text-white transition-colors hover:bg-court-dark disabled:opacity-60"
+        className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
       >
         {pending ? "Ingresando…" : "Iniciar sesión"}
       </button>
 
-      <p className="text-center text-sm text-foreground/70">
+      <p className="mt-1 text-center text-sm text-foreground/70">
         ¿Jugador nuevo?{" "}
-        <Link href="/register" className="font-medium text-court underline">
+        <Link href="/register" className="font-semibold text-primary hover:underline">
           Registrarme
         </Link>
       </p>
     </form>
   );
 }
+

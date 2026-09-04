@@ -1,6 +1,8 @@
+import "reflect-metadata";
 import { ChildEntity, Column } from "typeorm";
 import { PlayerCategory } from "@/src/domain/enums";
 import { User } from "@/src/entities/User";
+
 
 @ChildEntity()
 export class Player extends User {

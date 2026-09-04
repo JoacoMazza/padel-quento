@@ -17,7 +17,7 @@ export function RegisterForm() {
       {state.message ? (
         <p
           role="alert"
-          className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+          className="rounded-lg border border-danger/30 bg-danger-light px-3.5 py-2.5 text-sm font-medium text-danger"
         >
           {state.message}
         </p>
@@ -28,6 +28,7 @@ export function RegisterForm() {
         name="names"
         label="Nombre"
         autoComplete="given-name"
+        placeholder="Juan"
         error={state.errors?.names}
       />
       <Field
@@ -35,6 +36,7 @@ export function RegisterForm() {
         name="lastnames"
         label="Apellido"
         autoComplete="family-name"
+        placeholder="Pérez"
         error={state.errors?.lastnames}
       />
       <Field
@@ -43,6 +45,7 @@ export function RegisterForm() {
         label="Email"
         type="email"
         autoComplete="email"
+        placeholder="juan@email.com"
         error={state.errors?.email}
       />
       <Field
@@ -51,20 +54,21 @@ export function RegisterForm() {
         label="Contraseña"
         type="password"
         autoComplete="new-password"
+        placeholder="••••••••"
         error={state.errors?.password}
       />
 
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 h-11 rounded-full bg-court text-sm font-semibold text-white transition-colors hover:bg-court-dark disabled:opacity-60"
+        className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
       >
         {pending ? "Creando cuenta…" : "Registrarme"}
       </button>
 
-      <p className="text-center text-sm text-foreground/70">
+      <p className="mt-1 text-center text-sm text-foreground/70">
         ¿Ya tenés cuenta?{" "}
-        <Link href="/login" className="font-medium text-court underline">
+        <Link href="/login" className="font-semibold text-primary hover:underline">
           Iniciar sesión
         </Link>
       </p>
@@ -78,6 +82,7 @@ function Field({
   label,
   type = "text",
   autoComplete,
+  placeholder,
   error,
 }: {
   id: string;
@@ -85,11 +90,12 @@ function Field({
   label: string;
   type?: string;
   autoComplete?: string;
+  placeholder?: string;
   error?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
         {label}
       </label>
       <input
@@ -97,14 +103,16 @@ function Field({
         name={name}
         type={type}
         autoComplete={autoComplete}
+        placeholder={placeholder}
         required
-        className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none ring-court/30 focus:ring-2"
+        className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
       />
       {error ? (
-        <p className="text-xs text-danger" role="alert">
+        <p className="text-xs font-medium text-danger" role="alert">
           {error}
         </p>
       ) : null}
     </div>
   );
 }
+
