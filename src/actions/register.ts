@@ -40,7 +40,7 @@ export async function registerPlayer(
 
   try {
     const dataSource = await getDataSource();
-    const players = dataSource.getRepository(Player);
+    const players = dataSource.getRepository<Player>("Player");
 
     const existing = await players.findOne({ where: { email } });
     if (existing) {
@@ -75,5 +75,5 @@ export async function registerPlayer(
     };
   }
 
-  redirect("/login?registrado=1");
+  redirect("/login");
 }

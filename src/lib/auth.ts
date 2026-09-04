@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           const dataSource = await getDataSource();
-          const users = dataSource.getRepository(User);
+          const users = dataSource.getRepository<User>("User");
           const user = await users.findOne({ where: { email } });
 
           if (!user) {
