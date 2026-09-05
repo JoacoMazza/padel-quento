@@ -55,6 +55,8 @@ export function RegisterForm() {
         type="password"
         autoComplete="new-password"
         placeholder="••••••••"
+        minLength={6}
+        maxLength={25}
         error={state.errors?.password}
       />
 
@@ -83,6 +85,8 @@ function Field({
   type = "text",
   autoComplete,
   placeholder,
+  minLength,
+  maxLength,
   error,
 }: {
   id: string;
@@ -91,6 +95,8 @@ function Field({
   type?: string;
   autoComplete?: string;
   placeholder?: string;
+  minLength?: number;
+  maxLength?: number;
   error?: string;
 }) {
   return (
@@ -104,6 +110,8 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         placeholder={placeholder}
+        minLength={minLength}
+        maxLength={maxLength}
         required
         className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
       />

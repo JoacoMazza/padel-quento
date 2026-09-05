@@ -26,7 +26,11 @@ export function parseRegisterForm(formData: FormData): {
   else if (!EMAIL_PATTERN.test(email)) {
     errors.email = "Ingresá un email con formato válido.";
   }
-  if (!password) errors.password = "La contraseña es obligatoria.";
+  if (!password) {
+    errors.password = "La contraseña es obligatoria.";
+  } else if (password.length < 6 || password.length > 25) {
+    errors.password = "La contraseña debe tener entre 6 y 25 caracteres.";
+  }
 
   if (Object.keys(errors).length > 0) {
     return { errors };
