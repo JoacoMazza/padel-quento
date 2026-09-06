@@ -47,7 +47,7 @@ export async function getOutOfServices(): Promise<ActionResult<OutOfService[]>> 
   try {
     const dataSource = await getDataSource();
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
-    const data = await outOfServices.find({ relations: ["court"] });
+    const data = await outOfServices.find({ relations: { court: true } });
     return { success: true, data };
   } catch (error) {
     console.error("getOutOfServices", error);
@@ -63,7 +63,7 @@ export async function getOutOfServiceById(
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
     const data = await outOfServices.findOne({
       where: { id },
-      relations: ["court"],
+      relations: { court: true },
     });
     return { success: true, data };
   } catch (error) {

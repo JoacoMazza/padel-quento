@@ -45,7 +45,7 @@ export async function getSchedules(): Promise<ActionResult<Schedule[]>> {
   try {
     const dataSource = await getDataSource();
     const schedules = dataSource.getRepository<Schedule>("Schedule");
-    const data = await schedules.find({ relations: ["court"] });
+    const data = await schedules.find({ relations: { court: true } });
     return { success: true, data };
   } catch (error) {
     console.error("getSchedules", error);
@@ -61,7 +61,7 @@ export async function getScheduleById(
     const schedules = dataSource.getRepository<Schedule>("Schedule");
     const data = await schedules.findOne({
       where: { id },
-      relations: ["court"],
+      relations: { court: true },
     });
     return { success: true, data };
   } catch (error) {

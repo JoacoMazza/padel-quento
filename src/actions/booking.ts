@@ -48,7 +48,7 @@ export async function getBookings(): Promise<ActionResult<Booking[]>> {
   try {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
-    const data = await bookings.find({ relations: ["player", "court"] });
+    const data = await bookings.find({ relations: { player: true, court: true } });
     return { success: true, data };
   } catch (error) {
     console.error("getBookings", error);
@@ -64,7 +64,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: ["player", "court"],
+      relations: { player: true, court: true },
     });
     return { success: true, data };
   } catch (error) {
