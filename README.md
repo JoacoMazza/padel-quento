@@ -8,14 +8,25 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 - [TypeORM](https://typeorm.io/) sobre PostgreSQL 16
 - [NextAuth](https://next-auth.js.org/) para autenticación
 - Tailwind CSS 4
+- [lucide-react](https://lucide.dev/) para íconos
 - [Vitest](https://vitest.dev/) para tests unitarios e de integración
 - pnpm como package manager
 
-## Diagrama de clases
+## Diagramas
 
-![Diagrama de clases](docs/class_model.png)
+### Diagrama de clases
 
-El diagrama fuente (editable) se encuentra en [docs/class_diagram.EAP](docs/class_diagram.EAP).
+![Diagrama de clases](docs/classes/class_model.png)
+
+El diagrama fuente (editable) se encuentra en [docs/classes/class_diagram.EAP](docs/classes/class_diagram.EAP).
+
+### Diagrama Entidad-Relación (DER)
+
+![DER](docs/der/DER%20Padel%20Quento.png)
+
+El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quento.drawio](docs/der/DER%20Padel%20Quento.drawio).
+
+Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
 ## Estructura del proyecto
 
@@ -24,18 +35,21 @@ app/                  Rutas y páginas (App Router de Next.js)
   api/auth/           Endpoints de NextAuth
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
+  my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
   components/         Componentes de UI compartidos (header, menú de usuario, logo)
 src/
   entities/           Entidades de TypeORM (User, Player, Court, Booking, Schedule, OutOfService)
   domain/             Enums y tipos de dominio
-  actions/            Server Actions con CRUD básico por entidad
+  actions/            Server Actions con CRUD básico por entidad (incluye validación de solapamiento en reservas)
   lib/                Infraestructura (conexión a DB en runtime, DataSource de CLI, auth, validaciones)
   migrations/         Migraciones de TypeORM
 scripts/              Scripts de mantenimiento (seed de datos)
 test/
   unit/               Tests unitarios (no requieren base de datos)
   integration/        Tests de integración (requieren Postgres levantado)
-docs/                 Documentación y diagrama de clases
+docs/
+  classes/            Diagrama de clases (imagen + fuente editable)
+  der/                Diagrama Entidad-Relación (imagen + fuente editable)
 ```
 
 ## Configuración del proyecto
