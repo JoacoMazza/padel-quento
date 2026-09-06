@@ -19,7 +19,15 @@ function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
 }
 
-const fromDateTime = new Date("2026-01-01T10:00:00Z");
+// Cada test necesita un horario propio: como ahora el backend rechaza solapamientos,
+// reutilizar el mismo horario entre tests haría que se pisen entre sí.
+let slotOffset = 0;
+function uniqueFromDateTime() {
+  const date = new Date(2026, 0, 1, 8, 0, 0);
+  date.setHours(date.getHours() + slotOffset * 2);
+  slotOffset += 1;
+  return date;
+}
 
 describe("booking actions (integración con Postgres real)", () => {
   let courtId: number;
@@ -46,7 +54,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("crea una reserva con los valores por defecto y la persiste", async () => {
-    const result = await createBooking({ fromDateTime, playerId, courtId });
+    const result = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
@@ -55,7 +63,12 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("lista las reservas con jugador y cancha cargados", async () => {
-    await createBooking({ fromDateTime, playerId, courtId, bookingState: BookingState.PAID });
+    await createBooking({
+      fromDateTime: uniqueFromDateTime(),
+      playerId,
+      courtId,
+      bookingState: BookingState.PAID,
+    });
 
     const result = await getBookings();
 
@@ -67,7 +80,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("obtiene una reserva por id y null si no existe", async () => {
-    const created = await createBooking({ fromDateTime, playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const found = await getBookingById(created.data.id);
@@ -80,7 +93,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("actualiza el estado de una reserva existente", async () => {
-    const created = await createBooking({ fromDateTime, playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const result = await updateBooking(created.data.id, { bookingState: BookingState.CANCELLED });
@@ -98,7 +111,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("elimina una reserva existente y falla al eliminarla de nuevo", async () => {
-    const created = await createBooking({ fromDateTime, playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const result = await deleteBooking(created.data.id);
@@ -106,5 +119,82 @@ describe("booking actions (integración con Postgres real)", () => {
 
     const secondAttempt = await deleteBooking(created.data.id);
     expect(secondAttempt).toEqual({ success: false, error: "La reserva no existe." });
+  });
+
+  describe("prevención de doble reserva", () => {
+    it("no permite crear una reserva en el mismo horario y cancha", async () => {
+      const fromDateTime = uniqueFromDateTime();
+      const first = await createBooking({ fromDateTime, playerId, courtId });
+      if (!first.success) throw new Error("expected success");
+
+      const second = await createBooking({ fromDateTime, playerId, courtId });
+
+      expect(second).toEqual({
+        success: false,
+        error: "Ese horario ya está reservado para esta cancha.",
+      });
+    });
+
+    it("no permite crear una reserva que se solapa parcialmente", async () => {
+      const fromDateTime = uniqueFromDateTime();
+      const first = await createBooking({ fromDateTime, playerId, courtId, durationMinutes: 90 });
+      if (!first.success) throw new Error("expected success");
+
+      const overlapping = new Date(fromDateTime.getTime() + 60 * 60_000);
+      const second = await createBooking({ fromDateTime: overlapping, playerId, courtId });
+
+      expect(second).toEqual({
+        success: false,
+        error: "Ese horario ya está reservado para esta cancha.",
+      });
+    });
+
+    it("permite reservar el mismo horario si la reserva anterior fue cancelada", async () => {
+      const fromDateTime = uniqueFromDateTime();
+      const first = await createBooking({ fromDateTime, playerId, courtId });
+      if (!first.success) throw new Error("expected success");
+
+      const cancelled = await updateBooking(first.data.id, { bookingState: BookingState.CANCELLED });
+      expect(cancelled.success).toBe(true);
+
+      const second = await createBooking({ fromDateTime, playerId, courtId });
+
+      expect(second.success).toBe(true);
+    });
+
+    it("no cuenta la reserva propia como solapamiento al actualizarla", async () => {
+      const fromDateTime = uniqueFromDateTime();
+      const created = await createBooking({ fromDateTime, playerId, courtId });
+      if (!created.success) throw new Error("expected success");
+
+      const result = await updateBooking(created.data.id, { bookingState: BookingState.PAID });
+
+      expect(result).toEqual({
+        success: true,
+        data: expect.objectContaining({ bookingState: BookingState.PAID }),
+      });
+    });
+
+    it("no permite mover una reserva a un horario ya ocupado en otra cancha", async () => {
+      const otherCourt = await createCourt({ number: uniqueCourtNumber() });
+      if (!otherCourt.success) throw new Error("no se pudo crear la segunda cancha de prueba");
+
+      const fromDateTime = uniqueFromDateTime();
+      const occupying = await createBooking({ fromDateTime, playerId, courtId: otherCourt.data.id });
+      if (!occupying.success) throw new Error("expected success");
+
+      const movable = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+      if (!movable.success) throw new Error("expected success");
+
+      const result = await updateBooking(movable.data.id, {
+        fromDateTime,
+        courtId: otherCourt.data.id,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Ese horario ya está reservado para esta cancha.",
+      });
+    });
   });
 });
