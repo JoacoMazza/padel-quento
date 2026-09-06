@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { Schedule } from "@/src/entities/Schedule";
 import { DayOfWeek } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreateScheduleInput = {
   dayOfWeek: DayOfWeek;
@@ -34,7 +34,7 @@ export async function createSchedule(
     });
 
     const saved = await schedules.save(schedule);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("createSchedule", error);
     return { success: false, error: "No se pudo crear el horario." };
@@ -46,7 +46,7 @@ export async function getSchedules(): Promise<ActionResult<Schedule[]>> {
     const dataSource = await getDataSource();
     const schedules = dataSource.getRepository<Schedule>("Schedule");
     const data = await schedules.find({ relations: { court: true } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getSchedules", error);
     return { success: false, error: "No se pudieron obtener los horarios." };
@@ -63,7 +63,7 @@ export async function getScheduleById(
       where: { id },
       relations: { court: true },
     });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getScheduleById", error);
     return { success: false, error: "No se pudo obtener el horario." };
@@ -90,7 +90,7 @@ export async function updateSchedule(
     });
 
     const saved = await schedules.save(schedule);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("updateSchedule", error);
     return { success: false, error: "No se pudo actualizar el horario." };

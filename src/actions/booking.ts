@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
 import { BookingState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreateBookingInput = {
   fromDateTime: Date;
@@ -37,7 +37,7 @@ export async function createBooking(
     });
 
     const saved = await bookings.save(booking);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("createBooking", error);
     return { success: false, error: "No se pudo crear la reserva." };
@@ -49,7 +49,7 @@ export async function getBookings(): Promise<ActionResult<Booking[]>> {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.find({ relations: { player: true, court: true } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getBookings", error);
     return { success: false, error: "No se pudieron obtener las reservas." };
@@ -66,7 +66,7 @@ export async function getBookingById(
       where: { id },
       relations: { player: true, court: true },
     });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getBookingById", error);
     return { success: false, error: "No se pudo obtener la reserva." };
@@ -94,7 +94,7 @@ export async function updateBooking(
     });
 
     const saved = await bookings.save(booking);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("updateBooking", error);
     return { success: false, error: "No se pudo actualizar la reserva." };

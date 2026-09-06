@@ -6,7 +6,7 @@ import { Player } from "@/src/entities/Player";
 import { PlayerCategory, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreatePlayerInput = {
   email: string;
@@ -49,7 +49,7 @@ export async function createPlayer(
     });
 
     const saved = await players.save(player);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "El correo ya está en uso." };
@@ -64,7 +64,7 @@ export async function getPlayers(): Promise<ActionResult<Player[]>> {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
     const data = await players.find();
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getPlayers", error);
     return { success: false, error: "No se pudieron obtener los jugadores." };
@@ -78,7 +78,7 @@ export async function getPlayerById(
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
     const data = await players.findOne({ where: { id } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getPlayerById", error);
     return { success: false, error: "No se pudo obtener el jugador." };
@@ -105,7 +105,7 @@ export async function updatePlayer(
     }
 
     const saved = await players.save(player);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "El correo ya está en uso." };

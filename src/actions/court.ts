@@ -5,7 +5,7 @@ import { Court } from "@/src/entities/Court";
 import { CourtState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreateCourtInput = {
   number: number;
@@ -27,7 +27,7 @@ export async function createCourt(
     });
 
     const saved = await courts.save(court);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "Ya existe una cancha con ese número." };
@@ -42,7 +42,7 @@ export async function getCourts(): Promise<ActionResult<Court[]>> {
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
     const data = await courts.find();
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getCourts", error);
     return { success: false, error: "No se pudieron obtener las canchas." };
@@ -54,7 +54,7 @@ export async function getCourtById(id: number): Promise<ActionResult<Court | nul
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
     const data = await courts.findOne({ where: { id } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getCourtById", error);
     return { success: false, error: "No se pudo obtener la cancha." };
@@ -76,7 +76,7 @@ export async function updateCourt(
 
     courts.merge(court, input);
     const saved = await courts.save(court);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "Ya existe una cancha con ese número." };

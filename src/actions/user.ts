@@ -6,7 +6,7 @@ import { User } from "@/src/entities/User";
 import { Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreateUserInput = {
   email: string;
@@ -47,7 +47,7 @@ export async function createUser(
     });
 
     const saved = await users.save(user);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "El correo ya está en uso." };
@@ -62,7 +62,7 @@ export async function getUsers(): Promise<ActionResult<User[]>> {
     const dataSource = await getDataSource();
     const users = dataSource.getRepository<User>("User");
     const data = await users.find();
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getUsers", error);
     return { success: false, error: "No se pudieron obtener los usuarios." };
@@ -76,7 +76,7 @@ export async function getUserById(
     const dataSource = await getDataSource();
     const users = dataSource.getRepository<User>("User");
     const data = await users.findOne({ where: { id } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getUserById", error);
     return { success: false, error: "No se pudo obtener el usuario." };
@@ -103,7 +103,7 @@ export async function updateUser(
     }
 
     const saved = await users.save(user);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { success: false, error: "El correo ya está en uso." };

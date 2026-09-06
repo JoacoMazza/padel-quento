@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { OutOfService } from "@/src/entities/OutOfService";
 import { OutOfServiceReason } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
 export type CreateOutOfServiceInput = {
   fromDateTime: Date;
@@ -36,7 +36,7 @@ export async function createOutOfService(
     });
 
     const saved = await outOfServices.save(outOfService);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("createOutOfService", error);
     return { success: false, error: "No se pudo crear el bloqueo de cancha." };
@@ -48,7 +48,7 @@ export async function getOutOfServices(): Promise<ActionResult<OutOfService[]>> 
     const dataSource = await getDataSource();
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
     const data = await outOfServices.find({ relations: { court: true } });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getOutOfServices", error);
     return { success: false, error: "No se pudieron obtener los bloqueos de cancha." };
@@ -65,7 +65,7 @@ export async function getOutOfServiceById(
       where: { id },
       relations: { court: true },
     });
-    return { success: true, data };
+    return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getOutOfServiceById", error);
     return { success: false, error: "No se pudo obtener el bloqueo de cancha." };
@@ -92,7 +92,7 @@ export async function updateOutOfService(
     });
 
     const saved = await outOfServices.save(outOfService);
-    return { success: true, data: saved };
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("updateOutOfService", error);
     return { success: false, error: "No se pudo actualizar el bloqueo de cancha." };
