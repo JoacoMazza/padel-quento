@@ -23,12 +23,15 @@ El diagrama fuente (editable) se encuentra en [docs/class_diagram.EAP](docs/clas
 app/                  Rutas y páginas (App Router de Next.js)
   api/auth/           Endpoints de NextAuth
   login/, register/   Páginas de autenticación
-  components/         Componentes de UI compartidos
+  bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
+  components/         Componentes de UI compartidos (header, menú de usuario, logo)
 src/
-  entities/           Entidades de TypeORM (User, Player, ...)
+  entities/           Entidades de TypeORM (User, Player, Court, Booking, Schedule, OutOfService)
   domain/             Enums y tipos de dominio
-  actions/            Server Actions (ej. registro de jugadores)
-  lib/                Infraestructura (conexión a DB, auth, validaciones)
+  actions/            Server Actions con CRUD básico por entidad
+  lib/                Infraestructura (conexión a DB en runtime, DataSource de CLI, auth, validaciones)
+  migrations/         Migraciones de TypeORM
+scripts/              Scripts de mantenimiento (seed de datos)
 test/
   unit/               Tests unitarios (no requieren base de datos)
   integration/        Tests de integración (requieren Postgres levantado)
@@ -80,7 +83,37 @@ Con Docker Compose se levanta un Postgres local usando las credenciales definida
 docker compose up -d
 ```
 
-El esquema se sincroniza automáticamente contra las entidades de TypeORM al iniciar la app (`synchronize` está habilitado fuera de producción), por lo que no hace falta correr migraciones manuales en desarrollo.
+En desarrollo y en los tests, el esquema se sincroniza automáticamente contra las entidades de TypeORM al iniciar la app (`synchronize` está habilitado fuera de producción), por lo que no hace falta correr migraciones para trabajar localmente.
+
+En producción (o en cualquier entorno donde `synchronize` esté deshabilitado) el esquema se provee con migraciones — ver la sección siguiente.
+
+### 4. Migraciones
+
+Las migraciones usan la CLI de TypeORM contra una `DataSource` dedicada ([src/lib/data-source.ts](src/lib/data-source.ts)), separada de la conexión que usa la app en runtime ([src/lib/db.ts](src/lib/db.ts)). Esta `DataSource` de CLI tiene `synchronize: false` siempre, así las migraciones reflejan cambios reales de esquema y no una sincronización automática.
+
+```bash
+pnpm migration:run                                    # aplica las migraciones pendientes
+pnpm migration:revert                                 # revierte la última migración aplicada
+pnpm migration:show                                   # lista migraciones aplicadas/pendientes
+pnpm migration:generate src/migrations/NombreDelCambio # genera una migración a partir del diff entidades vs. base de datos
+pnpm migration:create src/migrations/NombreDelCambio   # crea una migración vacía para escribir a mano
+```
+
+> **En tu base de datos de desarrollo local no hace falta correr `pnpm migration:run`.** Como el esquema ya se creó por `synchronize`, aplicar la migración inicial fallaría porque las tablas ya existen. Las migraciones están pensadas para bases de datos nuevas (producción, CI, la máquina de un compañero que recién clona el repo).
+
+Al modificar una entidad, generar la migración correspondiente para que quede versionada:
+
+```bash
+pnpm migration:generate src/migrations/AgregarCampoX
+```
+
+### 5. Datos de ejemplo (seed)
+
+```bash
+pnpm db:seed
+```
+
+Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
 ## Comandos importantes
 
@@ -92,6 +125,19 @@ pnpm build      # Build de producción
 pnpm start      # Sirve el build de producción
 pnpm lint       # Linter (ESLint)
 ```
+
+### Migraciones y seed
+
+```bash
+pnpm migration:generate src/migrations/NombreDelCambio  # genera una migración a partir del diff entidades vs. BD
+pnpm migration:create src/migrations/NombreDelCambio    # crea una migración vacía
+pnpm migration:run                                      # aplica las migraciones pendientes
+pnpm migration:revert                                   # revierte la última migración aplicada
+pnpm migration:show                                     # lista migraciones aplicadas/pendientes
+pnpm db:seed                                             # crea 8 canchas con horario 09-23hs todos los días (idempotente)
+```
+
+Ver [Migraciones](#4-migraciones) y [Datos de ejemplo (seed)](#5-datos-de-ejemplo-seed) para más detalle.
 
 ### Tests unitarios
 
