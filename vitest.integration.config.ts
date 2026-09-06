@@ -8,7 +8,7 @@ export default defineConfig({
         experimentalDecorators: true,
       },
     },
-  },
+  } as any,
   resolve: {
     alias: {
       "@": path.resolve(__dirname),

@@ -4,6 +4,7 @@ import { config as loadEnv } from "dotenv";
 import { DataSource } from "typeorm";
 import { Player } from "../../src/entities/Player";
 import { User } from "../../src/entities/User";
+import { PointsMovement } from "../../src/entities/PointsMovement";
 
 export default async function globalSetup() {
   loadEnv({ path: path.resolve(__dirname, "../../.env.test"), quiet: true });
@@ -18,7 +19,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [User, Player],
+    entities: [User, Player, PointsMovement],
     synchronize: true,
     dropSchema: true,
   });
