@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { OutOfServiceReason } from "@/src/domain/enums";
-import { Court } from "@/src/entities/Court";
+import type { Court } from "@/src/entities/Court";
 
 @Entity({ name: "out_of_services" })
 export class OutOfService {
@@ -18,8 +18,8 @@ export class OutOfService {
   reason!: OutOfServiceReason;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  description!: string;
+  description!: string | null;
 
-  @ManyToOne(() => Court, (court) => court.outOfServices)
+  @ManyToOne("Court", (court: any) => court.outOfServices)
   court!: Court;
 }

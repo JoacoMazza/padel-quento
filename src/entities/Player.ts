@@ -2,8 +2,6 @@ import "reflect-metadata";
 import { ChildEntity, Column, OneToMany } from "typeorm";
 import { PlayerCategory } from "@/src/domain/enums";
 import { User } from "@/src/entities/User";
-import { Booking } from "@/src/entities/Booking";
-
 
 @ChildEntity()
 export class Player extends User {
@@ -16,6 +14,6 @@ export class Player extends User {
   @Column({ type: "float", default: 0 })
   scoring!: number;
 
-  @OneToMany(() => Booking, (booking) => booking.player)
+  @OneToMany("Booking", (booking: any) => booking.player)
   bookings!: any[];
 }

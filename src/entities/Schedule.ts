@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { DayOfWeek } from "@/src/domain/enums";
-import { Court } from "@/src/entities/Court";
+import type { Court } from "@/src/entities/Court";
 
 @Entity({ name: "schedules" })
 export class Schedule {
@@ -17,6 +17,6 @@ export class Schedule {
   @Column({ type: "time", default: '23:00:00' })
   closingTime!: Date;
 
-  @ManyToOne(() => Court, (court) => court.schedules)
+  @ManyToOne("Court", (court: any) => court.schedules)
   court!: Court;
 }
