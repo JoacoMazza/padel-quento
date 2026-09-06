@@ -1,10 +1,13 @@
 import "reflect-metadata";
-import { ChildEntity, Column, ManyToOne } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
 import { Player, Court } from "@/src/entities";
 
-@ChildEntity()
+@Entity({ name: "bookings" })
 export class Booking {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
   @Column({ type: "datetime" })
   fromDateTime!: Date;
 

@@ -1,10 +1,13 @@
 import "reflect-metadata";
-import { ChildEntity, Column, OneToMany } from "typeorm";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { CourtState } from "@/src/domain/enums";
 import { Booking, OutOfService, Schedule } from "@/src/entities";
 
-@ChildEntity()
+@Entity({ name: "courts" })
 export class Court {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
   @Column({ type: "int", unique: true })
   number!: number;
 

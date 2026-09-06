@@ -1,10 +1,13 @@
 import "reflect-metadata";
-import { ChildEntity, Column, ManyToOne } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { OutOfServiceReason } from "@/src/domain/enums";
 import { Court } from "@/src/entities/Court";
 
-@ChildEntity()
+@Entity({ name: "out_of_services" })
 export class OutOfService {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
   @Column({ type: "datetime" })
   fromDateTime!: Date;
 

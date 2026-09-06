@@ -1,10 +1,13 @@
 import "reflect-metadata";
-import { ChildEntity, Column, ManyToOne } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { DayOfWeek } from "@/src/domain/enums";
 import { Court } from "@/src/entities";
 
-@ChildEntity()
+@Entity({ name: "schedules" })
 export class Schedule {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
   @Column({ type: "enum", enum: DayOfWeek, length: 255 })
   dayOfWeek!: DayOfWeek;
 
