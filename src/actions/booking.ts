@@ -36,13 +36,13 @@ async function hasOverlappingBooking(
 ): Promise<boolean> {
   const qb = manager
     .createQueryBuilder(Booking, "booking")
-    .where('booking."courtId" = :courtId', { courtId: params.courtId })
-    .andWhere('booking."bookingState" != :cancelled', { cancelled: BookingState.CANCELLED })
-    .andWhere('booking."fromDateTime" < :end', {
+    .where('booking."court_id" = :courtId', { courtId: params.courtId })
+    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+    .andWhere('booking."datetime" < :end', {
       end: new Date(params.start.getTime() + params.durationMinutes * 60_000),
     })
     .andWhere(
-      'booking."fromDateTime" + make_interval(mins => booking."durationMinutes") > :start',
+      'booking."datetime" + make_interval(mins => booking."duration_minutes") > :start',
       { start: params.start },
     );
 
