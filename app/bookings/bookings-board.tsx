@@ -83,7 +83,8 @@ export function BookingsBoard({
   const dayOfWeek = useMemo(() => dayOfWeekFromDate(selectedDate), [selectedDate]);
 
   const now = new Date();
-  const isToday = toISODate(selectedDate) === toISODate(now);
+  const todayISODate = toISODate(now);
+  const isToday = toISODate(selectedDate) === todayISODate;
 
   const visibleCourts = useMemo(
     () => (courtFilter === "all" ? courts : courts.filter((c) => String(c.id) === courtFilter)),
@@ -195,8 +196,14 @@ export function BookingsBoard({
           <input
             type="date"
             value={dateInput}
+            min={todayISODate}
+            onClick={(event) => {
+              event.currentTarget.showPicker?.();
+            }}
             onChange={(event) => {
-              setDateInput(event.target.value);
+              const value = event.target.value;
+              if (!value || value < todayISODate) return;
+              setDateInput(value);
               setSelectedSlot(null);
               setFeedback(null);
             }}
