@@ -8,13 +8,13 @@ export class OutOfService {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: "datetime" })
+  @Column({ type: "timestamp" })
   fromDateTime!: Date;
 
-  @Column({ type: "datetime"})
+  @Column({ type: "timestamp" })
   toDateTime!: Date;
 
-  @Column({ type: "enum", enum: OutOfServiceReason, length: 255 })
+  @Column({ type: "enum", enum: OutOfServiceReason })
   reason!: OutOfServiceReason;
 
   @Column({ type: "varchar", length: 255, nullable: true })

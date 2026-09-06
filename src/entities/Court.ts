@@ -1,7 +1,9 @@
 import "reflect-metadata";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { CourtState } from "@/src/domain/enums";
-import { Booking, OutOfService, Schedule } from "@/src/entities";
+import { Booking } from "@/src/entities/Booking";
+import { OutOfService } from "@/src/entities/OutOfService";
+import { Schedule } from "@/src/entities/Schedule";
 
 @Entity({ name: "courts" })
 export class Court {
@@ -11,7 +13,7 @@ export class Court {
   @Column({ type: "int", unique: true })
   number!: number;
 
-  @Column({ type: "enum", enum: CourtState, length: 255 })
+  @Column({ type: "enum", enum: CourtState })
   state!: CourtState;
 
   @OneToMany(() => Booking, (booking) => booking.court)

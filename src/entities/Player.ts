@@ -1,7 +1,8 @@
 import "reflect-metadata";
 import { ChildEntity, Column, OneToMany } from "typeorm";
 import { PlayerCategory } from "@/src/domain/enums";
-import { User, Booking } from "@/src/entities";
+import { User } from "@/src/entities/User";
+import { Booking } from "@/src/entities/Booking";
 
 
 @ChildEntity()
