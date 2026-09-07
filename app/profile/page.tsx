@@ -1,10 +1,8 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { authOptions } from "@/src/lib/auth";
 import { getProfileData } from "@/src/actions/profile";
-import { QuentoLogo } from "@/app/components/quento-logo";
-import { SignOutButton } from "@/app/components/sign-out-button";
+import { AppHeader } from "@/app/components/app-header";
 import { ProfileForm } from "@/app/profile/profile-form";
 import { PointsHistory } from "@/app/profile/points-history";
 
@@ -18,34 +16,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col bg-background min-h-screen">
-      {/* Header Navigation */}
-      <header className="flex items-center justify-between border-b border-line bg-card px-6 py-3.5 shadow-sm">
-        <div className="flex items-center gap-6">
-          <Link href="/">
-            <QuentoLogo size="sm" variant="horizontal" />
-          </Link>
-          <nav className="flex items-center gap-4 text-sm font-medium">
-            <Link
-              href="/"
-              className="text-foreground/70 hover:text-foreground transition-colors"
-            >
-              Inicio
-            </Link>
-            <Link
-              href="/profile"
-              className="text-primary font-semibold border-b-2 border-primary py-1"
-            >
-              Mi Perfil
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-foreground/80">
-            {profile ? `${profile.names} ${profile.lastnames}` : session.user.email}
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
+      <AppHeader active="/profile" userName={session.user.name} userEmail={session.user.email} />
 
       {/* Main Content */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-10">
