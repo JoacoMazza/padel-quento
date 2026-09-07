@@ -22,19 +22,19 @@ export class User {
   @Column({ type: "varchar" })
   names!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "varchar", name: "last_names" })
   lastnames!: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar", nullable: true, name: "phone_number" })
   phoneNumber!: string | null;
 
   @Column({ type: "varchar", default: Role.PLAYER })
   role!: Role;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "varchar", nullable: true, name: "photo_url" })
   photoUrl!: string | null;
 
   /** Hash bcrypt; nunca se envía al cliente. RNF-03. */
-  @Column({ type: "varchar" })
+  @Column({ type: "varchar", name: "password_hashed" })
   passwordHash!: string;
 }

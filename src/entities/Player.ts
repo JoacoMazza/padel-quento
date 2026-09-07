@@ -4,7 +4,6 @@ import { PlayerCategory } from "@/src/domain/enums";
 import { User } from "@/src/entities/User";
 import type { Penalty } from "@/src/entities/Penalty";
 
-
 @ChildEntity()
 export class Player extends User {
   @Column({
@@ -18,4 +17,6 @@ export class Player extends User {
 
   @OneToMany("Penalty", "player")
   penalties!: Penalty[];
+  @OneToMany("Booking", (booking: any) => booking.player)
+  bookings!: any[];
 }

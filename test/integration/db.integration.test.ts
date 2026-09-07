@@ -17,7 +17,7 @@ describe("getDataSource (integración con Postgres real)", () => {
     const columnNames = columns.map((c) => c.column_name);
 
     expect(columnNames).toEqual(
-      expect.arrayContaining(["id", "email", "names", "lastnames", "role", "type", "passwordHash"]),
+      expect.arrayContaining(["id", "email", "names", "last_names", "role", "type", "password_hashed"]),
     );
   });
 

@@ -1,39 +1,19 @@
 import { getServerSession } from "next-auth/next";
-import Link from "next/link";
-import { SignOutButton } from "@/app/components/sign-out-button";
-import { QuentoLogo } from "@/app/components/quento-logo";
 import { authOptions } from "@/src/lib/auth";
+import { AppHeader } from "@/app/components/app-header";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.email) {
+    redirect("/login");
+  }
 
   return (
     <div className="flex flex-1 flex-col bg-background min-h-screen">
-      <header className="flex items-center justify-between border-b border-line bg-card px-6 py-3.5 shadow-sm">
-        <div className="flex items-center gap-6">
-          <QuentoLogo size="sm" variant="horizontal" />
-          <nav className="flex items-center gap-4 text-sm font-medium">
-            <Link
-              href="/"
-              className="text-primary font-semibold border-b-2 border-primary py-1"
-            >
-              Inicio
-            </Link>
-            <Link
-              href="/profile"
-              className="text-foreground/70 hover:text-foreground transition-colors"
-            >
-              Mi Perfil
-            </Link>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-foreground/80">
-            {session?.user?.name ?? session?.user?.email}
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
+      <AppHeader active="/" userName={session.user.name} userEmail={session.user.email} />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-16">
         <div className="rounded-2xl border border-line bg-card p-8 shadow-sm space-y-4">
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
