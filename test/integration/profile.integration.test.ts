@@ -16,7 +16,6 @@ vi.mock("next-auth/next", () => ({
 import { getServerSession } from "next-auth/next";
 import { PlayerCategory } from "@/src/domain/enums";
 import { Player } from "@/src/entities/Player";
-import { PointsMovement, PointsMovementType } from "@/src/entities/PointsMovement";
 import { getDataSource } from "@/src/lib/db";
 import {
   getProfileData,
@@ -101,7 +100,7 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const ok1 = await recordPointsMovement(
       playerId,
       50,
-      PointsMovementType.BONUS,
+      "bonus",
       "Bonificación por victoria en torneo",
     );
     expect(ok1).toBe(true);
@@ -110,7 +109,7 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const ok2 = await recordPointsMovement(
       playerId,
       -15,
-      PointsMovementType.PENALTY,
+      "penalty",
       "Penalización por cancelación tardía",
     );
     expect(ok2).toBe(true);
@@ -121,9 +120,9 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(profile?.scoring).toBe(35);
     expect(profile?.movements.length).toBe(2);
     expect(profile?.movements[0].amount).toBe(-15);
-    expect(profile?.movements[0].type).toBe(PointsMovementType.PENALTY);
+    expect(profile?.movements[0].type).toBe("penalty");
     expect(profile?.movements[1].amount).toBe(50);
-    expect(profile?.movements[1].type).toBe(PointsMovementType.BONUS);
+    expect(profile?.movements[1].type).toBe("bonus");
 
     // Verificar en BD que scoring se mantiene sincronizado
     const dataSource = await getDataSource();
@@ -132,4 +131,3 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(playerInDb?.scoring).toBe(35);
   });
 });
-

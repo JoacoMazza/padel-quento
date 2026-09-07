@@ -1,9 +1,7 @@
-import { PointsMovementType } from "@/src/entities/PointsMovement";
-
 interface MovementItem {
   id: number;
   amount: number;
-  type: PointsMovementType;
+  type: "bonus" | "penalty";
   description: string;
   createdAt: string;
 }
