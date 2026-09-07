@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { Player } from "@/src/entities/Player";
 import { User } from "@/src/entities/User";
+import { Penalty } from "@/src/entities/Penalty";
 
 const globalForDb = globalThis as unknown as {
   dataSource?: DataSource;
@@ -16,7 +17,7 @@ function createDataSource() {
   return new DataSource({
     type: "postgres",
     url,
-    entities: [User, Player],
+    entities: [User, Player, Penalty],
     synchronize: process.env.NODE_ENV !== "production",
     logging: process.env.NODE_ENV === "development",
   });
