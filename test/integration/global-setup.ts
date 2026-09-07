@@ -2,7 +2,11 @@ import "reflect-metadata";
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
 import { DataSource } from "typeorm";
+import { Booking } from "../../src/entities/Booking";
+import { Court } from "../../src/entities/Court";
+import { OutOfService } from "../../src/entities/OutOfService";
 import { Player } from "../../src/entities/Player";
+import { Schedule } from "../../src/entities/Schedule";
 import { User } from "../../src/entities/User";
 
 export default async function globalSetup() {
@@ -18,7 +22,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [User, Player],
+    entities: [User, Player, Court, Booking, OutOfService, Schedule],
     synchronize: true,
     dropSchema: true,
   });
