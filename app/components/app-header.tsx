@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Inicio" },
   { href: "/bookings", label: "Turnos" },
   { href: "/my-bookings", label: "Mis reservas" },
+  { href: "/profile", label: "Mi Perfil" },
 ] as const;
 
 export function AppHeader({
@@ -13,7 +14,7 @@ export function AppHeader({
   userName,
   userEmail,
 }: {
-  active: "/" | "/bookings" | "/my-bookings";
+  active: "/" | "/bookings" | "/my-bookings" | "/profile";
   userName?: string | null;
   userEmail?: string | null;
 }) {
