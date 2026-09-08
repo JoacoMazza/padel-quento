@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { Role } from "@/src/domain/enums";
 
 function getInitials(name?: string | null, email?: string | null) {
   if (name && name.trim()) {
@@ -17,9 +18,11 @@ function getInitials(name?: string | null, email?: string | null) {
 export function UserMenu({
   name,
   email,
+  role,
 }: {
   name?: string | null;
   email?: string | null;
+  role?: Role | string | null;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -33,6 +36,8 @@ export function UserMenu({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  const isAdmin = role === Role.ADMIN || role === "admin";
 
   return (
     <div className="relative" ref={ref}>
@@ -59,8 +64,21 @@ export function UserMenu({
       {open ? (
         <div className="absolute right-0 z-10 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
           <div className="border-b border-line px-4 py-3">
-            <p className="truncate text-sm font-semibold text-foreground">{name ?? "Mi cuenta"}</p>
-            <p className="truncate text-xs text-foreground/60">{email}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold text-foreground">{name ?? "Mi cuenta"}</p>
+              {role ? (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    isAdmin
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      : "bg-primary/10 text-primary"
+                  }`}
+                >
+                  {isAdmin ? "Admin" : "Jugador"}
+                </span>
+              ) : null}
+            </div>
+            <p className="truncate text-xs text-foreground/60 mt-0.5">{email}</p>
           </div>
           <button
             type="button"

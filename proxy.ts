@@ -1,5 +1,6 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
+import { Role } from "@/src/domain/enums";
 
 const publicPaths = new Set(["/login", "/register"]);
 
@@ -8,6 +9,10 @@ function isPublicPath(pathname: string) {
     return true;
   }
   return pathname.startsWith("/api/auth");
+}
+
+function isAdminPath(pathname: string) {
+  return pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin");
 }
 
 export async function proxy(request: NextRequest) {
@@ -25,6 +30,22 @@ export async function proxy(request: NextRequest) {
 
   if (token && publicPaths.has(pathname)) {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Criterio de aceptación: Si un usuario con rol "Jugador" intenta acceder a rutas administrativas, denegar HTTP 403
+  if (isAdminPath(pathname)) {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (token.role !== Role.ADMIN) {
+      return new NextResponse("Acceso denegado: Se requieren permisos de Administrador", {
+        status: 403,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
   }
 
   return NextResponse.next();

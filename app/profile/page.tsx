@@ -16,7 +16,12 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col bg-background min-h-screen">
-      <AppHeader active="/profile" userName={session.user.name} userEmail={session.user.email} />
+      <AppHeader
+        active="/profile"
+        userName={session.user.name}
+        userEmail={session.user.email}
+        userRole={session.user.role}
+      />
 
       {/* Main Content */}
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-10">
