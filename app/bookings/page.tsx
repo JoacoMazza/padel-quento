@@ -34,7 +34,12 @@ export default async function BookingsPage() {
 
   return (
     <div className="flex min-h-screen flex-1 flex-col bg-background">
-      <AppHeader active="/bookings" userName={session.user.name} userEmail={session.user.email} />
+      <AppHeader
+        active="/bookings"
+        userName={session.user.name}
+        userEmail={session.user.email}
+        userRole={session.user.role}
+      />
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-10">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
           Turnos disponibles

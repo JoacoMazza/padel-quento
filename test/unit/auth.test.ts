@@ -62,19 +62,20 @@ describe("authorize (CredentialsProvider)", () => {
     expect(result).toBeNull();
   });
 
-  it("devuelve los datos del usuario y normaliza el email en éxito", async () => {
+  it("devuelve los datos del usuario con su rol y normaliza el email en éxito", async () => {
     findOne.mockResolvedValueOnce({
       id: 7,
       email: "a@test.com",
       passwordHash: "hash",
       names: "Ana",
       lastnames: "Gomez",
+      role: "admin",
     });
     vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
 
     const result = await getAuthorize()({ email: "  A@Test.com ", password: "correcta" });
 
-    expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez" });
+    expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin" });
     expect(findOne).toHaveBeenCalledWith({ where: { email: "a@test.com" } });
   });
 
@@ -84,5 +85,42 @@ describe("authorize (CredentialsProvider)", () => {
     const result = await getAuthorize()({ email: "a@test.com", password: "x" });
 
     expect(result).toBeNull();
+  });
+
+  describe("callbacks (jwt & session)", () => {
+    it("propaga el rol del usuario en el token JWT", async () => {
+      const jwtCallback = authOptions.callbacks?.jwt;
+      if (!jwtCallback) throw new Error("jwt callback missing");
+
+      const token = await jwtCallback({
+        token: {},
+        user: { id: "123", email: "admin@test.com", name: "Admin Test", role: "admin" as any },
+      } as any);
+
+      expect(token).toMatchObject({
+        id: "123",
+        sub: "123",
+        email: "admin@test.com",
+        name: "Admin Test",
+        role: "admin",
+      });
+    });
+
+    it("propaga el rol del token en la sesión", async () => {
+      const sessionCallback = authOptions.callbacks?.session;
+      if (!sessionCallback) throw new Error("session callback missing");
+
+      const session = await sessionCallback({
+        session: { user: { email: "admin@test.com", name: "Admin" }, expires: "1" } as any,
+        token: { id: "123", email: "admin@test.com", name: "Admin", role: "admin" as any },
+      } as any);
+
+      expect(session.user).toMatchObject({
+        id: "123",
+        email: "admin@test.com",
+        name: "Admin",
+        role: "admin",
+      });
+    });
   });
 });

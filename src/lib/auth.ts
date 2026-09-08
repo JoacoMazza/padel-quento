@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
             id: String(user.id),
             email: user.email,
             name: `${user.names} ${user.lastnames}`,
+            role: user.role,
           };
         } catch (error) {
           console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);
@@ -59,15 +60,19 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.id = token.id ?? token.sub ?? session.user.id;
         session.user.email = token.email ?? session.user.email;
         session.user.name = token.name ?? session.user.name;
+        session.user.role = token.role ?? session.user.role;
       }
       return session;
     },

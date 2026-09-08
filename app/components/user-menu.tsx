@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
+import { User, Shield, LogOut } from "lucide-react";
+import { Role } from "@/src/domain/enums";
 
 function getInitials(name?: string | null, email?: string | null) {
   if (name && name.trim()) {
@@ -17,9 +20,11 @@ function getInitials(name?: string | null, email?: string | null) {
 export function UserMenu({
   name,
   email,
+  role,
 }: {
   name?: string | null;
   email?: string | null;
+  role?: Role | string | null;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -33,6 +38,8 @@ export function UserMenu({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  const isAdmin = role === Role.ADMIN || role === "admin";
 
   return (
     <div className="relative" ref={ref}>
@@ -59,16 +66,50 @@ export function UserMenu({
       {open ? (
         <div className="absolute right-0 z-10 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
           <div className="border-b border-line px-4 py-3">
-            <p className="truncate text-sm font-semibold text-foreground">{name ?? "Mi cuenta"}</p>
-            <p className="truncate text-xs text-foreground/60">{email}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold text-foreground">{name ?? "Mi cuenta"}</p>
+              {role ? (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    isAdmin
+                      ? "bg-slate-600 text-white dark:bg-slate-500"
+                      : "bg-primary/10 text-primary"
+                  }`}
+                >
+                  {isAdmin ? "Admin" : "Jugador"}
+                </span>
+              ) : null}
+            </div>
+            <p className="truncate text-xs text-foreground/60 mt-0.5">{email}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium text-danger hover:bg-danger-light"
-          >
-            Cerrar sesión
-          </button>
+          <div className="py-2">
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
+            >
+              <User size={16} />
+              Mi perfil
+            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
+              >
+                <Shield size={16} />
+                Admin panel
+              </Link>
+            )}
+          </div>
+          <div className="border-t border-line py-2">
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left text-sm font-medium text-danger hover:bg-danger-light"
+            >
+              <LogOut size={16} />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

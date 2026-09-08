@@ -32,7 +32,12 @@ export default async function MyBookingsPage() {
 
   return (
     <div className="flex min-h-screen flex-1 flex-col bg-background">
-      <AppHeader active="/my-bookings" userName={session.user.name} userEmail={session.user.email} />
+      <AppHeader
+        active="/my-bookings"
+        userName={session.user.name}
+        userEmail={session.user.email}
+        userRole={session.user.role}
+      />
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-10">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Mis turnos</h1>
         <p className="mt-1.5 text-foreground/60">Acá podés ver y administrar todos tus turnos</p>
