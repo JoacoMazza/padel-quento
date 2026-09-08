@@ -58,7 +58,7 @@ export default async function AdminPage() {
         {/* Encabezado del Panel */}
         <div className="flex flex-col gap-2 border-b border-line pb-6">
           <div className="flex items-center gap-2.5">
-            <span className="rounded-md bg-amber-500/15 p-1.5 text-amber-700 dark:text-amber-400">
+            <span className="rounded-md bg-slate-500/15 p-1.5 text-slate-700 dark:text-slate-400">
               <Settings className="h-6 w-6" />
             </span>
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -138,10 +138,10 @@ export default async function AdminPage() {
           {/* Tarjeta: Usuarios y Roles */}
           <div className="group rounded-2xl border border-line bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/50">
             <div className="flex items-center justify-between">
-              <div className="rounded-xl bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400">
+              <div className="rounded-xl bg-slate-500/10 p-3 text-slate-600 dark:text-slate-400">
                 <Users className="h-6 w-6" />
               </div>
-              <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              <span className="rounded-full bg-slate-500/10 px-2.5 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-400">
                 Seguridad
               </span>
             </div>
@@ -150,7 +150,7 @@ export default async function AdminPage() {
               Revisá el listado de jugadores registrados y administradores autorizados del sistema.
             </p>
             <div className="mt-5 pt-3 border-t border-line/60">
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400 group-hover:underline">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-400 group-hover:underline">
                 Ver usuarios &rarr;
               </span>
             </div>

@@ -3,6 +3,7 @@ import { authOptions } from "@/src/lib/auth";
 import { AppHeader } from "@/app/components/app-header";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { User, Shield, ArrowRight } from "lucide-react";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -32,16 +33,20 @@ export default async function Home() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
               href="/profile"
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
             >
+              <User size={18} />
               Ir a Mi Perfil
+              <ArrowRight size={18} />
             </Link>
             {isAdmin && (
               <Link
                 href="/admin"
-                className="inline-flex items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-colors dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
+                <Shield size={18} />
                 Ir al Panel Admin
+                <ArrowRight size={18} />
               </Link>
             )}
           </div>

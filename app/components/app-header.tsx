@@ -27,8 +27,6 @@ export function AppHeader({
     { href: "/", label: "Inicio" },
     { href: "/bookings", label: "Turnos" },
     { href: "/my-bookings", label: "Mis reservas" },
-    { href: "/profile", label: "Mi Perfil" },
-    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   return (
@@ -37,7 +35,6 @@ export function AppHeader({
       <nav className="flex items-center gap-8">
         {navItems.map((item) => {
           const isActive = item.href === active;
-          const isItemAdmin = item.href === "/admin";
           return (
             <Link
               key={item.href}
@@ -45,17 +42,10 @@ export function AppHeader({
               className={`flex items-center gap-1.5 pb-1 text-sm font-semibold transition-colors ${
                 isActive
                   ? "border-b-2 border-primary text-primary"
-                  : isItemAdmin
-                    ? "text-amber-600 hover:text-amber-700 dark:text-amber-400"
-                    : "text-foreground/70 hover:text-foreground"
+                  : "text-foreground/70 hover:text-foreground"
               }`}
             >
               {item.label}
-              {isItemAdmin && (
-                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                  Panel
-                </span>
-              )}
             </Link>
           );
         })}

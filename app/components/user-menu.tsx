@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
+import { User, Shield, LogOut } from "lucide-react";
 import { Role } from "@/src/domain/enums";
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -70,7 +72,7 @@ export function UserMenu({
                 <span
                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                     isAdmin
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      ? "bg-slate-600 text-white dark:bg-slate-500"
                       : "bg-primary/10 text-primary"
                   }`}
                 >
@@ -80,13 +82,34 @@ export function UserMenu({
             </div>
             <p className="truncate text-xs text-foreground/60 mt-0.5">{email}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full cursor-pointer px-4 py-2.5 text-left text-sm font-medium text-danger hover:bg-danger-light"
-          >
-            Cerrar sesión
-          </button>
+          <div className="py-2">
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
+            >
+              <User size={16} />
+              Mi perfil
+            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
+              >
+                <Shield size={16} />
+                Admin panel
+              </Link>
+            )}
+          </div>
+          <div className="border-t border-line py-2">
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left text-sm font-medium text-danger hover:bg-danger-light"
+            >
+              <LogOut size={16} />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
