@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
 import { OutOfServiceReason } from "@/src/domain/enums";
 import type { Court } from "@/src/entities/Court";
 
@@ -7,6 +7,9 @@ import type { Court } from "@/src/entities/Court";
 export class OutOfService {
   @PrimaryGeneratedColumn()
   id!: number;
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt!: Date;
 
   @Column({ type: "timestamp", name: "from_datetime" })
   fromDateTime!: Date;

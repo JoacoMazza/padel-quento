@@ -73,7 +73,10 @@ export default async function AdminPage() {
         {/* Módulos de gestión */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Tarjeta: Bloqueo de Canchas */}
-          <div className="group rounded-2xl border border-line bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/50">
+          <Link
+            href="/admin/out-of-service"
+            className="group rounded-2xl border border-line bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/50"
+          >
             <div className="flex items-center justify-between">
               <div className="rounded-xl bg-primary/10 p-3 text-primary">
                 <Lock className="h-6 w-6" />
@@ -91,7 +94,7 @@ export default async function AdminPage() {
                 Gestionar bloqueos &rarr;
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Tarjeta: Métricas y Estadísticas */}
           <div className="group rounded-2xl border border-line bg-card p-6 shadow-sm transition hover:shadow-md hover:border-primary/50">
