@@ -29,7 +29,7 @@ function ModalShell({
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -150,14 +150,14 @@ function EditForm({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
+            className="cursor-pointer rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50"
+            className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? "Guardando..." : "Guardar cambios"}
           </button>
@@ -214,7 +214,7 @@ function DeleteConfirm({
           type="button"
           onClick={handleDelete}
           disabled={isDeleting}
-          className="rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white shadow hover:bg-danger/90 disabled:opacity-50"
+          className="cursor-pointer rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white shadow hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isDeleting ? "Eliminando..." : "Eliminar"}
         </button>

@@ -33,7 +33,7 @@ export function AppHeader({
   ];
 
   return (
-    <header className="flex items-center justify-between border-b border-line bg-card px-6 py-3.5 shadow-sm">
+    <header className="flex shrink-0 items-center justify-between border-b border-line bg-card px-6 py-3.5 shadow-sm">
       <QuentoLogo size="sm" variant="horizontal" />
       {showNav ? (
         <nav className="flex items-center gap-8">

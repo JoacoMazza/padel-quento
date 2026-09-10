@@ -68,7 +68,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                         aria-label={`Ver cancha ${court.number}`}
                         title="Ver"
                         onClick={() => setModal({ mode: "view", court })}
-                        className="rounded-lg p-2 text-foreground/60 hover:bg-line/40 hover:text-foreground"
+                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-line/40 hover:text-foreground"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -77,7 +77,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                         aria-label={`Editar cancha ${court.number}`}
                         title="Editar"
                         onClick={() => setModal({ mode: "edit", court })}
-                        className="rounded-lg p-2 text-foreground/60 hover:bg-primary/10 hover:text-primary"
+                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:text-blue-500/80 hover:bg-blue-500/20"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -86,7 +86,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                         aria-label={`Eliminar cancha ${court.number}`}
                         title="Eliminar"
                         onClick={() => setModal({ mode: "delete", court })}
-                        className="rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
+                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

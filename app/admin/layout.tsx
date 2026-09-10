@@ -39,7 +39,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <AppHeader
         active="/admin"
         userName={session.user.name}
@@ -47,7 +47,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         userRole={session.user.role}
         showNav={false}
       />
-      <div className="flex flex-1">{children}</div>
+      {children}
     </div>
   );
 }
