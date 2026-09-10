@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { MapPin, Lock, BarChart3, Users } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
@@ -8,7 +9,7 @@ import type { CourtItem } from "@/app/admin/court-status";
 
 const SECTIONS = [
   { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
-  { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: false },
+  { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: true, href: "/admin/out-of-service" },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: false },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: false },
 ] as const;
@@ -29,8 +30,9 @@ export function AdminPanel({
     <div className="flex flex-1 overflow-hidden">
       <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-line bg-card">
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {SECTIONS.map(({ id, label, icon: Icon, available }) => {
+          {SECTIONS.map(({ id, label, icon: Icon, available, ...rest }) => {
             const isActive = id === activeSection;
+            const href = "href" in rest ? rest.href : undefined;
             if (!available) {
               return (
                 <span
@@ -43,6 +45,18 @@ export function AdminPanel({
                     Próx.
                   </span>
                 </span>
+              );
+            }
+            if (href) {
+              return (
+                <Link
+                  key={id}
+                  href={href}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-foreground/70 transition-colors hover:bg-line/40 hover:text-foreground"
+                >
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </Link>
               );
             }
             return (

@@ -1,7 +1,7 @@
 "use server";
 
 import "reflect-metadata";
-import { EntityManager } from "typeorm";
+import { EntityManager, In } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
 import { BookingState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
@@ -35,7 +35,7 @@ async function hasOverlappingBooking(
   params: { courtId: number; start: Date; durationMinutes: number; excludeBookingId?: number },
 ): Promise<boolean> {
   const qb = manager
-    .createQueryBuilder(Booking, "booking")
+    .createQueryBuilder<Booking>("Booking", "booking")
     .where('booking."court_id" = :courtId', { courtId: params.courtId })
     .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
     .andWhere('booking."datetime" < :end', {
@@ -52,6 +52,37 @@ async function hasOverlappingBooking(
 
   const overlapping = await qb.getOne();
   return overlapping !== null;
+}
+
+/**
+ * Cancela, dentro de una transacción existente, las reservas de una cancha que se
+ * solapan con un rango de fechas (por ejemplo, el bloqueo de un horario por
+ * mantenimiento). No registra ninguna penalización: la causa es ajena al jugador.
+ */
+export async function cancelBookingsInRange(
+  manager: EntityManager,
+  params: { courtId: number; from: Date; to: Date },
+): Promise<Booking[]> {
+  const affected = await manager
+    .createQueryBuilder<Booking>("Booking", "booking")
+    .where('booking."court_id" = :courtId', { courtId: params.courtId })
+    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+    .andWhere('booking."datetime" < :to', { to: params.to })
+    .andWhere(
+      'booking."datetime" + make_interval(mins => booking."duration_minutes") > :from',
+      { from: params.from },
+    )
+    .getMany();
+
+  if (affected.length === 0) {
+    return [];
+  }
+
+  await manager
+    .getRepository<Booking>("Booking")
+    .update({ id: In(affected.map((booking) => booking.id)) }, { bookingState: BookingState.CANCELLED });
+
+  return affected.map((booking) => ({ ...booking, bookingState: BookingState.CANCELLED }));
 }
 
 export async function createBooking(
@@ -80,7 +111,7 @@ export async function createBooking(
         }
       }
 
-      const bookings = manager.getRepository(Booking);
+      const bookings = manager.getRepository<Booking>("Booking");
       const booking = bookings.create({
         fromDateTime: input.fromDateTime,
         durationMinutes,
@@ -139,7 +170,7 @@ export async function updateBooking(
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
-      const bookings = manager.getRepository(Booking);
+      const bookings = manager.getRepository<Booking>("Booking");
       const booking = await bookings.findOne({ where: { id }, relations: { court: true } });
       if (!booking) {
         throw new Error("NOT_FOUND");
