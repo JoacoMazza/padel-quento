@@ -4,9 +4,7 @@ import { useState } from "react";
 import { MapPin, Lock, BarChart3, Users } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
-import { CourtState } from "@/src/domain/enums";
-
-type CourtItem = { id: number; number: number; state: CourtState };
+import type { CourtItem } from "@/app/admin/court-status";
 
 const SECTIONS = [
   { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
