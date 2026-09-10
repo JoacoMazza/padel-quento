@@ -1,10 +1,5 @@
-import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Lock } from "lucide-react";
-import { authOptions } from "@/src/lib/auth";
-import { AppHeader } from "@/app/components/app-header";
-import { Role } from "@/src/domain/enums";
 import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { getBookings } from "@/src/actions/booking";
@@ -12,14 +7,6 @@ import { buildCourtMonitorItems, buildStats } from "@/app/admin/out-of-service/d
 import { OutOfServiceManager } from "@/app/admin/out-of-service/out-of-service-manager";
 
 export default async function OutOfServicePage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
-  if (session.user.role !== Role.ADMIN) {
-    redirect("/admin");
-  }
-
   const [courtsResult, outOfServicesResult, bookingsResult] = await Promise.all([
     getCourts(),
     getOutOfServices(),
@@ -57,13 +44,7 @@ export default async function OutOfServicePage() {
   const stats = buildStats(courts, outOfServices, bookings, now);
 
   return (
-    <div className="flex flex-1 flex-col bg-background min-h-screen">
-      <AppHeader
-        active="/admin"
-        userName={session.user.name}
-        userEmail={session.user.email}
-        userRole={session.user.role}
-      />
+    <div className="flex flex-1 flex-col overflow-y-auto bg-background">
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-10 space-y-6">
         <div className="space-y-2">
           <Link
