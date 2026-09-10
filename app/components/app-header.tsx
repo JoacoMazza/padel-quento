@@ -15,11 +15,14 @@ export function AppHeader({
   userName,
   userEmail,
   userRole,
+  showNav = true,
 }: {
   active: HeaderActiveTab;
   userName?: string | null;
   userEmail?: string | null;
   userRole?: Role | string | null;
+  /** Cuando es `false`, oculta los links de navegación principal (usado en el panel de administración). */
+  showNav?: boolean;
 }) {
   const isAdmin = userRole === Role.ADMIN || userRole === "admin";
 
@@ -32,24 +35,26 @@ export function AppHeader({
   return (
     <header className="flex items-center justify-between border-b border-line bg-card px-6 py-3.5 shadow-sm">
       <QuentoLogo size="sm" variant="horizontal" />
-      <nav className="flex items-center gap-8">
-        {navItems.map((item) => {
-          const isActive = item.href === active;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-1.5 pb-1 text-sm font-semibold transition-colors ${
-                isActive
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-foreground/70 hover:text-foreground"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {showNav ? (
+        <nav className="flex items-center gap-8">
+          {navItems.map((item) => {
+            const isActive = item.href === active;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-1.5 pb-1 text-sm font-semibold transition-colors ${
+                  isActive
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-foreground/70 hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
       <UserMenu name={userName} email={userEmail} role={userRole} />
     </header>
   );

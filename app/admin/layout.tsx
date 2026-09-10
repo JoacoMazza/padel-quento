@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { authOptions } from "@/src/lib/auth";
 import { Role } from "@/src/domain/enums";
-import { AdminSidebar } from "@/app/admin/admin-sidebar";
+import { AppHeader } from "@/app/components/app-header";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/login");
   }
 
-  // Si no es admin, se deniega el acceso con vista de 403 (sin la barra lateral)
+  // Si no es admin, se deniega el acceso con una vista de 403
   if (session.user.role !== Role.ADMIN) {
     return (
       <div className="flex min-h-screen flex-1 flex-col items-center justify-center bg-background px-6 py-16 text-center">
@@ -39,9 +39,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar userName={session.user.name} userEmail={session.user.email} />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+    <div className="flex min-h-screen flex-col bg-background">
+      <AppHeader
+        active="/admin"
+        userName={session.user.name}
+        userEmail={session.user.email}
+        userRole={session.user.role}
+        showNav={false}
+      />
+      <div className="flex flex-1">{children}</div>
     </div>
   );
 }
