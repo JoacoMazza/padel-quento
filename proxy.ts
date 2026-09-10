@@ -29,7 +29,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (token && publicPaths.has(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const destination = token.role === Role.ADMIN ? "/admin" : "/";
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
   // Criterio de aceptación: Si un usuario con rol "Jugador" intenta acceder a rutas administrativas, denegar HTTP 403
@@ -46,6 +47,12 @@ export async function proxy(request: NextRequest) {
         headers: { "content-type": "text/plain; charset=utf-8" },
       });
     }
+  }
+
+  // El administrador queda encapsulado dentro del panel: cualquier ruta pública
+  // fuera de /admin lo redirige de vuelta, salvo endpoints de auth (login/logout).
+  if (token && token.role === Role.ADMIN && !isAdminPath(pathname) && !isPublicPath(pathname)) {
+    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   return NextResponse.next();
