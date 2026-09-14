@@ -12,6 +12,7 @@ import {
   SLOT_DURATION_MINUTES,
   buildSlotDate,
   dayOfWeekFromDate,
+  getInitialBoardDate,
   parseISODate,
   rangesOverlap,
   timeStringToMinutes,
@@ -44,7 +45,9 @@ export function BookingsBoard({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
+  const [dateInput, setDateInput] = useState(() =>
+    toISODate(getInitialBoardDate(courts, schedules, new Date())),
+  );
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(

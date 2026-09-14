@@ -1,4 +1,5 @@
 import { DayOfWeek } from "@/src/domain/enums";
+import type { CourtProp, ScheduleProp } from "@/app/bookings/types";
 
 export const SLOT_DURATION_MINUTES = 90;
 
@@ -48,6 +49,39 @@ export function buildSlotDate(baseDate: Date, minutesOfDay: number): Date {
 
 export function rangesOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean {
   return startA < endB && startB < endA;
+}
+
+function lastSlotStartMinutes(openMinutes: number, closeMinutes: number): number | null {
+  const totalSlots = Math.floor((closeMinutes - openMinutes) / SLOT_DURATION_MINUTES);
+  if (totalSlots <= 0) return null;
+  return openMinutes + (totalSlots - 1) * SLOT_DURATION_MINUTES;
+}
+
+// Skips to tomorrow when every slot today is already in the past.
+export function getInitialBoardDate(
+  courts: CourtProp[],
+  schedules: ScheduleProp[],
+  now: Date,
+): Date {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const todayDayOfWeek = dayOfWeekFromDate(today);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const hasSlotLeftToday = courts.some((court) => {
+    const schedule = schedules.find((s) => s.courtId === court.id && s.dayOfWeek === todayDayOfWeek);
+    if (!schedule) return false;
+    const openMinutes = timeStringToMinutes(schedule.openingTime);
+    const closeMinutes = timeStringToMinutes(schedule.closingTime);
+    const lastStart = lastSlotStartMinutes(openMinutes, closeMinutes);
+    return lastStart !== null && lastStart >= nowMinutes;
+  });
+
+  if (hasSlotLeftToday) return today;
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
 }
 
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
