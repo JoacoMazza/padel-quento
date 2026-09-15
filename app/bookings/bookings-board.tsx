@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingState, CourtState } from "@/src/domain/enums";
+import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { createBooking } from "@/src/actions/booking";
 import { BookingSummary } from "@/app/bookings/booking-summary";
 import { CourtCard } from "@/app/bookings/court-card";
@@ -50,6 +51,8 @@ export function BookingsBoard({
   );
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [isOpenMatch, setIsOpenMatch] = useState(false);
+  const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
@@ -95,19 +98,23 @@ export function BookingsBoard({
               rangesOverlap(start, end, new Date(o.fromDateTime), new Date(o.toDateTime)),
           );
 
-          const isBlockedByBooking = bookings.some((b) => {
+          const overlappingBooking = bookings.find((b) => {
             if (b.courtId !== court.id || b.bookingState === BookingState.CANCELLED) return false;
             const bookingStart = new Date(b.fromDateTime);
             const bookingEnd = new Date(bookingStart.getTime() + b.durationMinutes * 60_000);
             return rangesOverlap(start, end, bookingStart, bookingEnd);
           });
 
-          const status: SlotStatus =
-            isSelected
-              ? "selected"
-              : isCourtOutOfService || isPast || isBlockedByOutOfService || isBlockedByBooking
-                ? "occupied"
-                : "available";
+          // Un partido abierto no cuenta como ocupado: todavía busca jugadores.
+          const isOpenMatch = overlappingBooking?.bookingState === BookingState.PENDING_PLAYERS;
+
+          const status: SlotStatus = isSelected
+            ? "selected"
+            : isCourtOutOfService || isPast || isBlockedByOutOfService || overlappingBooking
+              ? isOpenMatch && !isCourtOutOfService && !isPast && !isBlockedByOutOfService
+                ? "open"
+                : "occupied"
+              : "available";
 
           slots.push({ minutesOfDay, start, end, status });
         }
@@ -123,10 +130,14 @@ export function BookingsBoard({
 
     if (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime()) {
       setSelectedSlot(null);
+      setIsOpenMatch(false);
+      setOpenMatchGroupSize(1);
       return;
     }
 
     setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
+    setIsOpenMatch(false);
+    setOpenMatchGroupSize(1);
   }
 
   function handleConfirm() {
@@ -137,11 +148,14 @@ export function BookingsBoard({
       return;
     }
 
+    const groupSize = isOpenMatch ? openMatchGroupSize : OPEN_MATCH_MAX_PLAYERS;
+
     setFeedback(null);
     startTransition(async () => {
       const result = await createBooking({
         fromDateTime: selectedSlot.start,
         durationMinutes: SLOT_DURATION_MINUTES,
+        groupSize,
         playerId,
         courtId: selectedSlot.courtId,
       });
@@ -166,11 +180,15 @@ export function BookingsBoard({
         onDateChange={(value) => {
           setDateInput(value);
           setSelectedSlot(null);
+          setIsOpenMatch(false);
+          setOpenMatchGroupSize(1);
           setFeedback(null);
         }}
         onCourtFilterChange={(value) => {
           setCourtFilter(value);
           setSelectedSlot(null);
+          setIsOpenMatch(false);
+          setOpenMatchGroupSize(1);
         }}
       />
 
@@ -195,6 +213,10 @@ export function BookingsBoard({
           feedback={feedback}
           isPending={isPending}
           price={SLOT_PRICE}
+          isOpenMatch={isOpenMatch}
+          onIsOpenMatchChange={setIsOpenMatch}
+          openMatchGroupSize={openMatchGroupSize}
+          onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
           onConfirm={handleConfirm}
         />
       </div>

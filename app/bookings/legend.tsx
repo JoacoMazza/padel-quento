@@ -3,6 +3,7 @@ export function Legend() {
     <div className="mt-6 flex items-center gap-6 text-sm text-foreground/70">
       <LegendItem className="border border-line bg-card" label="Disponible" />
       <LegendItem className="bg-line" label="Ocupado" />
+      <LegendItem className="bg-amber-500" label="Partido abierto" />
       <LegendItem className="bg-primary" label="Seleccionado" />
     </div>
   );

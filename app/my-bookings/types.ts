@@ -6,6 +6,7 @@ export type MyBookingItem = {
   durationMinutes: number;
   bookingState: BookingState;
   courtNumber: number;
+  confirmedPlayers: number;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";

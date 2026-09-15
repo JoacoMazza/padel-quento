@@ -46,7 +46,7 @@ const CELL_STYLES: Record<CellState, string> = {
 const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: string }[] = [
   { state: "available", label: "Disponible", swatch: "border border-line bg-card" },
   { state: "reserved", label: "Reservado", swatch: "bg-blue-500" },
-  { state: "pending", label: "Pendiente", swatch: "bg-amber-500" },
+  { state: "pending", label: "Partido abierto", swatch: "bg-amber-500" },
   { state: "blocked", label: "Bloqueado", swatch: "bg-danger" },
 ];
 

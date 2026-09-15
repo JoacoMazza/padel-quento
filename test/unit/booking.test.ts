@@ -126,6 +126,57 @@ describe("booking actions", () => {
 
       expect(result).toEqual({ success: false, error: "No se pudo crear la reserva." });
     });
+
+    it("con groupSize menor a 4 crea un partido abierto y registra al creador con esa cantidad de jugadores", async () => {
+      const result = await createBooking({
+        fromDateTime,
+        groupSize: 2,
+        playerId: 1,
+        courtId: 2,
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ bookingState: BookingState.PENDING_PLAYERS }),
+      );
+      expect(create).toHaveBeenCalledWith({
+        booking: { id: undefined },
+        player: { id: 1 },
+        playersCount: 2,
+      });
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(true);
+    });
+
+    it("con groupSize 4 crea una reserva completa (no un partido abierto) y no registra participantes", async () => {
+      const result = await createBooking({ fromDateTime, groupSize: 4, playerId: 1, courtId: 2 });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ bookingState: BookingState.RESERVED }),
+      );
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+    });
+
+    it("no registra participantes para una reserva sin groupSize", async () => {
+      await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
+
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("rechaza un groupSize fuera del rango 1 a 4", async () => {
+      const tooLow = await createBooking({ fromDateTime, groupSize: 0, playerId: 1, courtId: 2 });
+      const tooHigh = await createBooking({ fromDateTime, groupSize: 5, playerId: 1, courtId: 2 });
+
+      expect(tooLow).toEqual({
+        success: false,
+        error: "La cantidad de jugadores debe ser entre 1 y 4.",
+      });
+      expect(tooHigh).toEqual({
+        success: false,
+        error: "La cantidad de jugadores debe ser entre 1 y 4.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
   });
 
   describe("getBookings", () => {
@@ -134,7 +185,9 @@ describe("booking actions", () => {
 
       const result = await getBookings();
 
-      expect(find).toHaveBeenCalledWith({ relations: { player: true, court: true } });
+      expect(find).toHaveBeenCalledWith({
+        relations: { player: true, court: true, participants: true },
+      });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
 
@@ -155,7 +208,7 @@ describe("booking actions", () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: true, court: true },
+        relations: { player: true, court: true, participants: true },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
     });
