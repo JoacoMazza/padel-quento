@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Calendar, CalendarCheck, Clock, MapPin, Users, Volleyball, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { updateBooking } from "@/src/actions/booking";
+import { closeOpenMatch, updateBooking } from "@/src/actions/booking";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import {
   getBookingBadgeClasses,
@@ -22,12 +22,16 @@ function timeLabel(date: Date) {
 export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirming, setConfirming] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"cancel" | "close" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
   const canCancel = tone === "confirmed" || tone === "pending";
+  const canCloseManually =
+    booking.bookingState === BookingState.PENDING_PLAYERS &&
+    booking.confirmedPlayers >= 1 &&
+    booking.confirmedPlayers < OPEN_MATCH_MAX_PLAYERS;
 
   function handleCancel() {
     setError(null);
@@ -35,7 +39,20 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
       const result = await updateBooking(booking.id, { bookingState: BookingState.CANCELLED });
       if (!result.success) {
         setError(result.error);
-        setConfirming(false);
+        setPendingAction(null);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleClose() {
+    setError(null);
+    startTransition(async () => {
+      const result = await closeOpenMatch(booking.id);
+      if (!result.success) {
+        setError(result.error);
+        setPendingAction(null);
         return;
       }
       router.refresh();
@@ -86,21 +103,31 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
         {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}
 
-        {confirming ? (
+        {pendingAction ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/60">¿Cancelar turno?</span>
+            <span className="text-xs text-foreground/60">
+              {pendingAction === "cancel" ? "¿Cancelar turno?" : "¿Cerrar búsqueda de jugadores?"}
+            </span>
             <button
               type="button"
               disabled={isPending}
-              onClick={handleCancel}
-              className="h-8 rounded-full bg-danger px-3 text-xs font-semibold text-white transition-colors hover:bg-danger/90 disabled:opacity-60 cursor-pointer"
+              onClick={pendingAction === "cancel" ? handleCancel : handleClose}
+              className={`h-8 rounded-full px-3 text-xs font-semibold text-white transition-colors disabled:opacity-60 cursor-pointer ${
+                pendingAction === "cancel" ? "bg-danger hover:bg-danger/90" : "bg-primary hover:bg-primary/90"
+              }`}
             >
-              {isPending ? "Cancelando…" : "Sí, cancelar"}
+              {pendingAction === "cancel"
+                ? isPending
+                  ? "Cancelando…"
+                  : "Sí, cancelar"
+                : isPending
+                  ? "Cerrando…"
+                  : "Sí, cerrar"}
             </button>
             <button
               type="button"
               disabled={isPending}
-              onClick={() => setConfirming(false)}
+              onClick={() => setPendingAction(null)}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-foreground/60 hover:bg-line/40 cursor-pointer"
               aria-label="Volver"
             >
@@ -116,10 +143,21 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
               <CalendarCheck className="h-4 w-4" />
               Ver detalle
             </button>
+            {canCloseManually ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("close")}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-primary hover:text-primary cursor-pointer"
+                aria-label="Cerrar búsqueda de jugadores"
+                title="Cerrar búsqueda de jugadores"
+              >
+                <Lock className="h-4 w-4" />
+              </button>
+            ) : null}
             {canCancel ? (
               <button
                 type="button"
-                onClick={() => setConfirming(true)}
+                onClick={() => setPendingAction("cancel")}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-danger hover:text-danger cursor-pointer"
                 aria-label="Cancelar turno"
               >

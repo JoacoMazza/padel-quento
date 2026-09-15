@@ -41,6 +41,7 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  closeOpenMatch,
 } from "@/src/actions/booking";
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
@@ -281,6 +282,64 @@ describe("booking actions", () => {
       const result = await updateBooking(999, { bookingState: BookingState.PAID });
 
       expect(result).toEqual({ success: false, error: "La reserva no existe." });
+      expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("closeOpenMatch", () => {
+    it("cierra manualmente un partido abierto con 1, 2 o 3 jugadores confirmados", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        bookingState: BookingState.PENDING_PLAYERS,
+        participants: [{ playersCount: 2 }],
+      });
+
+      const result = await closeOpenMatch(1);
+
+      expect(result).toEqual({
+        success: true,
+        data: { id: 1, bookingState: BookingState.RESERVED, participants: [{ playersCount: 2 }] },
+      });
+    });
+
+    it("devuelve error si la reserva no existe", async () => {
+      findOne.mockResolvedValueOnce(null);
+
+      const result = await closeOpenMatch(999);
+
+      expect(result).toEqual({ success: false, error: "La reserva no existe." });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("devuelve error si el turno no está pendiente de jugadores", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        bookingState: BookingState.RESERVED,
+        participants: [{ playersCount: 4 }],
+      });
+
+      const result = await closeOpenMatch(1);
+
+      expect(result).toEqual({
+        success: false,
+        error: "Este turno no es un partido abierto pendiente de jugadores.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("devuelve error si ya están los 4 jugadores confirmados", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        bookingState: BookingState.PENDING_PLAYERS,
+        participants: [{ playersCount: 4 }],
+      });
+
+      const result = await closeOpenMatch(1);
+
+      expect(result).toEqual({
+        success: false,
+        error: "El cierre manual solo está disponible con entre 1 y 3 jugadores confirmados.",
+      });
       expect(save).not.toHaveBeenCalled();
     });
   });

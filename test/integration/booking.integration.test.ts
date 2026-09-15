@@ -9,6 +9,7 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  closeOpenMatch,
 } from "@/src/actions/booking";
 
 function uniqueCourtNumber() {
@@ -173,6 +174,43 @@ describe("booking actions (integración con Postgres real)", () => {
         success: false,
         error: "La cantidad de jugadores debe ser entre 1 y 4.",
       });
+    });
+  });
+
+  describe("cierre manual de partido abierto", () => {
+    it("cierra manualmente un partido abierto y lo pasa a Reservada", async () => {
+      const created = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 2,
+      });
+      if (!created.success) throw new Error("expected success");
+
+      const result = await closeOpenMatch(created.data.id);
+
+      expect(result).toEqual({
+        success: true,
+        data: expect.objectContaining({ bookingState: BookingState.RESERVED }),
+      });
+    });
+
+    it("rechaza el cierre manual si el turno no está pendiente de jugadores", async () => {
+      const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+      if (!created.success) throw new Error("expected success");
+
+      const result = await closeOpenMatch(created.data.id);
+
+      expect(result).toEqual({
+        success: false,
+        error: "Este turno no es un partido abierto pendiente de jugadores.",
+      });
+    });
+
+    it("devuelve error si la reserva no existe", async () => {
+      const result = await closeOpenMatch(999_999_999);
+
+      expect(result).toEqual({ success: false, error: "La reserva no existe." });
     });
   });
 

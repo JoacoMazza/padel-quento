@@ -32,9 +32,13 @@ export type UpdateBookingInput = Partial<
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
 const INVALID_GROUP_SIZE_MESSAGE = `La cantidad de jugadores debe ser entre 1 y ${OPEN_MATCH_MAX_PLAYERS}.`;
+const NOT_PENDING_PLAYERS_MESSAGE = "Este turno no es un partido abierto pendiente de jugadores.";
+const INVALID_PLAYERS_TO_CLOSE_MESSAGE = `El cierre manual solo está disponible con entre 1 y ${OPEN_MATCH_MAX_PLAYERS - 1} jugadores confirmados.`;
 
 class DoubleBookingError extends Error {}
 class InvalidGroupSizeError extends Error {}
+class NotPendingPlayersError extends Error {}
+class InvalidPlayersToCloseError extends Error {}
 
 /**
  * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
@@ -219,6 +223,57 @@ export async function updateBooking(
     }
     console.error("updateBooking", error);
     return { success: false, error: "No se pudo actualizar la reserva." };
+  }
+}
+
+/**
+ * Cierre manual de la convocatoria de un partido abierto: quien lo creó ya
+ * consiguió al resto de los jugadores por fuera de la app y asegura la cancha
+ * pasando el turno a "Reservada". Solo aplica con 1, 2 o 3 jugadores confirmados;
+ * con el cupo completo el turno ya pasa a "Reservada" al sumarse el último jugador.
+ */
+export async function closeOpenMatch(id: number): Promise<ActionResult<Booking>> {
+  try {
+    const dataSource = await getDataSource();
+
+    const saved = await dataSource.transaction(async (manager) => {
+      const bookings = manager.getRepository(Booking);
+      const booking = await bookings.findOne({
+        where: { id },
+        relations: { participants: true },
+      });
+      if (!booking) {
+        throw new Error("NOT_FOUND");
+      }
+      if (booking.bookingState !== BookingState.PENDING_PLAYERS) {
+        throw new NotPendingPlayersError();
+      }
+
+      const confirmedPlayers = (booking.participants ?? []).reduce(
+        (sum, p) => sum + (p.playersCount ?? 1),
+        0,
+      );
+      if (confirmedPlayers < 1 || confirmedPlayers >= OPEN_MATCH_MAX_PLAYERS) {
+        throw new InvalidPlayersToCloseError();
+      }
+
+      booking.bookingState = BookingState.RESERVED;
+      return bookings.save(booking);
+    });
+
+    return { success: true, data: toPlain(saved) };
+  } catch (error) {
+    if (error instanceof NotPendingPlayersError) {
+      return { success: false, error: NOT_PENDING_PLAYERS_MESSAGE };
+    }
+    if (error instanceof InvalidPlayersToCloseError) {
+      return { success: false, error: INVALID_PLAYERS_TO_CLOSE_MESSAGE };
+    }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return { success: false, error: "La reserva no existe." };
+    }
+    console.error("closeOpenMatch", error);
+    return { success: false, error: "No se pudo cerrar el partido." };
   }
 }
 
