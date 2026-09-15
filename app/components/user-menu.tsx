@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { User, Shield, LogOut } from "lucide-react";
+import { User, LogOut } from "lucide-react";
 import { Role } from "@/src/domain/enums";
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -82,24 +82,17 @@ export function UserMenu({
             </div>
             <p className="truncate text-xs text-foreground/60 mt-0.5">{email}</p>
           </div>
-          <div className="py-2">
-            <Link
-              href="/profile"
-              className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
-            >
-              <User size={16} />
-              Mi perfil
-            </Link>
-            {isAdmin && (
+          {!isAdmin && (
+            <div className="py-2">
               <Link
-                href="/admin"
+                href="/profile"
                 className="flex items-center gap-3 px-4 py-2 text-sm text-foreground/80 hover:bg-line/40 hover:text-foreground"
               >
-                <Shield size={16} />
-                Admin panel
+                <User size={16} />
+                Mi perfil
               </Link>
-            )}
-          </div>
+            </div>
+          )}
           <div className="border-t border-line py-2">
             <button
               type="button"

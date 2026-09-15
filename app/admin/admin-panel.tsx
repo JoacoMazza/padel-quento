@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Lock, BarChart3, Users } from "lucide-react";
+import { MapPin, Lock, BarChart3, Users, CalendarClock } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
+import { ScheduleBoard } from "@/app/admin/schedule-board";
 import type { CourtItem } from "@/app/admin/court-status";
+import type { BookingProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
 
 const SECTIONS = [
+  { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
   { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: false },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: false },
@@ -18,11 +21,17 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 export function AdminPanel({
   courts,
   courtsError,
+  schedules,
+  bookings,
+  outOfServices,
 }: {
   courts: CourtItem[];
   courtsError?: string | null;
+  schedules: ScheduleProp[];
+  bookings: BookingProp[];
+  outOfServices: OutOfServiceProp[];
 }) {
-  const [activeSection, setActiveSection] = useState<SectionId>("courts");
+  const [activeSection, setActiveSection] = useState<SectionId>("schedule");
   const activeLabel = SECTIONS.find((s) => s.id === activeSection)?.label ?? "";
 
   return (
@@ -71,7 +80,16 @@ export function AdminPanel({
       <main className="flex-1 overflow-y-auto px-8 py-10">
         <h1 className="mb-6 text-2xl font-bold tracking-tight text-foreground">{activeLabel}</h1>
 
-        {activeSection === "courts" ? (
+        {activeSection === "schedule" ? (
+          <div className="space-y-4">
+            {courtsError ? (
+              <div className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm font-medium text-danger">
+                {courtsError}
+              </div>
+            ) : null}
+            <ScheduleBoard initialData={{ courts, schedules, bookings, outOfServices }} />
+          </div>
+        ) : activeSection === "courts" ? (
           <div className="space-y-4">
             {courtsError ? (
               <div className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm font-medium text-danger">
