@@ -121,6 +121,61 @@ describe("booking actions (integración con Postgres real)", () => {
     expect(secondAttempt).toEqual({ success: false, error: "La reserva no existe." });
   });
 
+  describe("partido abierto", () => {
+    it("con groupSize 2 crea la reserva pendiente de jugadores y registra al creador con esa cantidad", async () => {
+      const result = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 2,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.PENDING_PLAYERS);
+
+      const found = await getBookingById(result.data.id);
+      expect(found.success).toBe(true);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.participants).toHaveLength(1);
+
+      const dataSource = await getDataSource();
+      const participant = await dataSource.getRepository("BookingParticipant").findOne({
+        where: { booking: { id: result.data.id } },
+        relations: { player: true },
+      });
+      expect(participant?.player).toMatchObject({ id: playerId });
+      expect(participant?.playersCount).toBe(2);
+    });
+
+    it("con groupSize 4 crea una reserva completa, sin dejarla pendiente de jugadores", async () => {
+      const result = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 4,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
+    });
+
+    it("rechaza un groupSize inválido", async () => {
+      const result = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 5,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "La cantidad de jugadores debe ser entre 1 y 4.",
+      });
+    });
+  });
+
   describe("prevención de doble reserva", () => {
     it("no permite crear una reserva en el mismo horario y cancha", async () => {
       const fromDateTime = uniqueFromDateTime();

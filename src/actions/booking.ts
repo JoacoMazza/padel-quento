@@ -3,7 +3,9 @@
 import "reflect-metadata";
 import { EntityManager } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
+import { BookingParticipant } from "@/src/entities/BookingParticipant";
 import { BookingState } from "@/src/domain/enums";
+import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
@@ -11,6 +13,12 @@ export type CreateBookingInput = {
   fromDateTime: Date;
   durationMinutes?: number;
   bookingState?: BookingState;
+  /**
+   * Cantidad de jugadores con la que reserva quien crea el turno (1 a 4, contando
+   * a los acompañantes que trae y no tienen cuenta propia). Menos de 4 dejan el
+   * turno en estado "pendiente de jugadores" para que se sumen otros.
+   */
+  groupSize?: number;
   playerId: number;
   courtId: number;
 };
@@ -23,8 +31,10 @@ export type UpdateBookingInput = Partial<
 };
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
+const INVALID_GROUP_SIZE_MESSAGE = `La cantidad de jugadores debe ser entre 1 y ${OPEN_MATCH_MAX_PLAYERS}.`;
 
 class DoubleBookingError extends Error {}
+class InvalidGroupSizeError extends Error {}
 
 /**
  * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
@@ -67,7 +77,14 @@ export async function createBooking(
       await manager.query("SELECT pg_advisory_xact_lock($1)", [input.courtId]);
 
       const durationMinutes = input.durationMinutes ?? 90;
-      const bookingState = input.bookingState ?? BookingState.RESERVED;
+      // Sin groupSize explícito no es un partido abierto: se asume completo (comportamiento previo).
+      const groupSize = input.groupSize ?? (input.bookingState ? 1 : OPEN_MATCH_MAX_PLAYERS);
+      if (groupSize < 1 || groupSize > OPEN_MATCH_MAX_PLAYERS) {
+        throw new InvalidGroupSizeError();
+      }
+      const bookingState =
+        input.bookingState ??
+        (groupSize < OPEN_MATCH_MAX_PLAYERS ? BookingState.PENDING_PLAYERS : BookingState.RESERVED);
 
       if (bookingState !== BookingState.CANCELLED) {
         const overlaps = await hasOverlappingBooking(manager, {
@@ -89,13 +106,30 @@ export async function createBooking(
         court: { id: input.courtId },
       });
 
-      return bookings.save(booking);
+      const saved = await bookings.save(booking);
+
+      // En un partido abierto, quien lo crea queda registrado como el primer participante confirmado.
+      if (bookingState === BookingState.PENDING_PLAYERS) {
+        const participants = manager.getRepository(BookingParticipant);
+        await participants.save(
+          participants.create({
+            booking: { id: saved.id },
+            player: { id: input.playerId },
+            playersCount: groupSize,
+          }),
+        );
+      }
+
+      return saved;
     });
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (error instanceof DoubleBookingError) {
       return { success: false, error: DOUBLE_BOOKING_MESSAGE };
+    }
+    if (error instanceof InvalidGroupSizeError) {
+      return { success: false, error: INVALID_GROUP_SIZE_MESSAGE };
     }
     console.error("createBooking", error);
     return { success: false, error: "No se pudo crear la reserva." };
@@ -106,7 +140,7 @@ export async function getBookings(): Promise<ActionResult<Booking[]>> {
   try {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
-    const data = await bookings.find({ relations: { player: true, court: true } });
+    const data = await bookings.find({ relations: { player: true, court: true, participants: true } });
     return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getBookings", error);
@@ -122,7 +156,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true },
+      relations: { player: true, court: true, participants: true },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
