@@ -17,7 +17,21 @@ import {
 } from "@/app/bookings/slot-utils";
 import type { BookingProp, CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
 
-const REFRESH_INTERVAL_MS = 15_000;
+const DEFAULT_REFRESH_INTERVAL_MS = 15_000;
+const MIN_REFRESH_INTERVAL_MS = 5_000;
+
+/**
+ * Configurable por env var para poder subir el intervalo en producción sin
+ * tocar código: un refresco cada 15s en desarrollo no pesa, pero en un plan
+ * gratuito puede acercarse rápido al límite de requests.
+ */
+function getRefreshIntervalMs(): number {
+  const raw = Number(process.env.NEXT_PUBLIC_SCHEDULE_BOARD_REFRESH_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_REFRESH_INTERVAL_MS;
+  return Math.max(raw, MIN_REFRESH_INTERVAL_MS);
+}
+
+const REFRESH_INTERVAL_MS = getRefreshIntervalMs();
 
 type CellState = "available" | "reserved" | "pending" | "blocked" | "closed";
 
