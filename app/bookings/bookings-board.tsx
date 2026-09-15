@@ -51,7 +51,8 @@ export function BookingsBoard({
   );
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
-  const [groupSize, setGroupSize] = useState(OPEN_MATCH_MAX_PLAYERS);
+  const [isOpenMatch, setIsOpenMatch] = useState(false);
+  const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
@@ -129,12 +130,14 @@ export function BookingsBoard({
 
     if (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime()) {
       setSelectedSlot(null);
-      setGroupSize(OPEN_MATCH_MAX_PLAYERS);
+      setIsOpenMatch(false);
+      setOpenMatchGroupSize(1);
       return;
     }
 
     setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
-    setGroupSize(OPEN_MATCH_MAX_PLAYERS);
+    setIsOpenMatch(false);
+    setOpenMatchGroupSize(1);
   }
 
   function handleConfirm() {
@@ -144,6 +147,8 @@ export function BookingsBoard({
       setFeedback({ type: "error", message: "Tu cuenta no puede reservar turnos." });
       return;
     }
+
+    const groupSize = isOpenMatch ? openMatchGroupSize : OPEN_MATCH_MAX_PLAYERS;
 
     setFeedback(null);
     startTransition(async () => {
@@ -175,13 +180,15 @@ export function BookingsBoard({
         onDateChange={(value) => {
           setDateInput(value);
           setSelectedSlot(null);
-          setGroupSize(OPEN_MATCH_MAX_PLAYERS);
+          setIsOpenMatch(false);
+          setOpenMatchGroupSize(1);
           setFeedback(null);
         }}
         onCourtFilterChange={(value) => {
           setCourtFilter(value);
           setSelectedSlot(null);
-          setGroupSize(OPEN_MATCH_MAX_PLAYERS);
+          setIsOpenMatch(false);
+          setOpenMatchGroupSize(1);
         }}
       />
 
@@ -206,8 +213,10 @@ export function BookingsBoard({
           feedback={feedback}
           isPending={isPending}
           price={SLOT_PRICE}
-          groupSize={groupSize}
-          onGroupSizeChange={setGroupSize}
+          isOpenMatch={isOpenMatch}
+          onIsOpenMatchChange={setIsOpenMatch}
+          openMatchGroupSize={openMatchGroupSize}
+          onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
           onConfirm={handleConfirm}
         />
       </div>

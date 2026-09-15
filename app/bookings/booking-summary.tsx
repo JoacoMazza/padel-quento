@@ -14,8 +14,10 @@ export function BookingSummary({
   feedback,
   isPending,
   price,
-  groupSize,
-  onGroupSizeChange,
+  isOpenMatch,
+  onIsOpenMatchChange,
+  openMatchGroupSize,
+  onOpenMatchGroupSizeChange,
   onConfirm,
 }: {
   selectedDate: Date;
@@ -23,12 +25,13 @@ export function BookingSummary({
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
   price: number;
-  groupSize: number;
-  onGroupSizeChange: (value: number) => void;
+  isOpenMatch: boolean;
+  onIsOpenMatchChange: (value: boolean) => void;
+  openMatchGroupSize: number;
+  onOpenMatchGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
 }) {
-  const isOpenMatch = groupSize < OPEN_MATCH_MAX_PLAYERS;
-  const groupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS }, (_, i) => i + 1);
+  const openMatchGroupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS - 1 }, (_, i) => i + 1);
   return (
     <aside className="h-fit rounded-2xl border border-line bg-card p-6 shadow-sm">
       <h2 className="text-lg font-extrabold text-foreground">Tu reserva</h2>
@@ -62,35 +65,52 @@ export function BookingSummary({
           <SummaryRow icon={<Clock className="h-5 w-5" />} label="Duración" value={`${SLOT_DURATION_MINUTES} min`} />
           <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(price)} />
 
-          <div className="rounded-xl border border-line p-3">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <Users className="h-4 w-4 text-foreground/50" />
-              ¿Con cuántos jugadores vas?
+          <label
+            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+              isOpenMatch ? "border-amber-300 bg-amber-50" : "border-line hover:border-amber-300"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={isOpenMatch}
+              onChange={(event) => onIsOpenMatchChange(event.target.checked)}
+              className="mt-0.5 h-4 w-4 cursor-pointer accent-amber-500"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <Users className="h-4 w-4 text-amber-600" />
+                ¿Es un partido abierto?
+              </span>
+              <span className="text-xs text-foreground/60">
+                Reservás el horario y dejás lugares libres para que otros jugadores de la comunidad se
+                sumen hasta completar los {OPEN_MATCH_MAX_PLAYERS}.
+              </span>
             </span>
+          </label>
 
-            <div className="mt-2.5 grid grid-cols-4 gap-2">
-              {groupSizeOptions.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  onClick={() => onGroupSizeChange(size)}
-                  className={`h-9 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                    groupSize === size
-                      ? "bg-primary text-white shadow-sm"
-                      : "border border-line bg-card text-foreground hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {size}
-                </button>
-              ))}
+          {isOpenMatch ? (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+              <p className="text-xs font-medium text-foreground/70">
+                ¿Cuántos jugadores confirmados hay (contándote a vos)?
+              </p>
+              <div className="mt-1.5 grid grid-cols-3 gap-2">
+                {openMatchGroupSizeOptions.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => onOpenMatchGroupSizeChange(size)}
+                    className={`h-9 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      openMatchGroupSize === size
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : "border border-amber-300 bg-white text-foreground hover:border-amber-500"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
             </div>
-
-            <p className="mt-2.5 text-xs text-foreground/60">
-              {isOpenMatch
-                ? `Partido abierto: te anotás con ${groupSize} de ${OPEN_MATCH_MAX_PLAYERS} y otros jugadores de la comunidad pueden sumarse hasta completar los lugares.`
-                : "Reserva completa: ya están definidos los 4 jugadores del partido."}
-            </p>
-          </div>
+          ) : null}
 
           <button
             type="button"
@@ -98,11 +118,7 @@ export function BookingSummary({
             onClick={onConfirm}
             className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
           >
-            {isPending
-              ? "Confirmando…"
-              : isOpenMatch
-                ? "Crear partido abierto"
-                : "Confirmar reserva"}
+            {isPending ? "Confirmando…" : "Reservar turno"}
           </button>
         </div>
       ) : (
