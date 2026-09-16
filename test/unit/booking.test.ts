@@ -41,6 +41,7 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  joinOpenMatch,
 } from "@/src/actions/booking";
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
@@ -127,66 +128,160 @@ describe("booking actions", () => {
       expect(result).toEqual({ success: false, error: "No se pudo crear la reserva." });
     });
 
-    it("con groupSize menor a 4 crea un partido abierto y registra al creador con esa cantidad de jugadores", async () => {
+    it("sin isOpenMatch crea una reserva completa y no crea ningún Match", async () => {
+      const result = await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
+    });
+
+    it("con isOpenMatch crea la reserva pendiente de jugadores, un Match y anota al creador como primer jugador", async () => {
       const result = await createBooking({
         fromDateTime,
-        groupSize: 2,
+        isOpenMatch: true,
         playerId: 1,
         courtId: 2,
       });
 
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ bookingState: BookingState.PENDING_PLAYERS }),
-      );
-      expect(create).toHaveBeenCalledWith({
-        booking: { id: undefined },
+      expect(create).toHaveBeenNthCalledWith(1, {
+        fromDateTime,
+        durationMinutes: 90,
+        bookingState: BookingState.PENDING_PLAYERS,
         player: { id: 1 },
-        playersCount: 2,
+        court: { id: 2 },
       });
-      expect(save).toHaveBeenCalledTimes(2);
+      expect(create).toHaveBeenNthCalledWith(2, { booking: { id: undefined }, needsPlayers: true });
+      expect(create).toHaveBeenNthCalledWith(3, { match: { id: undefined }, player: { id: 1 } });
+      expect(save).toHaveBeenCalledTimes(3);
       expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.PENDING_PLAYERS);
+    });
+  });
+
+  describe("joinOpenMatch", () => {
+    it("suma un jugador nuevo a un partido abierto sin completar el cupo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needsPlayers: true,
+        matchPlayers: [{ matchId: 20, playerId: 1 }, { matchId: 20, playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(create).toHaveBeenCalledWith({ match: { id: 20 }, player: { id: 5 } });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.PENDING_PLAYERS);
     });
 
-    it("con groupSize 4 crea una reserva completa (no un partido abierto) y no registra participantes", async () => {
-      const result = await createBooking({ fromDateTime, groupSize: 4, playerId: 1, courtId: 2 });
+    it("toma un lock por partido antes de buscarlo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({ id: 20, needsPlayers: true, matchPlayers: [] });
 
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ bookingState: BookingState.RESERVED }),
+      await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(queryFn).toHaveBeenCalledWith(
+        expect.stringContaining("pg_advisory_xact_lock"),
+        expect.arrayContaining([10]),
       );
-      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("si al sumarse se completa el cupo máximo, la reserva pasa a reservada y el match deja de necesitar jugadores", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needsPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(save).toHaveBeenCalledTimes(3);
       expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
     });
 
-    it("no registra participantes para una reserva sin groupSize", async () => {
-      await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
+    it("rechaza si el turno no existe", async () => {
+      findOne.mockResolvedValueOnce(null);
 
-      expect(save).toHaveBeenCalledTimes(1);
+      const result = await joinOpenMatch({ bookingId: 999, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "El turno no existe." });
+      expect(create).not.toHaveBeenCalled();
     });
 
-    it("rechaza un groupSize fuera del rango 1 a 4", async () => {
-      const tooLow = await createBooking({ fromDateTime, groupSize: 0, playerId: 1, courtId: 2 });
-      const tooHigh = await createBooking({ fromDateTime, groupSize: 5, playerId: 1, courtId: 2 });
+    it("rechaza si el turno no es un partido abierto", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
 
-      expect(tooLow).toEqual({
-        success: false,
-        error: "La cantidad de jugadores debe ser entre 1 y 4.",
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el turno está pendiente de jugadores pero no tiene un Match asociado", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce(null);
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el jugador ya está anotado en el partido", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({ id: 20, needsPlayers: true, matchPlayers: [{ playerId: 5 }] });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Ya estás anotado en este partido." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el partido ya está completo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needsPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }, { playerId: 4 }],
       });
-      expect(tooHigh).toEqual({
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({
         success: false,
-        error: "La cantidad de jugadores debe ser entre 1 y 4.",
+        error: "El partido ya está completo, no quedan lugares libres.",
       });
-      expect(save).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("devuelve un error genérico si falla el guardado", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.PENDING_PLAYERS });
+      findOne.mockResolvedValueOnce({ id: 20, needsPlayers: true, matchPlayers: [] });
+      save.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "No se pudo sumar al partido." });
     });
   });
 
   describe("getBookings", () => {
-    it("devuelve todas las reservas con jugador y cancha", async () => {
+    it("devuelve todas las reservas con jugador, cancha y partido", async () => {
       find.mockResolvedValueOnce([{ id: 1 }]);
 
       const result = await getBookings();
 
       expect(find).toHaveBeenCalledWith({
-        relations: { player: true, court: true, participants: true },
+        relations: { player: true, court: true, match: { matchPlayers: true } },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
@@ -208,7 +303,7 @@ describe("booking actions", () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: true, court: true, participants: true },
+        relations: { player: true, court: true, match: { matchPlayers: true } },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
     });

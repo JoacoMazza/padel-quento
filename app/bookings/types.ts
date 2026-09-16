@@ -16,6 +16,7 @@ export type BookingProp = {
   durationMinutes: number;
   bookingState: BookingState;
   courtId?: number;
+  confirmedPlayers: number;
 };
 
 export type OutOfServiceProp = {
@@ -32,6 +33,9 @@ export type Slot = {
   start: Date;
   end: Date;
   status: SlotStatus;
+  /** Sólo presentes cuando status === "open": el partido abierto al que se puede sumar. */
+  bookingId?: number;
+  confirmedPlayers?: number;
 };
 
 export type SelectedSlot = {
@@ -39,4 +43,13 @@ export type SelectedSlot = {
   courtNumber: number;
   start: Date;
   end: Date;
+};
+
+export type SelectedOpenMatch = {
+  bookingId: number;
+  courtId: number;
+  courtNumber: number;
+  start: Date;
+  end: Date;
+  confirmedPlayers: number;
 };

@@ -88,6 +88,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
               durationMinutes: b.durationMinutes,
               bookingState: b.bookingState,
               courtId: b.court?.id,
+              confirmedPlayers: b.match?.matchPlayers?.length ?? 0,
             })),
             outOfServices: result.data.outOfServices.map((o) => ({
               id: o.id,

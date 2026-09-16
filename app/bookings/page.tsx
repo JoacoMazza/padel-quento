@@ -64,6 +64,7 @@ export default async function BookingsPage() {
             durationMinutes: b.durationMinutes,
             bookingState: b.bookingState,
             courtId: b.court?.id,
+            confirmedPlayers: b.match?.matchPlayers?.length ?? 0,
           }))}
           outOfServices={outOfServices.map((o) => ({
             id: o.id,

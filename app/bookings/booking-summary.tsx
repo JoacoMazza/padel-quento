@@ -16,8 +16,6 @@ export function BookingSummary({
   price,
   isOpenMatch,
   onIsOpenMatchChange,
-  openMatchGroupSize,
-  onOpenMatchGroupSizeChange,
   onConfirm,
 }: {
   selectedDate: Date;
@@ -27,11 +25,8 @@ export function BookingSummary({
   price: number;
   isOpenMatch: boolean;
   onIsOpenMatchChange: (value: boolean) => void;
-  openMatchGroupSize: number;
-  onOpenMatchGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
 }) {
-  const openMatchGroupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS - 1 }, (_, i) => i + 1);
   return (
     <aside className="h-fit rounded-2xl border border-line bg-card p-6 shadow-sm">
       <h2 className="text-lg font-extrabold text-foreground">Tu reserva</h2>
@@ -82,35 +77,11 @@ export function BookingSummary({
                 ¿Es un partido abierto?
               </span>
               <span className="text-xs text-foreground/60">
-                Reservás el horario y dejás lugares libres para que otros jugadores de la comunidad se
-                sumen hasta completar los {OPEN_MATCH_MAX_PLAYERS}.
+                Reservás el horario como único jugador confirmado y dejás lugares libres para que
+                otros jugadores de la comunidad se sumen hasta completar los {OPEN_MATCH_MAX_PLAYERS}.
               </span>
             </span>
           </label>
-
-          {isOpenMatch ? (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-              <p className="text-xs font-medium text-foreground/70">
-                ¿Cuántos jugadores confirmados hay (contándote a vos)?
-              </p>
-              <div className="mt-1.5 grid grid-cols-3 gap-2">
-                {openMatchGroupSizeOptions.map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => onOpenMatchGroupSizeChange(size)}
-                    className={`h-9 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                      openMatchGroupSize === size
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "border border-amber-300 bg-white text-foreground hover:border-amber-500"
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           <button
             type="button"

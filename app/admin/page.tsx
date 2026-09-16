@@ -34,6 +34,7 @@ export default async function AdminPage() {
         durationMinutes: b.durationMinutes,
         bookingState: b.bookingState,
         courtId: b.court?.id,
+        confirmedPlayers: b.match?.matchPlayers?.length ?? 0,
       }))}
       outOfServices={outOfServices.map((o) => ({
         id: o.id,

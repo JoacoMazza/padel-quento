@@ -3,8 +3,9 @@ import path from "node:path";
 import { config as loadEnv } from "dotenv";
 import { DataSource } from "typeorm";
 import { Booking } from "../../src/entities/Booking";
-import { BookingParticipant } from "../../src/entities/BookingParticipant";
 import { Court } from "../../src/entities/Court";
+import { Match } from "../../src/entities/Match";
+import { MatchPlayer } from "../../src/entities/MatchPlayer";
 import { OutOfService } from "../../src/entities/OutOfService";
 import { Player } from "../../src/entities/Player";
 import { Schedule } from "../../src/entities/Schedule";
@@ -24,7 +25,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [User, Player, Penalty, Court, Booking, BookingParticipant, OutOfService, Schedule],
+    entities: [User, Player, Penalty, Court, Booking, Match, MatchPlayer, OutOfService, Schedule],
     synchronize: true,
     dropSchema: true,
   });
