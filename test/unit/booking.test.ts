@@ -42,10 +42,14 @@ import {
   updateBooking,
   deleteBooking,
   closeOpenMatch,
+  cancelExpiredOpenMatches,
 } from "@/src/actions/booking";
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
-const fromDateTime = new Date("2026-01-01T10:00:00Z");
+// Siempre en el futuro: la validación de antelación para partidos abiertos
+// compara contra la hora real, así que una fecha fija terminaría quedando en
+// el pasado con el correr del tiempo.
+const fromDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 describe("booking actions", () => {
   beforeEach(() => {
@@ -177,6 +181,34 @@ describe("booking actions", () => {
         error: "La cantidad de jugadores debe ser entre 1 y 4.",
       });
       expect(save).not.toHaveBeenCalled();
+    });
+
+    it("rechaza crear un partido abierto con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 2 * 60 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, groupSize: 2, playerId: 1, courtId: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "No se puede crear un partido abierto con menos de 3 horas de anticipación.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("permite crear un partido abierto con más de 3 horas de anticipación", async () => {
+      const inTime = new Date(Date.now() + 4 * 60 * 60_000);
+
+      const result = await createBooking({ fromDateTime: inTime, groupSize: 2, playerId: 1, courtId: 2 });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("permite crear una reserva completa (no partido abierto) con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 30 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, groupSize: 4, playerId: 1, courtId: 2 });
+
+      expect(result.success).toBe(true);
     });
   });
 
@@ -341,6 +373,44 @@ describe("booking actions", () => {
         error: "El cierre manual solo está disponible con entre 1 y 3 jugadores confirmados.",
       });
       expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cancelExpiredOpenMatches", () => {
+    it("cancela los partidos abiertos vencidos que no completaron el cupo", async () => {
+      find.mockResolvedValueOnce([
+        { id: 1, bookingState: BookingState.PENDING_PLAYERS, participants: [{ playersCount: 2 }] },
+        { id: 2, bookingState: BookingState.PENDING_PLAYERS, participants: [{ playersCount: 4 }] },
+      ]);
+
+      const result = await cancelExpiredOpenMatches();
+
+      expect(save).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 1, bookingState: BookingState.CANCELLED }),
+      ]);
+      expect(result).toEqual({ success: true, data: 1 });
+    });
+
+    it("no guarda nada si no hay partidos abiertos vencidos sin cupo completo", async () => {
+      find.mockResolvedValueOnce([
+        { id: 2, bookingState: BookingState.PENDING_PLAYERS, participants: [{ playersCount: 4 }] },
+      ]);
+
+      const result = await cancelExpiredOpenMatches();
+
+      expect(save).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: true, data: 0 });
+    });
+
+    it("devuelve un error genérico si falla la consulta", async () => {
+      find.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await cancelExpiredOpenMatches();
+
+      expect(result).toEqual({
+        success: false,
+        error: "No se pudieron cancelar los partidos abiertos vencidos.",
+      });
     });
   });
 

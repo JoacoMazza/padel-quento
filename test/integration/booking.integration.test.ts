@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
@@ -10,6 +10,7 @@ import {
   updateBooking,
   deleteBooking,
   closeOpenMatch,
+  cancelExpiredOpenMatches,
 } from "@/src/actions/booking";
 
 function uniqueCourtNumber() {
@@ -21,10 +22,14 @@ function uniqueEmail(prefix: string) {
 }
 
 // Cada test necesita un horario propio: como ahora el backend rechaza solapamientos,
-// reutilizar el mismo horario entre tests haría que se pisen entre sí.
+// reutilizar el mismo horario entre tests haría que se pisen entre sí. Se arma
+// siempre a partir de "ahora" (y bien en el futuro) porque la validación de
+// antelación de partidos abiertos y la cancelación automática comparan contra
+// la hora real.
 let slotOffset = 0;
 function uniqueFromDateTime() {
-  const date = new Date(2026, 0, 1, 8, 0, 0);
+  const date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  date.setHours(8, 0, 0, 0);
   date.setHours(date.getHours() + slotOffset * 2);
   slotOffset += 1;
   return date;
@@ -288,6 +293,85 @@ describe("booking actions (integración con Postgres real)", () => {
         success: false,
         error: "Ese horario ya está reservado para esta cancha.",
       });
+    });
+  });
+
+  describe("antelación mínima para partidos abiertos", () => {
+    it("rechaza crear un partido abierto con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 2 * 60 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, playerId, courtId, groupSize: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "No se puede crear un partido abierto con menos de 3 horas de anticipación.",
+      });
+    });
+
+    it("permite crear una reserva completa con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 90 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, playerId, courtId, groupSize: 4 });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("cancelación automática de partidos abiertos por falta de cupo", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("cancela un partido abierto que no completó el cupo al llegar a 3 horas del inicio", async () => {
+      const startTime = uniqueFromDateTime();
+      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
+      if (!created.success) throw new Error("expected success");
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(startTime.getTime() - 3 * 60 * 60_000));
+
+      const result = await cancelExpiredOpenMatches();
+      expect(result.success).toBe(true);
+      vi.useRealTimers();
+
+      const found = await getBookingById(created.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.bookingState).toBe(BookingState.CANCELLED);
+    });
+
+    it("no cancela un partido abierto si todavía faltan más de 3 horas para el inicio", async () => {
+      const startTime = uniqueFromDateTime();
+      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
+      if (!created.success) throw new Error("expected success");
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(startTime.getTime() - 4 * 60 * 60_000));
+
+      await cancelExpiredOpenMatches();
+      vi.useRealTimers();
+
+      const found = await getBookingById(created.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.bookingState).toBe(BookingState.PENDING_PLAYERS);
+    });
+
+    it("no cancela un partido abierto que ya fue cerrado manualmente", async () => {
+      const startTime = uniqueFromDateTime();
+      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
+      if (!created.success) throw new Error("expected success");
+
+      const closed = await closeOpenMatch(created.data.id);
+      expect(closed.success).toBe(true);
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(startTime.getTime() - 60 * 60_000));
+
+      await cancelExpiredOpenMatches();
+      vi.useRealTimers();
+
+      const found = await getBookingById(created.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.bookingState).toBe(BookingState.RESERVED);
     });
   });
 });

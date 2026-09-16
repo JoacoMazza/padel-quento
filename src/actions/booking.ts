@@ -1,11 +1,11 @@
 "use server";
 
 import "reflect-metadata";
-import { EntityManager } from "typeorm";
+import { EntityManager, LessThanOrEqual } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
 import { BookingParticipant } from "@/src/entities/BookingParticipant";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
@@ -34,11 +34,14 @@ const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.
 const INVALID_GROUP_SIZE_MESSAGE = `La cantidad de jugadores debe ser entre 1 y ${OPEN_MATCH_MAX_PLAYERS}.`;
 const NOT_PENDING_PLAYERS_MESSAGE = "Este turno no es un partido abierto pendiente de jugadores.";
 const INVALID_PLAYERS_TO_CLOSE_MESSAGE = `El cierre manual solo está disponible con entre 1 y ${OPEN_MATCH_MAX_PLAYERS - 1} jugadores confirmados.`;
+const OPEN_MATCH_TOO_SOON_MESSAGE = `No se puede crear un partido abierto con menos de ${OPEN_MATCH_MIN_HOURS_BEFORE_START} horas de anticipación.`;
+const CANCEL_EXPIRED_OPEN_MATCHES_ERROR_MESSAGE = "No se pudieron cancelar los partidos abiertos vencidos.";
 
 class DoubleBookingError extends Error {}
 class InvalidGroupSizeError extends Error {}
 class NotPendingPlayersError extends Error {}
 class InvalidPlayersToCloseError extends Error {}
+class OpenMatchTooSoonError extends Error {}
 
 /**
  * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
@@ -90,6 +93,13 @@ export async function createBooking(
         input.bookingState ??
         (groupSize < OPEN_MATCH_MAX_PLAYERS ? BookingState.PENDING_PLAYERS : BookingState.RESERVED);
 
+      if (bookingState === BookingState.PENDING_PLAYERS) {
+        const hoursUntilStart = (input.fromDateTime.getTime() - Date.now()) / (60 * 60_000);
+        if (hoursUntilStart < OPEN_MATCH_MIN_HOURS_BEFORE_START) {
+          throw new OpenMatchTooSoonError();
+        }
+      }
+
       if (bookingState !== BookingState.CANCELLED) {
         const overlaps = await hasOverlappingBooking(manager, {
           courtId: input.courtId,
@@ -134,6 +144,9 @@ export async function createBooking(
     }
     if (error instanceof InvalidGroupSizeError) {
       return { success: false, error: INVALID_GROUP_SIZE_MESSAGE };
+    }
+    if (error instanceof OpenMatchTooSoonError) {
+      return { success: false, error: OPEN_MATCH_TOO_SOON_MESSAGE };
     }
     console.error("createBooking", error);
     return { success: false, error: "No se pudo crear la reserva." };
@@ -274,6 +287,46 @@ export async function closeOpenMatch(id: number): Promise<ActionResult<Booking>>
     }
     console.error("closeOpenMatch", error);
     return { success: false, error: "No se pudo cerrar el partido." };
+  }
+}
+
+/**
+ * Cancelación automática de partidos abiertos que no llegaron a completar el
+ * cupo a horas de su inicio: pensada para correr periódicamente desde un
+ * proceso en segundo plano (ver src/jobs/open-match-expiration.ts). Los que ya
+ * fueron cerrados manualmente quedaron en RESERVED y no los toca esta consulta.
+ */
+export async function cancelExpiredOpenMatches(): Promise<ActionResult<number>> {
+  try {
+    const dataSource = await getDataSource();
+    const bookings = dataSource.getRepository<Booking>("Booking");
+
+    const threshold = new Date(Date.now() + OPEN_MATCH_MIN_HOURS_BEFORE_START * 60 * 60_000);
+    const expiring = await bookings.find({
+      where: {
+        bookingState: BookingState.PENDING_PLAYERS,
+        fromDateTime: LessThanOrEqual(threshold),
+      },
+      relations: { participants: true },
+    });
+
+    const toCancel = expiring.filter(
+      (booking) =>
+        (booking.participants ?? []).reduce((sum, p) => sum + (p.playersCount ?? 1), 0) <
+        OPEN_MATCH_MAX_PLAYERS,
+    );
+
+    for (const booking of toCancel) {
+      booking.bookingState = BookingState.CANCELLED;
+    }
+    if (toCancel.length > 0) {
+      await bookings.save(toCancel);
+    }
+
+    return { success: true, data: toCancel.length };
+  } catch (error) {
+    console.error("cancelExpiredOpenMatches", error);
+    return { success: false, error: CANCEL_EXPIRED_OPEN_MATCHES_ERROR_MESSAGE };
   }
 }
 
