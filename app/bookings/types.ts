@@ -15,7 +15,12 @@ export type BookingProp = {
   fromDateTime: Date;
   durationMinutes: number;
   bookingState: BookingState;
+  /** Si tiene un partido abierto asociado que todavía está buscando jugadores. */
+  needPlayers: boolean;
   courtId?: number;
+  confirmedPlayers: number;
+  /** IDs de los jugadores ya sumados al partido (incluye a quien lo creó). */
+  matchPlayerIds?: number[];
 };
 
 export type OutOfServiceProp = {
@@ -32,6 +37,11 @@ export type Slot = {
   start: Date;
   end: Date;
   status: SlotStatus;
+  /** Sólo presentes cuando status === "open": el partido abierto al que se puede sumar. */
+  bookingId?: number;
+  confirmedPlayers?: number;
+  /** true si el jugador logueado ya forma parte de este partido (creador o sumado). */
+  alreadyJoined?: boolean;
 };
 
 export type SelectedSlot = {
@@ -39,4 +49,14 @@ export type SelectedSlot = {
   courtNumber: number;
   start: Date;
   end: Date;
+};
+
+export type SelectedOpenMatch = {
+  bookingId: number;
+  courtId: number;
+  courtNumber: number;
+  start: Date;
+  end: Date;
+  confirmedPlayers: number;
+  alreadyJoined: boolean;
 };

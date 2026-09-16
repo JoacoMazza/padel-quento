@@ -4,10 +4,11 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingState, CourtState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { createBooking } from "@/src/actions/booking";
+import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { BookingSummary } from "@/app/bookings/booking-summary";
 import { CourtCard } from "@/app/bookings/court-card";
 import { FilterBar } from "@/app/bookings/filter-bar";
+import { JoinMatchPanel } from "@/app/bookings/join-match-panel";
 import { Legend } from "@/app/bookings/legend";
 import {
   SLOT_DURATION_MINUTES,
@@ -24,6 +25,7 @@ import type {
   CourtProp,
   OutOfServiceProp,
   ScheduleProp,
+  SelectedOpenMatch,
   SelectedSlot,
   Slot,
   SlotStatus,
@@ -53,6 +55,8 @@ export function BookingsBoard({
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
   const [isOpenMatch, setIsOpenMatch] = useState(false);
   const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
+  const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(null);
+  const [joinGroupSize, setJoinGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
@@ -90,7 +94,8 @@ export function BookingsBoard({
           const isPast = isToday && start < now;
 
           const isSelected =
-            selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === start.getTime();
+            (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === start.getTime()) ||
+            (selectedOpenMatch?.courtId === court.id && selectedOpenMatch.start.getTime() === start.getTime());
 
           const isBlockedByOutOfService = outOfServices.some(
             (o) =>
@@ -106,27 +111,74 @@ export function BookingsBoard({
           });
 
           // Un partido abierto no cuenta como ocupado: todavía busca jugadores.
-          const isOpenMatch = overlappingBooking?.bookingState === BookingState.PENDING_PLAYERS;
+          const isOpenMatchSlot = overlappingBooking?.needPlayers === true;
 
           const status: SlotStatus = isSelected
             ? "selected"
             : isCourtOutOfService || isPast || isBlockedByOutOfService || overlappingBooking
-              ? isOpenMatch && !isCourtOutOfService && !isPast && !isBlockedByOutOfService
+              ? isOpenMatchSlot && !isCourtOutOfService && !isPast && !isBlockedByOutOfService
                 ? "open"
                 : "occupied"
               : "available";
 
-          slots.push({ minutesOfDay, start, end, status });
+          slots.push({
+            minutesOfDay,
+            start,
+            end,
+            status,
+            ...(status === "open"
+              ? {
+                  bookingId: overlappingBooking!.id,
+                  confirmedPlayers: overlappingBooking!.confirmedPlayers,
+                  alreadyJoined: playerId != null && (overlappingBooking!.matchPlayerIds ?? []).includes(playerId),
+                }
+              : {}),
+          });
         }
       }
 
       return { court, slots };
     });
-  }, [visibleCourts, schedules, dayOfWeek, selectedDate, isToday, now, selectedSlot, outOfServices, bookings]);
+  }, [
+    visibleCourts,
+    schedules,
+    dayOfWeek,
+    selectedDate,
+    isToday,
+    now,
+    selectedSlot,
+    selectedOpenMatch,
+    outOfServices,
+    bookings,
+    playerId,
+  ]);
 
   function handleSlotClick(court: CourtProp, slot: Slot) {
     if (slot.status === "occupied") return;
     setFeedback(null);
+
+    if (slot.status === "open") {
+      if (selectedOpenMatch?.bookingId === slot.bookingId) {
+        setSelectedOpenMatch(null);
+        setJoinGroupSize(1);
+        return;
+      }
+
+      setSelectedSlot(null);
+      setIsOpenMatch(false);
+      setOpenMatchGroupSize(1);
+      setJoinGroupSize(1);
+      setSelectedOpenMatch({
+        bookingId: slot.bookingId!,
+        courtId: court.id,
+        courtNumber: court.number,
+        start: slot.start,
+        end: slot.end,
+        confirmedPlayers: slot.confirmedPlayers ?? 0,
+        alreadyJoined: slot.alreadyJoined ?? false,
+      });
+      return;
+    }
 
     if (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime()) {
       setSelectedSlot(null);
@@ -135,6 +187,8 @@ export function BookingsBoard({
       return;
     }
 
+    setSelectedOpenMatch(null);
+    setJoinGroupSize(1);
     setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
@@ -169,6 +223,31 @@ export function BookingsBoard({
     });
   }
 
+  function handleJoinConfirm() {
+    if (!selectedOpenMatch || selectedOpenMatch.alreadyJoined) return;
+
+    if (!playerId) {
+      setFeedback({ type: "error", message: "Tu cuenta no puede sumarse a partidos." });
+      return;
+    }
+
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await joinOpenMatch({
+        bookingId: selectedOpenMatch.bookingId,
+        playerId,
+        groupSize: joinGroupSize,
+      });
+
+      if (!result.success) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+
+      router.push("/my-bookings");
+    });
+  }
+
   return (
     <div className="mt-8">
       <FilterBar
@@ -182,6 +261,8 @@ export function BookingsBoard({
           setSelectedSlot(null);
           setIsOpenMatch(false);
           setOpenMatchGroupSize(1);
+          setSelectedOpenMatch(null);
+          setJoinGroupSize(1);
           setFeedback(null);
         }}
         onCourtFilterChange={(value) => {
@@ -189,6 +270,8 @@ export function BookingsBoard({
           setSelectedSlot(null);
           setIsOpenMatch(false);
           setOpenMatchGroupSize(1);
+          setSelectedOpenMatch(null);
+          setJoinGroupSize(1);
         }}
       />
 
@@ -207,18 +290,31 @@ export function BookingsBoard({
           ) : null}
         </div>
 
-        <BookingSummary
-          selectedDate={selectedDate}
-          selectedSlot={selectedSlot}
-          feedback={feedback}
-          isPending={isPending}
-          price={SLOT_PRICE}
-          isOpenMatch={isOpenMatch}
-          onIsOpenMatchChange={setIsOpenMatch}
-          openMatchGroupSize={openMatchGroupSize}
-          onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
-          onConfirm={handleConfirm}
-        />
+        {selectedOpenMatch ? (
+          <JoinMatchPanel
+            selectedDate={selectedDate}
+            selectedMatch={selectedOpenMatch}
+            feedback={feedback}
+            isPending={isPending}
+            alreadyJoined={selectedOpenMatch.alreadyJoined}
+            groupSize={joinGroupSize}
+            onGroupSizeChange={setJoinGroupSize}
+            onConfirm={handleJoinConfirm}
+          />
+        ) : (
+          <BookingSummary
+            selectedDate={selectedDate}
+            selectedSlot={selectedSlot}
+            feedback={feedback}
+            isPending={isPending}
+            price={SLOT_PRICE}
+            isOpenMatch={isOpenMatch}
+            onIsOpenMatchChange={setIsOpenMatch}
+            openMatchGroupSize={openMatchGroupSize}
+            onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
+            onConfirm={handleConfirm}
+          />
+        )}
       </div>
 
       <Legend />

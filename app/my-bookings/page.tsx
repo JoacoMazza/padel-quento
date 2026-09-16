@@ -21,14 +21,26 @@ export default async function MyBookingsPage() {
   const allBookings = bookingsResult.success ? bookingsResult.data : [];
 
   const myBookings = allBookings
-    .filter((b) => player && b.player?.id === player.id)
+    .filter((b) => {
+      if (!player) return false;
+      const isOwner = b.player?.id === player.id;
+      const isMatchPlayer = (b.match?.matchPlayers ?? []).some((mp) => mp.playerId === player.id);
+      return isOwner || isMatchPlayer;
+    })
     .map((b) => ({
       id: b.id,
       fromDateTime: b.fromDateTime,
       durationMinutes: b.durationMinutes,
       bookingState: b.bookingState,
       courtNumber: b.court?.number ?? 0,
-      confirmedPlayers: (b.participants ?? []).reduce((sum, p) => sum + (p.playersCount ?? 1), 0),
+      matchId: b.match?.id ?? null,
+      needPlayers: b.match?.needPlayers ?? false,
+      confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
+        (sum, mp) => sum + (mp.playersCount ?? 1),
+        0,
+      ),
+      // Turno creado por otro jugador al que este jugador se sumó (no es quien reservó).
+      joinedAsParticipant: player ? b.player?.id !== player.id : false,
     }));
 
   return (

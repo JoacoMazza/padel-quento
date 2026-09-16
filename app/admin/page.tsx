@@ -33,7 +33,12 @@ export default async function AdminPage() {
         fromDateTime: b.fromDateTime,
         durationMinutes: b.durationMinutes,
         bookingState: b.bookingState,
+        needPlayers: b.match?.needPlayers ?? false,
         courtId: b.court?.id,
+        confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
+          (sum, mp) => sum + (mp.playersCount ?? 1),
+          0,
+        ),
       }))}
       outOfServices={outOfServices.map((o) => ({
         id: o.id,

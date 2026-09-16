@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 
-const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource } = vi.hoisted(
-  () => {
+const { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource } =
+  vi.hoisted(() => {
     const create = vi.fn((data: unknown) => data);
     const save = vi.fn(async (entity: unknown) => entity);
+    const update = vi.fn(async () => ({ affected: 1 }));
     const find = vi.fn();
     const findOne = vi.fn();
     const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
@@ -12,7 +13,7 @@ const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSo
     const getOne = vi.fn(async () => null as unknown);
     const queryFn = vi.fn(async () => undefined);
 
-    const repository = { create, save, find, findOne, merge, delete: deleteFn };
+    const repository = { create, save, update, find, findOne, merge, delete: deleteFn };
 
     const queryBuilder: any = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
@@ -29,9 +30,8 @@ const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSo
     const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
     const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
 
-    return { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource };
-  },
-);
+    return { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource };
+  });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
@@ -41,10 +41,14 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  joinOpenMatch,
 } from "@/src/actions/booking";
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
-const fromDateTime = new Date("2026-01-01T10:00:00Z");
+// Siempre en el futuro: la validación de antelación para partidos abiertos
+// compara contra la hora real, así que una fecha fija terminaría quedando en
+// el pasado con el correr del tiempo.
+const fromDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 describe("booking actions", () => {
   beforeEach(() => {
@@ -127,7 +131,7 @@ describe("booking actions", () => {
       expect(result).toEqual({ success: false, error: "No se pudo crear la reserva." });
     });
 
-    it("con groupSize menor a 4 crea un partido abierto y registra al creador con esa cantidad de jugadores", async () => {
+    it("con groupSize menor a 4 crea el turno reservado y el partido abierto con el creador como primer jugador", async () => {
       const result = await createBooking({
         fromDateTime,
         groupSize: 2,
@@ -136,18 +140,21 @@ describe("booking actions", () => {
       });
 
       expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ bookingState: BookingState.PENDING_PLAYERS }),
+        expect.objectContaining({ bookingState: BookingState.RESERVED }),
       );
+      expect(create).toHaveBeenCalledWith({ booking: { id: undefined }, needPlayers: true });
       expect(create).toHaveBeenCalledWith({
-        booking: { id: undefined },
+        match: { id: undefined },
         player: { id: 1 },
         playersCount: 2,
       });
-      expect(save).toHaveBeenCalledTimes(2);
+      expect(save).toHaveBeenCalledTimes(3);
       expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
     });
 
-    it("con groupSize 4 crea una reserva completa (no un partido abierto) y no registra participantes", async () => {
+    it("con groupSize 4 crea una reserva completa (no un partido abierto) y no crea ningún partido", async () => {
       const result = await createBooking({ fromDateTime, groupSize: 4, playerId: 1, courtId: 2 });
 
       expect(create).toHaveBeenCalledWith(
@@ -157,7 +164,7 @@ describe("booking actions", () => {
       expect(result.success).toBe(true);
     });
 
-    it("no registra participantes para una reserva sin groupSize", async () => {
+    it("no crea ningún partido para una reserva sin groupSize", async () => {
       await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
 
       expect(save).toHaveBeenCalledTimes(1);
@@ -177,16 +184,229 @@ describe("booking actions", () => {
       });
       expect(save).not.toHaveBeenCalled();
     });
+
+    it("rechaza crear un partido abierto con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 2 * 60 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, groupSize: 2, playerId: 1, courtId: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "No se puede crear un partido abierto con menos de 3 horas de anticipación.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("permite crear un partido abierto con más de 3 horas de anticipación", async () => {
+      const inTime = new Date(Date.now() + 4 * 60 * 60_000);
+
+      const result = await createBooking({ fromDateTime: inTime, groupSize: 2, playerId: 1, courtId: 2 });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("permite crear una reserva completa (no partido abierto) con menos de 3 horas de anticipación", async () => {
+      const soon = new Date(Date.now() + 30 * 60_000);
+
+      const result = await createBooking({ fromDateTime: soon, groupSize: 4, playerId: 1, courtId: 2 });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("joinOpenMatch", () => {
+    it("suma un jugador nuevo a un partido abierto sin completar el cupo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(create).toHaveBeenCalledWith({
+        match: { id: 20 },
+        player: { id: 5 },
+        playersCount: 1,
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+    });
+
+    it("permite sumarse con acompañantes indicando groupSize", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 2 });
+
+      expect(create).toHaveBeenCalledWith({
+        match: { id: 20 },
+        player: { id: 5 },
+        playersCount: 2,
+      });
+      expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
+      expect(result.success).toBe(true);
+    });
+
+    it("rechaza un groupSize mayor a los lugares libres", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 3 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Elegí entre 1 y 2 jugadores (los lugares libres que quedan).",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza un groupSize menor a 1", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 0 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Elegí entre 1 y 3 jugadores (los lugares libres que quedan).",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("toma un lock por partido antes de buscarlo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [] });
+
+      await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(queryFn).toHaveBeenCalledWith(
+        expect.stringContaining("pg_advisory_xact_lock"),
+        expect.arrayContaining([10]),
+      );
+    });
+
+    it("si al sumarse se completa el cupo máximo, el partido deja de necesitar jugadores", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
+    });
+
+    it("respeta playersCount de cada jugador al calcular el cupo restante", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        // El creador reservó con playersCount 4 (trajo acompañantes): ya no queda lugar.
+        matchPlayers: [{ playerId: 1, playersCount: 4 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "El partido ya está completo, no quedan lugares libres.",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el turno no existe", async () => {
+      findOne.mockResolvedValueOnce(null);
+
+      const result = await joinOpenMatch({ bookingId: 999, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "El turno no existe." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el turno no tiene un partido abierto asociado", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce(null);
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el partido ya no está buscando jugadores", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({ id: 20, needPlayers: false, matchPlayers: [{ playerId: 1 }] });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el jugador ya está anotado en el partido", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [{ playerId: 5 }] });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Ya estás anotado en este partido." });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza si el partido ya está completo", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }, { playerId: 4 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "El partido ya está completo, no quedan lugares libres.",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("devuelve un error genérico si falla el guardado", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [] });
+      save.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "No se pudo sumar al partido." });
+    });
   });
 
   describe("getBookings", () => {
-    it("devuelve todas las reservas con jugador y cancha", async () => {
+    it("devuelve todas las reservas con jugador, cancha y partido asociado", async () => {
       find.mockResolvedValueOnce([{ id: 1 }]);
 
       const result = await getBookings();
 
       expect(find).toHaveBeenCalledWith({
-        relations: { player: true, court: true, participants: true },
+        relations: { player: true, court: true, match: { matchPlayers: true } },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
@@ -208,7 +428,7 @@ describe("booking actions", () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: true, court: true, participants: true },
+        relations: { player: true, court: true, match: { matchPlayers: true } },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
     });

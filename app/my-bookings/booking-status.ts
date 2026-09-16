@@ -7,7 +7,7 @@ export function getBookingEnd(booking: MyBookingItem): Date {
 
 export function getBookingTone(booking: MyBookingItem, now: Date): BookingTone {
   if (booking.bookingState === BookingState.CANCELLED) return "cancelled";
-  if (booking.bookingState === BookingState.PENDING_PLAYERS) return "pending";
+  if (booking.needPlayers) return "pending";
   return getBookingEnd(booking) < now ? "completed" : "confirmed";
 }
 
