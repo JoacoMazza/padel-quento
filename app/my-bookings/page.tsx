@@ -28,7 +28,9 @@ export default async function MyBookingsPage() {
       durationMinutes: b.durationMinutes,
       bookingState: b.bookingState,
       courtNumber: b.court?.number ?? 0,
-      confirmedPlayers: (b.participants ?? []).reduce((sum, p) => sum + (p.playersCount ?? 1), 0),
+      matchId: b.match?.id ?? null,
+      needPlayers: b.match?.needPlayers ?? false,
+      confirmedPlayers: (b.match?.players ?? []).reduce((sum, p) => sum + (p.playersCount ?? 1), 0),
     }));
 
   return (

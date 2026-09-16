@@ -1,4 +1,4 @@
-import { cancelExpiredOpenMatches } from "@/src/actions/booking";
+import { cancelExpiredMatches } from "@/src/actions/match";
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -17,7 +17,7 @@ export function startOpenMatchExpirationJob() {
   }
 
   globalForJob.openMatchExpirationInterval = setInterval(() => {
-    cancelExpiredOpenMatches().catch((error) => {
+    cancelExpiredMatches().catch((error) => {
       console.error("openMatchExpirationJob", error);
     });
   }, CHECK_INTERVAL_MS);

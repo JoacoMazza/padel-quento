@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { closeOpenMatch, updateBooking } from "@/src/actions/booking";
+import { updateBooking } from "@/src/actions/booking";
+import { closeMatch } from "@/src/actions/match";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import {
   getBookingBadgeClasses,
@@ -29,7 +30,8 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
   const tone = getBookingTone(booking, now);
   const canCancel = tone === "confirmed" || tone === "pending";
   const canCloseManually =
-    booking.bookingState === BookingState.PENDING_PLAYERS &&
+    booking.needPlayers &&
+    booking.matchId !== null &&
     booking.confirmedPlayers >= 1 &&
     booking.confirmedPlayers < OPEN_MATCH_MAX_PLAYERS;
 
@@ -47,9 +49,10 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
   }
 
   function handleClose() {
+    if (booking.matchId === null) return;
     setError(null);
     startTransition(async () => {
-      const result = await closeOpenMatch(booking.id);
+      const result = await closeMatch(booking.matchId!);
       if (!result.success) {
         setError(result.error);
         setPendingAction(null);
@@ -92,7 +95,7 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {getBookingStatusLabel(tone)}
         </span>
-        {booking.bookingState === BookingState.PENDING_PLAYERS ? (
+        {booking.needPlayers ? (
           <span className="flex items-center gap-1 text-xs text-foreground/60">
             <Users className="h-3.5 w-3.5" />
             {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores

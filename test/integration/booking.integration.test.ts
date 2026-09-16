@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
@@ -9,8 +9,6 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
-  closeOpenMatch,
-  cancelExpiredOpenMatches,
 } from "@/src/actions/booking";
 
 function uniqueCourtNumber() {
@@ -128,7 +126,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   describe("partido abierto", () => {
-    it("con groupSize 2 crea la reserva pendiente de jugadores y registra al creador con esa cantidad", async () => {
+    it("con groupSize 2 reserva el turno y crea el partido con el creador como primer jugador", async () => {
       const result = await createBooking({
         fromDateTime: uniqueFromDateTime(),
         playerId,
@@ -138,23 +136,24 @@ describe("booking actions (integración con Postgres real)", () => {
 
       expect(result.success).toBe(true);
       if (!result.success) throw new Error("expected success");
-      expect(result.data.bookingState).toBe(BookingState.PENDING_PLAYERS);
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
 
       const found = await getBookingById(result.data.id);
       expect(found.success).toBe(true);
       if (!found.success) throw new Error("expected success");
-      expect(found.data?.participants).toHaveLength(1);
+      expect(found.data?.match?.needPlayers).toBe(true);
+      expect(found.data?.match?.players).toHaveLength(1);
 
       const dataSource = await getDataSource();
-      const participant = await dataSource.getRepository("BookingParticipant").findOne({
-        where: { booking: { id: result.data.id } },
+      const matchPlayer = await dataSource.getRepository("MatchPlayer").findOne({
+        where: { match: { id: found.data?.match?.id } },
         relations: { player: true },
       });
-      expect(participant?.player).toMatchObject({ id: playerId });
-      expect(participant?.playersCount).toBe(2);
+      expect(matchPlayer?.player).toMatchObject({ id: playerId });
+      expect(matchPlayer?.playersCount).toBe(2);
     });
 
-    it("con groupSize 4 crea una reserva completa, sin dejarla pendiente de jugadores", async () => {
+    it("con groupSize 4 crea una reserva completa, sin partido asociado", async () => {
       const result = await createBooking({
         fromDateTime: uniqueFromDateTime(),
         playerId,
@@ -165,6 +164,10 @@ describe("booking actions (integración con Postgres real)", () => {
       expect(result.success).toBe(true);
       if (!result.success) throw new Error("expected success");
       expect(result.data.bookingState).toBe(BookingState.RESERVED);
+
+      const found = await getBookingById(result.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match).toBeNull();
     });
 
     it("rechaza un groupSize inválido", async () => {
@@ -179,43 +182,6 @@ describe("booking actions (integración con Postgres real)", () => {
         success: false,
         error: "La cantidad de jugadores debe ser entre 1 y 4.",
       });
-    });
-  });
-
-  describe("cierre manual de partido abierto", () => {
-    it("cierra manualmente un partido abierto y lo pasa a Reservada", async () => {
-      const created = await createBooking({
-        fromDateTime: uniqueFromDateTime(),
-        playerId,
-        courtId,
-        groupSize: 2,
-      });
-      if (!created.success) throw new Error("expected success");
-
-      const result = await closeOpenMatch(created.data.id);
-
-      expect(result).toEqual({
-        success: true,
-        data: expect.objectContaining({ bookingState: BookingState.RESERVED }),
-      });
-    });
-
-    it("rechaza el cierre manual si el turno no está pendiente de jugadores", async () => {
-      const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
-      if (!created.success) throw new Error("expected success");
-
-      const result = await closeOpenMatch(created.data.id);
-
-      expect(result).toEqual({
-        success: false,
-        error: "Este turno no es un partido abierto pendiente de jugadores.",
-      });
-    });
-
-    it("devuelve error si la reserva no existe", async () => {
-      const result = await closeOpenMatch(999_999_999);
-
-      expect(result).toEqual({ success: false, error: "La reserva no existe." });
     });
   });
 
@@ -314,64 +280,6 @@ describe("booking actions (integración con Postgres real)", () => {
       const result = await createBooking({ fromDateTime: soon, playerId, courtId, groupSize: 4 });
 
       expect(result.success).toBe(true);
-    });
-  });
-
-  describe("cancelación automática de partidos abiertos por falta de cupo", () => {
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it("cancela un partido abierto que no completó el cupo al llegar a 3 horas del inicio", async () => {
-      const startTime = uniqueFromDateTime();
-      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
-      if (!created.success) throw new Error("expected success");
-
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(startTime.getTime() - 3 * 60 * 60_000));
-
-      const result = await cancelExpiredOpenMatches();
-      expect(result.success).toBe(true);
-      vi.useRealTimers();
-
-      const found = await getBookingById(created.data.id);
-      if (!found.success) throw new Error("expected success");
-      expect(found.data?.bookingState).toBe(BookingState.CANCELLED);
-    });
-
-    it("no cancela un partido abierto si todavía faltan más de 3 horas para el inicio", async () => {
-      const startTime = uniqueFromDateTime();
-      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
-      if (!created.success) throw new Error("expected success");
-
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(startTime.getTime() - 4 * 60 * 60_000));
-
-      await cancelExpiredOpenMatches();
-      vi.useRealTimers();
-
-      const found = await getBookingById(created.data.id);
-      if (!found.success) throw new Error("expected success");
-      expect(found.data?.bookingState).toBe(BookingState.PENDING_PLAYERS);
-    });
-
-    it("no cancela un partido abierto que ya fue cerrado manualmente", async () => {
-      const startTime = uniqueFromDateTime();
-      const created = await createBooking({ fromDateTime: startTime, playerId, courtId, groupSize: 2 });
-      if (!created.success) throw new Error("expected success");
-
-      const closed = await closeOpenMatch(created.data.id);
-      expect(closed.success).toBe(true);
-
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(startTime.getTime() - 60 * 60_000));
-
-      await cancelExpiredOpenMatches();
-      vi.useRealTimers();
-
-      const found = await getBookingById(created.data.id);
-      if (!found.success) throw new Error("expected success");
-      expect(found.data?.bookingState).toBe(BookingState.RESERVED);
     });
   });
 });

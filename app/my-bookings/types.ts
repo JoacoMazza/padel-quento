@@ -6,6 +6,9 @@ export type MyBookingItem = {
   durationMinutes: number;
   bookingState: BookingState;
   courtNumber: number;
+  /** Id del partido abierto asociado, si lo hay. */
+  matchId: number | null;
+  needPlayers: boolean;
   confirmedPlayers: number;
 };
 

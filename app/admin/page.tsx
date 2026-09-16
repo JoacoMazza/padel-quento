@@ -33,6 +33,7 @@ export default async function AdminPage() {
         fromDateTime: b.fromDateTime,
         durationMinutes: b.durationMinutes,
         bookingState: b.bookingState,
+        needPlayers: b.match?.needPlayers ?? false,
         courtId: b.court?.id,
       }))}
       outOfServices={outOfServices.map((o) => ({

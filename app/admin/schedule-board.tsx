@@ -87,6 +87,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
               fromDateTime: new Date(b.fromDateTime),
               durationMinutes: b.durationMinutes,
               bookingState: b.bookingState,
+              needPlayers: b.match?.needPlayers ?? false,
               courtId: b.court?.id,
             })),
             outOfServices: result.data.outOfServices.map((o) => ({
@@ -176,7 +177,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
       return rangesOverlap(start, end, bookingStart, bookingEnd);
     });
 
-    if (overlappingBooking?.bookingState === BookingState.PENDING_PLAYERS) return "pending";
+    if (overlappingBooking?.needPlayers) return "pending";
     if (
       overlappingBooking?.bookingState === BookingState.RESERVED ||
       overlappingBooking?.bookingState === BookingState.PAID

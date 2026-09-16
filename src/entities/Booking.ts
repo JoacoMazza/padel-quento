@@ -1,9 +1,9 @@
 import "reflect-metadata";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
 import type { Player } from "@/src/entities/Player";
 import type { Court } from "@/src/entities/Court";
-import type { BookingParticipant } from "@/src/entities/BookingParticipant";
+import type { Match } from "@/src/entities/Match";
 
 @Entity({ name: "bookings" })
 export class Booking {
@@ -27,7 +27,7 @@ export class Booking {
   @JoinColumn({ name: "court_id" })
   court!: Court;
 
-  /** Jugadores confirmados; usado por los partidos abiertos para saber cuántos lugares faltan. */
-  @OneToMany("BookingParticipant", "booking")
-  participants!: BookingParticipant[];
+  /** Partido asociado si el turno se reservó como partido abierto. */
+  @OneToOne("Match", (match: any) => match.booking)
+  match?: Match;
 }

@@ -106,7 +106,7 @@ export function BookingsBoard({
           });
 
           // Un partido abierto no cuenta como ocupado: todavía busca jugadores.
-          const isOpenMatch = overlappingBooking?.bookingState === BookingState.PENDING_PLAYERS;
+          const isOpenMatch = overlappingBooking?.needPlayers === true;
 
           const status: SlotStatus = isSelected
             ? "selected"

@@ -15,6 +15,8 @@ export type BookingProp = {
   fromDateTime: Date;
   durationMinutes: number;
   bookingState: BookingState;
+  /** Si tiene un partido abierto asociado que todavía está buscando jugadores. */
+  needPlayers: boolean;
   courtId?: number;
 };
 

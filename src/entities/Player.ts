@@ -3,7 +3,7 @@ import { ChildEntity, Column, OneToMany } from "typeorm";
 import { PlayerCategory } from "@/src/domain/enums";
 import { User } from "@/src/entities/User";
 import type { Penalty } from "@/src/entities/Penalty";
-import type { BookingParticipant } from "@/src/entities/BookingParticipant";
+import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 
 @ChildEntity()
 export class Player extends User {
@@ -20,6 +20,6 @@ export class Player extends User {
   penalties!: Penalty[];
   @OneToMany("Booking", (booking: any) => booking.player)
   bookings!: any[];
-  @OneToMany("BookingParticipant", "player")
-  bookingParticipations!: BookingParticipant[];
+  @OneToMany("MatchPlayer", "player")
+  matchParticipations!: MatchPlayer[];
 }
