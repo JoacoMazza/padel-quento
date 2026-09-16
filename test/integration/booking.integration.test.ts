@@ -9,6 +9,7 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  joinOpenMatch,
 } from "@/src/actions/booking";
 
 function uniqueCourtNumber() {
@@ -36,6 +37,17 @@ function uniqueFromDateTime() {
 describe("booking actions (integración con Postgres real)", () => {
   let courtId: number;
   let playerId: number;
+
+  async function createExtraPlayer(prefix: string) {
+    const player = await createPlayer({
+      email: uniqueEmail(prefix),
+      password: "secreto123",
+      names: "Jugador",
+      lastnames: "Extra",
+    });
+    if (!player.success) throw new Error("no se pudo crear el jugador extra de prueba");
+    return player.data.id;
+  }
 
   beforeAll(async () => {
     const court = await createCourt({ number: uniqueCourtNumber() });
@@ -142,15 +154,8 @@ describe("booking actions (integración con Postgres real)", () => {
       expect(found.success).toBe(true);
       if (!found.success) throw new Error("expected success");
       expect(found.data?.match?.needPlayers).toBe(true);
-      expect(found.data?.match?.players).toHaveLength(1);
-
-      const dataSource = await getDataSource();
-      const matchPlayer = await dataSource.getRepository("MatchPlayer").findOne({
-        where: { match: { id: found.data?.match?.id } },
-        relations: { player: true },
-      });
-      expect(matchPlayer?.player).toMatchObject({ id: playerId });
-      expect(matchPlayer?.playersCount).toBe(2);
+      expect(found.data?.match?.matchPlayers).toHaveLength(1);
+      expect(found.data?.match?.matchPlayers[0]).toMatchObject({ playerId, playersCount: 2 });
     });
 
     it("con groupSize 4 crea una reserva completa, sin partido asociado", async () => {
@@ -182,6 +187,117 @@ describe("booking actions (integración con Postgres real)", () => {
         success: false,
         error: "La cantidad de jugadores debe ser entre 1 y 4.",
       });
+    });
+  });
+
+  describe("unirse a un partido abierto", () => {
+    it("suma un jugador nuevo sin completar el cupo", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-partial");
+      const result = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
+
+      const found = await getBookingById(opener.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match?.matchPlayers).toHaveLength(2);
+      expect(found.data?.match?.needPlayers).toBe(true);
+    });
+
+    it("al completar el cupo máximo de 4 jugadores, el partido deja de necesitar jugadores", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const secondId = await createExtraPlayer("joiner-second");
+      const thirdId = await createExtraPlayer("joiner-third");
+      const fourthId = await createExtraPlayer("joiner-fourth");
+
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: secondId });
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: thirdId });
+      const result = await joinOpenMatch({ bookingId: opener.data.id, playerId: fourthId });
+
+      expect(result.success).toBe(true);
+      if (!result.success) throw new Error("expected success");
+      expect(result.data.bookingState).toBe(BookingState.RESERVED);
+
+      const found = await getBookingById(opener.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match?.matchPlayers).toHaveLength(4);
+      expect(found.data?.match?.needPlayers).toBe(false);
+    });
+
+    it("rechaza sumarse a un partido ya completo", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const secondId = await createExtraPlayer("joiner-full-2");
+      const thirdId = await createExtraPlayer("joiner-full-3");
+      const fourthId = await createExtraPlayer("joiner-full-4");
+      const fifthId = await createExtraPlayer("joiner-full-5");
+
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: secondId });
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: thirdId });
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: fourthId });
+
+      const result = await joinOpenMatch({ bookingId: opener.data.id, playerId: fifthId });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Este turno no es un partido abierto.",
+      });
+    });
+
+    it("rechaza sumarse dos veces al mismo partido", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-twice");
+      const first = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId });
+      expect(first.success).toBe(true);
+
+      const second = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId });
+      expect(second).toEqual({ success: false, error: "Ya estás anotado en este partido." });
+    });
+
+    it("rechaza sumarse a un turno que no es un partido abierto", async () => {
+      const full = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+      if (!full.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-not-open");
+      const result = await joinOpenMatch({ bookingId: full.data.id, playerId: joinerId });
+
+      expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
+    });
+
+    it("rechaza sumarse a un turno inexistente", async () => {
+      const joinerId = await createExtraPlayer("joiner-missing");
+      const result = await joinOpenMatch({ bookingId: 999_999_999, playerId: joinerId });
+
+      expect(result).toEqual({ success: false, error: "El turno no existe." });
     });
   });
 

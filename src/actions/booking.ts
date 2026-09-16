@@ -31,13 +31,30 @@ export type UpdateBookingInput = Partial<
   courtId?: number;
 };
 
+export type JoinOpenMatchInput = {
+  bookingId: number;
+  playerId: number;
+};
+
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
 const INVALID_GROUP_SIZE_MESSAGE = `La cantidad de jugadores debe ser entre 1 y ${OPEN_MATCH_MAX_PLAYERS}.`;
 const OPEN_MATCH_TOO_SOON_MESSAGE = `No se puede crear un partido abierto con menos de ${OPEN_MATCH_MIN_HOURS_BEFORE_START} horas de anticipación.`;
+const BOOKING_NOT_FOUND_MESSAGE = "El turno no existe.";
+const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
+const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
+const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
+
+// Namespace distinto (forma de dos claves) al lock por cancha de createBooking/updateBooking,
+// para que un bookingId nunca contienda con un courtId que tenga el mismo número.
+const JOIN_MATCH_LOCK_CLASS = 42;
 
 class DoubleBookingError extends Error {}
 class InvalidGroupSizeError extends Error {}
 class OpenMatchTooSoonError extends Error {}
+class BookingNotFoundError extends Error {}
+class NotOpenMatchError extends Error {}
+class AlreadyJoinedError extends Error {}
+class MatchFullError extends Error {}
 
 /**
  * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
@@ -154,12 +171,91 @@ export async function createBooking(
   }
 }
 
+/**
+ * Suma a un jugador a un partido abierto (Match.needPlayers = true) hasta
+ * completar el cupo máximo de OPEN_MATCH_MAX_PLAYERS jugadores. Si con esta
+ * suma se completa el cupo, el partido deja de necesitar jugadores (el turno
+ * ya estaba reservado desde su creación, así que su estado no cambia acá).
+ */
+export async function joinOpenMatch(
+  input: JoinOpenMatchInput,
+): Promise<ActionResult<Booking>> {
+  try {
+    const dataSource = await getDataSource();
+
+    const saved = await dataSource.transaction(async (manager) => {
+      // Serializa los intentos de sumarse al mismo partido para no pasarse del cupo máximo.
+      await manager.query("SELECT pg_advisory_xact_lock($1, $2)", [
+        JOIN_MATCH_LOCK_CLASS,
+        input.bookingId,
+      ]);
+
+      const bookings = manager.getRepository(Booking);
+      const booking = await bookings.findOne({ where: { id: input.bookingId } });
+      if (!booking) {
+        throw new BookingNotFoundError();
+      }
+
+      const matches = manager.getRepository(Match);
+      const match = await matches.findOne({
+        where: { booking: { id: booking.id } },
+        relations: { matchPlayers: true },
+      });
+      if (!match || !match.needPlayers) {
+        throw new NotOpenMatchError();
+      }
+
+      const alreadyJoined = match.matchPlayers.some((mp) => mp.playerId === input.playerId);
+      if (alreadyJoined) {
+        throw new AlreadyJoinedError();
+      }
+
+      const confirmedPlayers = match.matchPlayers.reduce(
+        (sum, mp) => sum + (mp.playersCount ?? 1),
+        0,
+      );
+      if (confirmedPlayers >= OPEN_MATCH_MAX_PLAYERS) {
+        throw new MatchFullError();
+      }
+
+      const matchPlayers = manager.getRepository(MatchPlayer);
+      await matchPlayers.save(
+        matchPlayers.create({ match: { id: match.id }, player: { id: input.playerId } }),
+      );
+
+      if (confirmedPlayers + 1 >= OPEN_MATCH_MAX_PLAYERS) {
+        match.needPlayers = false;
+        await matches.save(match);
+      }
+
+      return booking;
+    });
+
+    return { success: true, data: toPlain(saved) };
+  } catch (error) {
+    if (error instanceof BookingNotFoundError) {
+      return { success: false, error: BOOKING_NOT_FOUND_MESSAGE };
+    }
+    if (error instanceof NotOpenMatchError) {
+      return { success: false, error: NOT_OPEN_MATCH_MESSAGE };
+    }
+    if (error instanceof AlreadyJoinedError) {
+      return { success: false, error: ALREADY_JOINED_MESSAGE };
+    }
+    if (error instanceof MatchFullError) {
+      return { success: false, error: MATCH_FULL_MESSAGE };
+    }
+    console.error("joinOpenMatch", error);
+    return { success: false, error: "No se pudo sumar al partido." };
+  }
+}
+
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
   try {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.find({
-      relations: { player: true, court: true, match: { players: true } },
+      relations: { player: true, court: true, match: { matchPlayers: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -176,7 +272,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true, match: { players: true } },
+      relations: { player: true, court: true, match: { matchPlayers: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {

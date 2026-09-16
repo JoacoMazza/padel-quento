@@ -89,6 +89,10 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
               bookingState: b.bookingState,
               needPlayers: b.match?.needPlayers ?? false,
               courtId: b.court?.id,
+              confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
+                (sum, mp) => sum + (mp.playersCount ?? 1),
+                0,
+              ),
             })),
             outOfServices: result.data.outOfServices.map((o) => ({
               id: o.id,

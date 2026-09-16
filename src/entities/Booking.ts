@@ -28,6 +28,6 @@ export class Booking {
   court!: Court;
 
   /** Partido asociado si el turno se reservó como partido abierto. */
-  @OneToOne("Match", (match: any) => match.booking)
+  @OneToOne("Match", "booking")
   match?: Match;
 }

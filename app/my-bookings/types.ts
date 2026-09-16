@@ -10,6 +10,8 @@ export type MyBookingItem = {
   matchId: number | null;
   needPlayers: boolean;
   confirmedPlayers: number;
+  /** true si este jugador se sumó a un partido abierto creado por otro (no lo reservó él). */
+  joinedAsParticipant: boolean;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";

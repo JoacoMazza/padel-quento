@@ -37,13 +37,13 @@ export function CourtCard({
               <button
                 key={slot.minutesOfDay}
                 type="button"
-                disabled={slot.status === "occupied" || slot.status === "open"}
+                disabled={slot.status === "occupied"}
                 onClick={() => onSlotClick(slot)}
                 className={`h-11 rounded-lg text-sm font-semibold transition-all ${
                   slot.status === "selected"
                     ? "bg-primary text-white shadow-sm"
                     : slot.status === "open"
-                      ? "cursor-not-allowed bg-amber-500 text-white"
+                      ? "cursor-pointer bg-amber-500 text-white hover:bg-amber-600"
                       : slot.status === "occupied"
                         ? "cursor-not-allowed bg-line/70 text-foreground/40"
                         : "border border-line bg-card text-foreground hover:border-primary hover:text-primary cursor-pointer"

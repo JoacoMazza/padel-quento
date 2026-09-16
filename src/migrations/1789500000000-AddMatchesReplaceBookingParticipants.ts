@@ -5,6 +5,9 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * (docs/der/DER Padel Quento.drawio): matchs.need_players reemplaza al estado
  * "pending_players" de bookings, y match_players reemplaza a booking_participants,
  * ligando a los jugadores confirmados con el partido en vez de con el turno.
+ * match_players usa una clave primaria compuesta (match_id, player_id): cada fila
+ * es un jugador distinto sumado al partido, y players_count sigue contando los
+ * acompañantes sin cuenta propia que trae quien crea el partido.
  */
 export class AddMatchesReplaceBookingParticipants1789500000000 implements MigrationInterface {
   name = "AddMatchesReplaceBookingParticipants1789500000000";
@@ -26,7 +29,7 @@ export class AddMatchesReplaceBookingParticipants1789500000000 implements Migrat
     );
 
     await queryRunner.query(
-      `CREATE TABLE "match_players" ("id" SERIAL NOT NULL, "players_count" integer NOT NULL DEFAULT '1', "joined_at" TIMESTAMP NOT NULL DEFAULT now(), "match_id" integer, "player_id" integer, CONSTRAINT "UQ_match_players_match_player" UNIQUE ("match_id", "player_id"), CONSTRAINT "PK_match_players_id" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "match_players" ("match_id" integer NOT NULL, "player_id" integer NOT NULL, "players_count" integer NOT NULL DEFAULT '1', "joined_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_match_players_match_id_player_id" PRIMARY KEY ("match_id", "player_id"))`,
     );
     await queryRunner.query(
       `ALTER TABLE "match_players" ADD CONSTRAINT "FK_match_players_match_id" FOREIGN KEY ("match_id") REFERENCES "matchs"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,

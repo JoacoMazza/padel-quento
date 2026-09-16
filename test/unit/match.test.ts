@@ -31,14 +31,14 @@ describe("match actions", () => {
       findOne.mockResolvedValueOnce({
         id: 1,
         needPlayers: true,
-        players: [{ playersCount: 2 }],
+        matchPlayers: [{ playersCount: 2 }],
       });
 
       const result = await closeMatch(1);
 
       expect(result).toEqual({
         success: true,
-        data: { id: 1, needPlayers: false, players: [{ playersCount: 2 }] },
+        data: { id: 1, needPlayers: false, matchPlayers: [{ playersCount: 2 }] },
       });
     });
 
@@ -55,7 +55,7 @@ describe("match actions", () => {
       findOne.mockResolvedValueOnce({
         id: 1,
         needPlayers: false,
-        players: [{ playersCount: 4 }],
+        matchPlayers: [{ playersCount: 4 }],
       });
 
       const result = await closeMatch(1);
@@ -71,7 +71,7 @@ describe("match actions", () => {
       findOne.mockResolvedValueOnce({
         id: 1,
         needPlayers: true,
-        players: [{ playersCount: 4 }],
+        matchPlayers: [{ playersCount: 4 }],
       });
 
       const result = await closeMatch(1);
@@ -92,13 +92,13 @@ describe("match actions", () => {
           id: 1,
           needPlayers: true,
           booking: { bookingState: BookingState.RESERVED, fromDateTime: soon },
-          players: [{ playersCount: 2 }],
+          matchPlayers: [{ playersCount: 2 }],
         },
         {
           id: 2,
           needPlayers: true,
           booking: { bookingState: BookingState.RESERVED, fromDateTime: soon },
-          players: [{ playersCount: 4 }],
+          matchPlayers: [{ playersCount: 4 }],
         },
       ]);
 
@@ -119,7 +119,7 @@ describe("match actions", () => {
           id: 1,
           needPlayers: true,
           booking: { bookingState: BookingState.RESERVED, fromDateTime: farFuture },
-          players: [{ playersCount: 2 }],
+          matchPlayers: [{ playersCount: 2 }],
         },
       ]);
 
@@ -135,7 +135,7 @@ describe("match actions", () => {
           id: 1,
           needPlayers: true,
           booking: { bookingState: BookingState.CANCELLED, fromDateTime: new Date() },
-          players: [{ playersCount: 2 }],
+          matchPlayers: [{ playersCount: 2 }],
         },
       ]);
 

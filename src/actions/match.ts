@@ -29,7 +29,7 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
       const matches = manager.getRepository(Match);
       const match = await matches.findOne({
         where: { id: matchId },
-        relations: { players: true },
+        relations: { matchPlayers: true },
       });
       if (!match) {
         throw new Error("NOT_FOUND");
@@ -38,7 +38,7 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
         throw new NotOpenError();
       }
 
-      const confirmedPlayers = (match.players ?? []).reduce(
+      const confirmedPlayers = (match.matchPlayers ?? []).reduce(
         (sum, p) => sum + (p.playersCount ?? 1),
         0,
       );
@@ -82,13 +82,16 @@ export async function cancelExpiredMatches(): Promise<ActionResult<number>> {
     const threshold = new Date(Date.now() + OPEN_MATCH_MIN_HOURS_BEFORE_START * 60 * 60_000);
     const openMatches = await matches.find({
       where: { needPlayers: true },
-      relations: { players: true, booking: true },
+      relations: { matchPlayers: true, booking: true },
     });
 
     const toCancel = openMatches.filter((match) => {
       if (match.booking.bookingState === BookingState.CANCELLED) return false;
       if (match.booking.fromDateTime.getTime() > threshold.getTime()) return false;
-      const confirmedPlayers = (match.players ?? []).reduce((sum, p) => sum + (p.playersCount ?? 1), 0);
+      const confirmedPlayers = (match.matchPlayers ?? []).reduce(
+        (sum, p) => sum + (p.playersCount ?? 1),
+        0,
+      );
       return confirmedPlayers < OPEN_MATCH_MAX_PLAYERS;
     });
 

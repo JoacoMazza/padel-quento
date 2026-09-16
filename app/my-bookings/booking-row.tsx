@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, Users, Volleyball, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { updateBooking } from "@/src/actions/booking";
@@ -28,10 +28,13 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
-  const canCancel = tone === "confirmed" || tone === "pending";
+  // Quien se sumó a un partido de otro jugador no puede cancelar el turno completo.
+  const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant;
+  // El cierre manual es una acción del creador del partido, no de quien se sumó.
   const canCloseManually =
     booking.needPlayers &&
     booking.matchId !== null &&
+    !booking.joinedAsParticipant &&
     booking.confirmedPlayers >= 1 &&
     booking.confirmedPlayers < OPEN_MATCH_MAX_PLAYERS;
 
@@ -99,6 +102,12 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
           <span className="flex items-center gap-1 text-xs text-foreground/60">
             <Users className="h-3.5 w-3.5" />
             {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores
+          </span>
+        ) : null}
+        {booking.joinedAsParticipant ? (
+          <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+            <UserPlus className="h-3.5 w-3.5" />
+            Te sumaste a este partido
           </span>
         ) : null}
       </div>
