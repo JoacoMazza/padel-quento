@@ -14,8 +14,8 @@ import type { Player } from "@/src/entities/Player";
 
 /**
  * Un jugador sumado a un partido abierto. playersCount cuenta al jugador que
- * se anota más los acompañantes que trae consigo sin cuenta propia (solo
- * aplica a quien crea el partido); quien se suma después siempre ocupa 1 lugar.
+ * se anota más los acompañantes que trae consigo sin cuenta propia (aplica
+ * tanto a quien crea el partido como a quien se suma después).
  *
  * Usa id autogenerado en vez de clave primaria compuesta (match_id, player_id):
  * con TypeORM, guardar filas nuevas mediante una PK compuesta armada a partir

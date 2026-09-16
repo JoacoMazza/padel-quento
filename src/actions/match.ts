@@ -26,7 +26,9 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
-      const matches = manager.getRepository(Match);
+      // Entity by name, not by class: see hasOverlappingBooking in
+      // src/actions/booking.ts for why (avoids EntityMetadataNotFoundError).
+      const matches = manager.getRepository<Match>("Match");
       const match = await matches.findOne({
         where: { id: matchId },
         relations: { matchPlayers: true },

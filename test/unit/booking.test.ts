@@ -225,9 +225,66 @@ describe("booking actions", () => {
 
       const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
 
-      expect(create).toHaveBeenCalledWith({ match: { id: 20 }, player: { id: 5 } });
+      expect(create).toHaveBeenCalledWith({
+        match: { id: 20 },
+        player: { id: 5 },
+        playersCount: 1,
+      });
       expect(save).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
+    });
+
+    it("permite sumarse con acompañantes indicando groupSize", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 2 });
+
+      expect(create).toHaveBeenCalledWith({
+        match: { id: 20 },
+        player: { id: 5 },
+        playersCount: 2,
+      });
+      expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
+      expect(result.success).toBe(true);
+    });
+
+    it("rechaza un groupSize mayor a los lugares libres", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 3 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Elegí entre 1 y 2 jugadores (los lugares libres que quedan).",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza un groupSize menor a 1", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 0 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Elegí entre 1 y 3 jugadores (los lugares libres que quedan).",
+      });
+      expect(create).not.toHaveBeenCalled();
     });
 
     it("toma un lock por partido antes de buscarlo", async () => {

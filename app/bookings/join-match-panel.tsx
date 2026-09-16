@@ -9,6 +9,8 @@ export function JoinMatchPanel({
   feedback,
   isPending,
   alreadyJoined,
+  groupSize,
+  onGroupSizeChange,
   onConfirm,
 }: {
   selectedDate: Date;
@@ -16,9 +18,12 @@ export function JoinMatchPanel({
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
   alreadyJoined: boolean;
+  groupSize: number;
+  onGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
 }) {
   const remainingSpots = OPEN_MATCH_MAX_PLAYERS - selectedMatch.confirmedPlayers;
+  const groupSizeOptions = Array.from({ length: remainingSpots }, (_, i) => i + 1);
 
   return (
     <aside className="h-fit rounded-2xl border border-amber-300 bg-card p-6 shadow-sm">
@@ -64,14 +69,40 @@ export function JoinMatchPanel({
             Ya formás parte de este partido.
           </p>
         ) : (
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={onConfirm}
-            className="mt-2 h-11 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
-          >
-            {isPending ? "Sumándote…" : "Sumarme al partido"}
-          </button>
+          <>
+            {remainingSpots > 1 ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="text-xs font-medium text-foreground/70">
+                  ¿Cuántos jugadores se suman (contándote a vos)?
+                </p>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  {groupSizeOptions.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => onGroupSizeChange(size)}
+                      className={`h-9 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                        groupSize === size
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "border border-amber-300 bg-white text-foreground hover:border-amber-500"
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={onConfirm}
+              className="mt-2 h-11 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
+            >
+              {isPending ? "Sumándote…" : "Sumarme al partido"}
+            </button>
+          </>
         )}
       </div>
     </aside>

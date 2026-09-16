@@ -240,6 +240,46 @@ describe("booking actions (integración con Postgres real)", () => {
       expect(found.data?.match?.needPlayers).toBe(false);
     });
 
+    it("permite sumarse con acompañantes indicando groupSize", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-with-friend");
+      const result = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId, groupSize: 2 });
+
+      expect(result.success).toBe(true);
+
+      const found = await getBookingById(opener.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match?.matchPlayers).toHaveLength(2);
+      // El creador (1) + el que se sumó con un acompañante (2) = cupo completo (3 de 4... en
+      // realidad quedaría un lugar libre: 1 + 2 = 3, todavía busca un jugador más).
+      expect(found.data?.match?.needPlayers).toBe(true);
+    });
+
+    it("rechaza un groupSize mayor a los lugares libres", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 3,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-too-many");
+      const result = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId, groupSize: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Elegí entre 1 y 1 jugador (los lugares libres que quedan).",
+      });
+    });
+
     it("rechaza sumarse a un partido ya completo", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),

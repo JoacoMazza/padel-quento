@@ -56,6 +56,7 @@ export function BookingsBoard({
   const [isOpenMatch, setIsOpenMatch] = useState(false);
   const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
   const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(null);
+  const [joinGroupSize, setJoinGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
@@ -159,12 +160,14 @@ export function BookingsBoard({
     if (slot.status === "open") {
       if (selectedOpenMatch?.bookingId === slot.bookingId) {
         setSelectedOpenMatch(null);
+        setJoinGroupSize(1);
         return;
       }
 
       setSelectedSlot(null);
       setIsOpenMatch(false);
       setOpenMatchGroupSize(1);
+      setJoinGroupSize(1);
       setSelectedOpenMatch({
         bookingId: slot.bookingId!,
         courtId: court.id,
@@ -185,6 +188,7 @@ export function BookingsBoard({
     }
 
     setSelectedOpenMatch(null);
+    setJoinGroupSize(1);
     setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
@@ -232,6 +236,7 @@ export function BookingsBoard({
       const result = await joinOpenMatch({
         bookingId: selectedOpenMatch.bookingId,
         playerId,
+        groupSize: joinGroupSize,
       });
 
       if (!result.success) {
@@ -257,6 +262,7 @@ export function BookingsBoard({
           setIsOpenMatch(false);
           setOpenMatchGroupSize(1);
           setSelectedOpenMatch(null);
+          setJoinGroupSize(1);
           setFeedback(null);
         }}
         onCourtFilterChange={(value) => {
@@ -265,6 +271,7 @@ export function BookingsBoard({
           setIsOpenMatch(false);
           setOpenMatchGroupSize(1);
           setSelectedOpenMatch(null);
+          setJoinGroupSize(1);
         }}
       />
 
@@ -290,6 +297,8 @@ export function BookingsBoard({
             feedback={feedback}
             isPending={isPending}
             alreadyJoined={selectedOpenMatch.alreadyJoined}
+            groupSize={joinGroupSize}
+            onGroupSizeChange={setJoinGroupSize}
             onConfirm={handleJoinConfirm}
           />
         ) : (
