@@ -16,11 +16,17 @@ export function startOpenMatchExpirationJob() {
     return;
   }
 
-  globalForJob.openMatchExpirationInterval = setInterval(() => {
+  const runCheck = () => {
     cancelExpiredMatches().catch((error) => {
       console.error("openMatchExpirationJob", error);
     });
-  }, CHECK_INTERVAL_MS);
+  };
 
+  // Corre una vez al arrancar: con setInterval solo, un partido ya vencido
+  // queda visible hasta 5 minutos (o más, si el server se reinicia antes de
+  // que el interval llegue a disparar, algo común en desarrollo).
+  runCheck();
+
+  globalForJob.openMatchExpirationInterval = setInterval(runCheck, CHECK_INTERVAL_MS);
   globalForJob.openMatchExpirationInterval.unref?.();
 }
