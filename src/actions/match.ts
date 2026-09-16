@@ -46,8 +46,13 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
         throw new InvalidPlayersToCloseError();
       }
 
+      // Update() en vez de save(match): el match trae precargado el array
+      // matchPlayers, y guardar el objeto completo puede hacer que TypeORM
+      // reconcile esa relación y borre filas que no figuren ahí. update()
+      // solo toca la columna indicada.
+      await matches.update(match.id, { needPlayers: false });
       match.needPlayers = false;
-      return matches.save(match);
+      return match;
     });
 
     return { success: true, data: toPlain(saved) };
@@ -95,13 +100,18 @@ export async function cancelExpiredMatches(): Promise<ActionResult<number>> {
       return confirmedPlayers < OPEN_MATCH_MAX_PLAYERS;
     });
 
-    for (const match of toCancel) {
-      match.booking.bookingState = BookingState.CANCELLED;
-      match.needPlayers = false;
-    }
     if (toCancel.length > 0) {
-      await bookings.save(toCancel.map((match) => match.booking));
-      await matches.save(toCancel);
+      // Update() por id en vez de save() de las entidades completas: los matches
+      // traen precargada la relación matchPlayers, y guardar el objeto entero
+      // puede hacer que TypeORM reconcile esa relación y borre filas.
+      await bookings.update(
+        toCancel.map((match) => match.booking.id),
+        { bookingState: BookingState.CANCELLED },
+      );
+      await matches.update(
+        toCancel.map((match) => match.id),
+        { needPlayers: false },
+      );
     }
 
     return { success: true, data: toCancel.length };

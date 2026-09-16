@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 
-const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource } = vi.hoisted(
-  () => {
+const { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource } =
+  vi.hoisted(() => {
     const create = vi.fn((data: unknown) => data);
     const save = vi.fn(async (entity: unknown) => entity);
+    const update = vi.fn(async () => ({ affected: 1 }));
     const find = vi.fn();
     const findOne = vi.fn();
     const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
@@ -12,7 +13,7 @@ const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSo
     const getOne = vi.fn(async () => null as unknown);
     const queryFn = vi.fn(async () => undefined);
 
-    const repository = { create, save, find, findOne, merge, delete: deleteFn };
+    const repository = { create, save, update, find, findOne, merge, delete: deleteFn };
 
     const queryBuilder: any = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
@@ -29,9 +30,8 @@ const { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSo
     const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
     const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
 
-    return { create, save, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource };
-  },
-);
+    return { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource };
+  });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
@@ -252,10 +252,8 @@ describe("booking actions", () => {
 
       const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
 
-      expect(save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 20, needPlayers: false }),
-      );
-      expect(save).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
+      expect(save).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
     });
 

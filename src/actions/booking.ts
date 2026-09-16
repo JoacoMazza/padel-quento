@@ -224,8 +224,11 @@ export async function joinOpenMatch(
       );
 
       if (confirmedPlayers + 1 >= OPEN_MATCH_MAX_PLAYERS) {
-        match.needPlayers = false;
-        await matches.save(match);
+        // Update() en vez de save(match): el match tiene precargado el array
+        // matchPlayers de ANTES de insertar la fila de arriba, así que guardar
+        // el objeto completo haría que TypeORM borre esa fila recién creada
+        // por no figurar en ese array. update() solo toca la columna indicada.
+        await matches.update(match.id, { needPlayers: false });
       }
 
       return booking;

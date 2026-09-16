@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 
-const { save, find, findOne, getDataSource } = vi.hoisted(() => {
-  const save = vi.fn(async (entity: unknown) => entity);
+const { update, find, findOne, getDataSource } = vi.hoisted(() => {
+  const update = vi.fn(async () => ({ affected: 1 }));
   const find = vi.fn();
   const findOne = vi.fn();
 
-  const repository = { save, find, findOne };
+  const repository = { update, find, findOne };
 
   const manager = { getRepository: vi.fn(() => repository) };
 
@@ -14,7 +14,7 @@ const { save, find, findOne, getDataSource } = vi.hoisted(() => {
   const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
   const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
 
-  return { save, find, findOne, getDataSource };
+  return { update, find, findOne, getDataSource };
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
@@ -36,6 +36,7 @@ describe("match actions", () => {
 
       const result = await closeMatch(1);
 
+      expect(update).toHaveBeenCalledWith(1, { needPlayers: false });
       expect(result).toEqual({
         success: true,
         data: { id: 1, needPlayers: false, matchPlayers: [{ playersCount: 2 }] },
@@ -48,7 +49,7 @@ describe("match actions", () => {
       const result = await closeMatch(999);
 
       expect(result).toEqual({ success: false, error: "El partido no existe." });
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it("devuelve error si el partido ya no está buscando jugadores", async () => {
@@ -64,7 +65,7 @@ describe("match actions", () => {
         success: false,
         error: "Este partido ya no está buscando jugadores.",
       });
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it("devuelve error si ya están los 4 jugadores confirmados", async () => {
@@ -80,7 +81,7 @@ describe("match actions", () => {
         success: false,
         error: "El cierre manual solo está disponible con entre 1 y 3 jugadores confirmados.",
       });
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
   });
 
@@ -91,24 +92,22 @@ describe("match actions", () => {
         {
           id: 1,
           needPlayers: true,
-          booking: { bookingState: BookingState.RESERVED, fromDateTime: soon },
+          booking: { id: 10, bookingState: BookingState.RESERVED, fromDateTime: soon },
           matchPlayers: [{ playersCount: 2 }],
         },
         {
           id: 2,
           needPlayers: true,
-          booking: { bookingState: BookingState.RESERVED, fromDateTime: soon },
+          booking: { id: 20, bookingState: BookingState.RESERVED, fromDateTime: soon },
           matchPlayers: [{ playersCount: 4 }],
         },
       ]);
 
       const result = await cancelExpiredMatches();
 
-      expect(save).toHaveBeenCalledWith([
-        expect.objectContaining({ bookingState: BookingState.CANCELLED }),
-      ]);
-      expect(save).toHaveBeenCalledWith([expect.objectContaining({ id: 1, needPlayers: false })]);
-      expect(save).toHaveBeenCalledTimes(2);
+      expect(update).toHaveBeenCalledWith([10], { bookingState: BookingState.CANCELLED });
+      expect(update).toHaveBeenCalledWith([1], { needPlayers: false });
+      expect(update).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ success: true, data: 1 });
     });
 
@@ -118,14 +117,14 @@ describe("match actions", () => {
         {
           id: 1,
           needPlayers: true,
-          booking: { bookingState: BookingState.RESERVED, fromDateTime: farFuture },
+          booking: { id: 10, bookingState: BookingState.RESERVED, fromDateTime: farFuture },
           matchPlayers: [{ playersCount: 2 }],
         },
       ]);
 
       const result = await cancelExpiredMatches();
 
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
       expect(result).toEqual({ success: true, data: 0 });
     });
 
@@ -134,14 +133,14 @@ describe("match actions", () => {
         {
           id: 1,
           needPlayers: true,
-          booking: { bookingState: BookingState.CANCELLED, fromDateTime: new Date() },
+          booking: { id: 10, bookingState: BookingState.CANCELLED, fromDateTime: new Date() },
           matchPlayers: [{ playersCount: 2 }],
         },
       ]);
 
       const result = await cancelExpiredMatches();
 
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
       expect(result).toEqual({ success: true, data: 0 });
     });
 
