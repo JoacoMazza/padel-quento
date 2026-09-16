@@ -7,6 +7,8 @@ export type MyBookingItem = {
   bookingState: BookingState;
   courtNumber: number;
   confirmedPlayers: number;
+  /** true si este jugador se sumó a un partido abierto creado por otro (no lo reservó él). */
+  joinedAsParticipant: boolean;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";

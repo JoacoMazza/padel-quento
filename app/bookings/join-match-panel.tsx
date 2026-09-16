@@ -8,12 +8,14 @@ export function JoinMatchPanel({
   selectedMatch,
   feedback,
   isPending,
+  alreadyJoined,
   onConfirm,
 }: {
   selectedDate: Date;
   selectedMatch: SelectedOpenMatch;
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
+  alreadyJoined: boolean;
   onConfirm: () => void;
 }) {
   const remainingSpots = OPEN_MATCH_MAX_PLAYERS - selectedMatch.confirmedPlayers;
@@ -57,14 +59,20 @@ export function JoinMatchPanel({
         />
         <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Lugares libres" value={`${remainingSpots}`} />
 
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={onConfirm}
-          className="mt-2 h-11 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
-        >
-          {isPending ? "Sumándote…" : "Sumarme al partido"}
-        </button>
+        {alreadyJoined ? (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-sm font-medium text-foreground/70">
+            Ya formás parte de este partido.
+          </p>
+        ) : (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onConfirm}
+            className="mt-2 h-11 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
+          >
+            {isPending ? "Sumándote…" : "Sumarme al partido"}
+          </button>
+        )}
       </div>
     </aside>
   );

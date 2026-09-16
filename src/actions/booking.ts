@@ -268,7 +268,7 @@ export async function updateBooking(
         throw new Error("NOT_FOUND");
       }
 
-      const { playerId, courtId, isOpenMatch: _isOpenMatch, ...rest } = input;
+      const { playerId, courtId, ...rest } = input;
 
       const effectiveCourtId = courtId ?? booking.court?.id;
       const effectiveState = input.bookingState ?? booking.bookingState;

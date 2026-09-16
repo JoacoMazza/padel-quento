@@ -124,7 +124,11 @@ export function BookingsBoard({
             end,
             status,
             ...(status === "open"
-              ? { bookingId: overlappingBooking!.id, confirmedPlayers: overlappingBooking!.confirmedPlayers }
+              ? {
+                  bookingId: overlappingBooking!.id,
+                  confirmedPlayers: overlappingBooking!.confirmedPlayers,
+                  alreadyJoined: playerId != null && (overlappingBooking!.matchPlayerIds ?? []).includes(playerId),
+                }
               : {}),
           });
         }
@@ -143,6 +147,7 @@ export function BookingsBoard({
     selectedOpenMatch,
     outOfServices,
     bookings,
+    playerId,
   ]);
 
   function handleSlotClick(court: CourtProp, slot: Slot) {
@@ -164,6 +169,7 @@ export function BookingsBoard({
         start: slot.start,
         end: slot.end,
         confirmedPlayers: slot.confirmedPlayers ?? 0,
+        alreadyJoined: slot.alreadyJoined ?? false,
       });
       return;
     }
@@ -207,7 +213,7 @@ export function BookingsBoard({
   }
 
   function handleJoinConfirm() {
-    if (!selectedOpenMatch) return;
+    if (!selectedOpenMatch || selectedOpenMatch.alreadyJoined) return;
 
     if (!playerId) {
       setFeedback({ type: "error", message: "Tu cuenta no puede sumarse a partidos." });
@@ -274,6 +280,7 @@ export function BookingsBoard({
             selectedMatch={selectedOpenMatch}
             feedback={feedback}
             isPending={isPending}
+            alreadyJoined={selectedOpenMatch.alreadyJoined}
             onConfirm={handleJoinConfirm}
           />
         ) : (
