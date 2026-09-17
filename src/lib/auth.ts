@@ -37,6 +37,11 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          if (user.isBlocked) {
+            console.warn(`[Auth] Intento de login de usuario bloqueado: ${email}`);
+            return null;
+          }
+
           console.log(`[Auth] Login exitoso para el usuario: ${user.email}`);
           return {
             id: String(user.id),

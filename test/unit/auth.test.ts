@@ -79,6 +79,23 @@ describe("authorize (CredentialsProvider)", () => {
     expect(findOne).toHaveBeenCalledWith({ where: { email: "a@test.com" } });
   });
 
+  it("devuelve null cuando el usuario tiene isBlocked = true (aunque la contraseña sea correcta)", async () => {
+    findOne.mockResolvedValueOnce({
+      id: 2,
+      email: "bloqueado@test.com",
+      passwordHash: "hash",
+      names: "Carlos",
+      lastnames: "Sanchez",
+      role: "player",
+      isBlocked: true,
+    });
+    vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+
+    const result = await getAuthorize()({ email: "bloqueado@test.com", password: "correcta" });
+
+    expect(result).toBeNull();
+  });
+
   it("devuelve null en vez de lanzar cuando falla la conexión a la base de datos", async () => {
     getDataSource.mockRejectedValueOnce(new Error("connection refused"));
 

@@ -34,6 +34,10 @@ export class User {
   @Column({ type: "varchar", nullable: true, name: "photo_url" })
   photoUrl!: string | null;
 
+  /** Si es true, el usuario no puede iniciar sesión ni realizar reservas. */
+  @Column({ type: "boolean", default: false, name: "is_blocked" })
+  isBlocked!: boolean;
+
   /** Hash bcrypt; nunca se envía al cliente. RNF-03. */
   @Column({ type: "varchar", name: "password_hashed" })
   passwordHash!: string;
