@@ -15,17 +15,29 @@ function getAuthorize() {
 
 describe("authorize - CredentialsProvider (integración con Postgres real)", () => {
   const email = `auth.${Date.now()}@test.com`;
+  const emailBlocked = `blocked.${Date.now()}@test.com`;
   const password = "claveSegura123";
 
   beforeAll(async () => {
     const dataSource = await getDataSource();
     const users = dataSource.getRepository<User>("User");
+    // usuario normal
     await users.save(
       users.create({
         email,
         names: "Login",
         lastnames: "Test",
         passwordHash: await bcrypt.hash(password, 12),
+      } as User),
+    );
+    // usuario bloqueado
+    await users.save(
+      users.create({
+        email: emailBlocked,
+        names: "Bloqueado",
+        lastnames: "Test",
+        passwordHash: await bcrypt.hash(password, 12),
+        isBlocked: true,
       } as User),
     );
   });
@@ -48,6 +60,11 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
 
   it("rechaza un email que no existe", async () => {
     const result = await getAuthorize()({ email: "no-existe@test.com", password });
+    expect(result).toBeNull();
+  });
+
+  it("rechaza el login de un usuario bloqueado aunque la contraseña sea correcta", async () => {
+    const result = await getAuthorize()({ email: emailBlocked, password });
     expect(result).toBeNull();
   });
 });

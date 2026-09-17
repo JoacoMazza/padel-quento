@@ -5,6 +5,7 @@ import { EntityManager } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
+import { Player } from "@/src/entities/Player";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
@@ -48,6 +49,7 @@ const BOOKING_NOT_FOUND_MESSAGE = "El turno no existe.";
 const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
 const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
 const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
+const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
 
@@ -62,6 +64,7 @@ class BookingNotFoundError extends Error {}
 class NotOpenMatchError extends Error {}
 class AlreadyJoinedError extends Error {}
 class MatchFullError extends Error {}
+class BlockedPlayerError extends Error {}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
@@ -106,6 +109,12 @@ export async function createBooking(
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
+      const players = manager.getRepository<Player>("Player");
+      const player = await players.findOne({ where: { id: input.playerId } });
+      if (player?.isBlocked) {
+        throw new BlockedPlayerError();
+      }
+
       // Serializa los intentos de reserva para la misma cancha: el lock se toma y
       // libera automáticamente con la transacción, así el chequeo de abajo nunca
       // corre en paralelo con otro para la misma cancha.
@@ -172,6 +181,9 @@ export async function createBooking(
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
+    if (error instanceof BlockedPlayerError) {
+      return { success: false, error: BLOCKED_PLAYER_MESSAGE };
+    }
     if (error instanceof DoubleBookingError) {
       return { success: false, error: DOUBLE_BOOKING_MESSAGE };
     }
@@ -201,6 +213,12 @@ export async function joinOpenMatch(
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
+      const players = manager.getRepository<Player>("Player");
+      const player = await players.findOne({ where: { id: input.playerId } });
+      if (player?.isBlocked) {
+        throw new BlockedPlayerError();
+      }
+
       // Serializa los intentos de sumarse al mismo partido para no pasarse del cupo máximo.
       await manager.query("SELECT pg_advisory_xact_lock($1, $2)", [
         JOIN_MATCH_LOCK_CLASS,
@@ -263,6 +281,9 @@ export async function joinOpenMatch(
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
+    if (error instanceof BlockedPlayerError) {
+      return { success: false, error: BLOCKED_PLAYER_MESSAGE };
+    }
     if (error instanceof BookingNotFoundError) {
       return { success: false, error: BOOKING_NOT_FOUND_MESSAGE };
     }

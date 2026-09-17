@@ -1,36 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 
-const { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource } =
+const { create, save, update, find, findOne, playerFindOne, merge, deleteFn, getOne, queryFn, getDataSource } =
   vi.hoisted(() => {
     const create = vi.fn((data: unknown) => data);
     const save = vi.fn(async (entity: unknown) => entity);
     const update = vi.fn(async () => ({ affected: 1 }));
     const find = vi.fn();
     const findOne = vi.fn();
+    const playerFindOne = vi.fn(async () => ({ id: 1, isBlocked: false }));
     const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
     const deleteFn = vi.fn();
     const getOne = vi.fn(async () => null as unknown);
     const queryFn = vi.fn(async () => undefined);
 
     const repository = { create, save, update, find, findOne, merge, delete: deleteFn };
+    const playerRepository = { create, save, update, find, findOne: playerFindOne, merge, delete: deleteFn };
 
     const queryBuilder: any = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
     queryBuilder.andWhere = vi.fn(() => queryBuilder);
     queryBuilder.getOne = getOne;
 
+    const getRepoForEntity = (entity: unknown) => (entity === "Player" ? playerRepository : repository);
+
     const manager = {
       query: queryFn,
-      getRepository: vi.fn(() => repository),
+      getRepository: vi.fn(getRepoForEntity),
       createQueryBuilder: vi.fn(() => queryBuilder),
     };
 
-    const getRepository = vi.fn(() => repository);
+    const getRepository = vi.fn(getRepoForEntity);
     const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
     const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
 
-    return { create, save, update, find, findOne, merge, deleteFn, getOne, queryFn, getDataSource };
+    return { create, save, update, find, findOne, playerFindOne, merge, deleteFn, getOne, queryFn, getDataSource };
   });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
@@ -56,6 +60,7 @@ describe("booking actions", () => {
     create.mockImplementation((data: unknown) => data);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
+    playerFindOne.mockResolvedValue({ id: 1, isBlocked: false });
   });
 
   describe("createBooking", () => {
@@ -168,6 +173,18 @@ describe("booking actions", () => {
       await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
 
       expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("rechaza la reserva si el usuario se encuentra bloqueado", async () => {
+      playerFindOne.mockResolvedValueOnce({ id: 1, isBlocked: true });
+
+      const result = await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "El usuario se encuentra bloqueado y no puede realizar reservas.",
+      });
+      expect(save).not.toHaveBeenCalled();
     });
 
     it("rechaza un groupSize fuera del rango 1 a 4", async () => {
@@ -328,6 +345,18 @@ describe("booking actions", () => {
       expect(result).toEqual({
         success: false,
         error: "El partido ya está completo, no quedan lugares libres.",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("rechaza al jugador si se encuentra bloqueado", async () => {
+      playerFindOne.mockResolvedValueOnce({ id: 5, isBlocked: true });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "El usuario se encuentra bloqueado y no puede realizar reservas.",
       });
       expect(create).not.toHaveBeenCalled();
     });

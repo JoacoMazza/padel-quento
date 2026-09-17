@@ -2,20 +2,24 @@ import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
 import { getBookings } from "@/src/actions/booking";
 import { getOutOfServices } from "@/src/actions/outOfService";
+import { getPlayersAdmin } from "@/src/actions/player";
 import { AdminPanel } from "@/app/admin/admin-panel";
 
 export default async function AdminPage() {
-  const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult] = await Promise.all([
-    getCourts(),
-    getSchedules(),
-    getBookings(),
-    getOutOfServices(),
-  ]);
+  const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult, playersResult] =
+    await Promise.all([
+      getCourts(),
+      getSchedules(),
+      getBookings(),
+      getOutOfServices(),
+      getPlayersAdmin(),
+    ]);
 
   const courts = courtsResult.success ? courtsResult.data : [];
   const schedules = schedulesResult.success ? schedulesResult.data : [];
   const bookings = bookingsResult.success ? bookingsResult.data : [];
   const outOfServices = outOfServicesResult.success ? outOfServicesResult.data : [];
+  const players = playersResult.success ? playersResult.data : [];
 
   return (
     <AdminPanel
@@ -46,6 +50,7 @@ export default async function AdminPage() {
         toDateTime: o.toDateTime,
         courtId: o.court?.id,
       }))}
+      players={players}
     />
   );
 }

@@ -7,6 +7,7 @@ import { PlayerCategory, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { requireAdmin } from "@/src/lib/rbac";
 
 export type CreatePlayerInput = {
   email: string;
@@ -129,5 +130,83 @@ export async function deletePlayer(id: number): Promise<ActionResult<null>> {
   } catch (error) {
     console.error("deletePlayer", error);
     return { success: false, error: "No se pudo eliminar el jugador." };
+  }
+}
+
+// ─── Administración ────────────────────────────────────────────────────────────
+
+export type PlayerAdminItem = {
+  id: number;
+  names: string;
+  lastnames: string;
+  email: string;
+  dni: number | null;
+  phoneNumber: string | null;
+  category: PlayerCategory;
+  scoring: number;
+  isBlocked: boolean;
+};
+
+/** Lista todos los jugadores. Solo accesible por administradores. */
+export async function getPlayersAdmin(): Promise<ActionResult<PlayerAdminItem[]>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const players = dataSource.getRepository<Player>("Player");
+    const data = await players.find({
+      select: {
+        id: true,
+        names: true,
+        lastnames: true,
+        email: true,
+        dni: true,
+        phoneNumber: true,
+        category: true,
+        scoring: true,
+        isBlocked: true,
+      },
+    });
+    return { success: true, data: toPlain(data) as PlayerAdminItem[] };
+  } catch (error) {
+    console.error("getPlayersAdmin", error);
+    return { success: false, error: "No se pudieron obtener los jugadores." };
+  }
+}
+
+/** Bloquea la cuenta de un jugador. Solo accesible por administradores. */
+export async function blockPlayer(id: number): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const players = dataSource.getRepository<Player>("Player");
+    const player = await players.findOne({ where: { id } });
+    if (!player) {
+      return { success: false, error: "El jugador no existe." };
+    }
+    player.isBlocked = true;
+    await players.save(player);
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("blockPlayer", error);
+    return { success: false, error: "No se pudo bloquear el jugador." };
+  }
+}
+
+/** Desbloquea la cuenta de un jugador. Solo accesible por administradores. */
+export async function unblockPlayer(id: number): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const players = dataSource.getRepository<Player>("Player");
+    const player = await players.findOne({ where: { id } });
+    if (!player) {
+      return { success: false, error: "El jugador no existe." };
+    }
+    player.isBlocked = false;
+    await players.save(player);
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("unblockPlayer", error);
+    return { success: false, error: "No se pudo desbloquear el jugador." };
   }
 }

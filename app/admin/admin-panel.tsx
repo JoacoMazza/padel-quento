@@ -5,15 +5,17 @@ import { MapPin, Lock, BarChart3, Users, CalendarClock } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
+import { UsersTable } from "@/app/admin/users-table";
 import type { CourtItem } from "@/app/admin/court-status";
 import type { BookingProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
+import type { PlayerAdminItem } from "@/src/actions/player";
 
 const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
   { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: false },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: false },
-  { id: "users", label: "Gestión de Usuarios", icon: Users, available: false },
+  { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -24,12 +26,14 @@ export function AdminPanel({
   schedules,
   bookings,
   outOfServices,
+  players,
 }: {
   courts: CourtItem[];
   courtsError?: string | null;
   schedules: ScheduleProp[];
   bookings: BookingProp[];
   outOfServices: OutOfServiceProp[];
+  players: PlayerAdminItem[];
 }) {
   const [activeSection, setActiveSection] = useState<SectionId>("schedule");
   const activeLabel = SECTIONS.find((s) => s.id === activeSection)?.label ?? "";
@@ -98,6 +102,8 @@ export function AdminPanel({
             ) : null}
             <CourtsTable courts={courts} />
           </div>
+        ) : activeSection === "users" ? (
+          <UsersTable players={players} />
         ) : (
           <p className="text-sm text-foreground/60">Esta sección estará disponible próximamente.</p>
         )}
