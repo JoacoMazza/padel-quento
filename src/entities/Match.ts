@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { Column, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import type { Booking } from "@/src/entities/Booking";
+import type { Chat } from "@/src/entities/Chat";
 import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 
 /**
@@ -23,4 +24,8 @@ export class Match {
 
   @OneToMany("MatchPlayer", "match")
   matchPlayers!: MatchPlayer[];
+
+  /** Sala de chat temporal del partido, si ya se sumó un segundo jugador con cuenta. */
+  @OneToOne("Chat", "match")
+  chat?: Chat;
 }
