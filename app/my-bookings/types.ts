@@ -10,6 +10,8 @@ export type MyBookingItem = {
   matchId: number | null;
   needPlayers: boolean;
   confirmedPlayers: number;
+  /** Id de la sala de chat temporal del partido, si ya se creó. */
+  chatId: number | null;
   /** true si este jugador se sumó a un partido abierto creado por otro (no lo reservó él). */
   joinedAsParticipant: boolean;
 };

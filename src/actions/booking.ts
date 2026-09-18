@@ -3,6 +3,7 @@
 import "reflect-metadata";
 import { EntityManager } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
+import { Chat } from "@/src/entities/Chat";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
@@ -268,6 +269,16 @@ export async function joinOpenMatch(
         }),
       );
 
+      // La sala de chat temporal se crea la primera vez que se suma un segundo
+      // jugador con cuenta propia: antes de esto (match.matchPlayers.length === 1,
+      // solo quien creó el partido) no habría con quién hablar. match.matchPlayers
+      // todavía no incluye la fila recién insertada arriba, así que el chequeo se
+      // hace contra la cantidad previa a esta suma.
+      if (match.matchPlayers.length === 1) {
+        const chats = manager.getRepository<Chat>("Chat");
+        await chats.save(chats.create({ match: { id: match.id } }));
+      }
+
       if (confirmedPlayers + groupSize >= OPEN_MATCH_MAX_PLAYERS) {
         // Update() en vez de save(match): el match tiene precargado el array
         // matchPlayers de ANTES de insertar la fila de arriba, así que guardar
@@ -309,7 +320,7 @@ export async function getBookings(): Promise<ActionResult<Booking[]>> {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.find({
-      relations: { player: true, court: true, match: { matchPlayers: true } },
+      relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -326,7 +337,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true, match: { matchPlayers: true } },
+      relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {

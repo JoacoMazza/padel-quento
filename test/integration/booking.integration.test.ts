@@ -213,6 +213,46 @@ describe("booking actions (integración con Postgres real)", () => {
       expect(found.data?.match?.needPlayers).toBe(true);
     });
 
+    it("no crea sala de chat mientras el partido abierto solo tiene al creador", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const found = await getBookingById(opener.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match?.chat).toBeFalsy();
+    });
+
+    it("crea y asocia automáticamente la sala de chat al sumarse el segundo jugador con cuenta", async () => {
+      const opener = await createBooking({
+        fromDateTime: uniqueFromDateTime(),
+        playerId,
+        courtId,
+        groupSize: 1,
+      });
+      if (!opener.success) throw new Error("expected success");
+
+      const joinerId = await createExtraPlayer("joiner-chat");
+      const joined = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId });
+      if (!joined.success) throw new Error("expected success");
+
+      const found = await getBookingById(opener.data.id);
+      if (!found.success) throw new Error("expected success");
+      expect(found.data?.match?.chat).toMatchObject({ id: expect.any(Number) });
+
+      const thirdId = await createExtraPlayer("joiner-chat-third");
+      await joinOpenMatch({ bookingId: opener.data.id, playerId: thirdId });
+
+      const afterThird = await getBookingById(opener.data.id);
+      if (!afterThird.success) throw new Error("expected success");
+      // Una sola sala por partido: no se crea una nueva con cada jugador que se suma después.
+      expect(afterThird.data?.match?.chat?.id).toBe(found.data?.match?.chat?.id);
+    });
+
     it("al completar el cupo máximo de 4 jugadores, el partido deja de necesitar jugadores", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),

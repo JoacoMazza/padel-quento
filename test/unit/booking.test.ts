@@ -251,6 +251,35 @@ describe("booking actions", () => {
       expect(result.success).toBe(true);
     });
 
+    it("crea la sala de chat al sumarse el segundo jugador con cuenta propia", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        // Solo el creador confirmado hasta ahora: esta suma es la segunda cuenta.
+        matchPlayers: [{ playerId: 1 }],
+      });
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(create).toHaveBeenCalledWith({ match: { id: 20 } });
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(result.success).toBe(true);
+    });
+
+    it("no crea otra sala de chat si el partido ya tenía más de un jugador confirmado", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
+      findOne.mockResolvedValueOnce({
+        id: 20,
+        needPlayers: true,
+        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
+      });
+
+      await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(create).not.toHaveBeenCalledWith({ match: { id: 20 } });
+    });
+
     it("permite sumarse con acompañantes indicando groupSize", async () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce({
@@ -435,7 +464,7 @@ describe("booking actions", () => {
       const result = await getBookings();
 
       expect(find).toHaveBeenCalledWith({
-        relations: { player: true, court: true, match: { matchPlayers: true } },
+        relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
@@ -457,7 +486,7 @@ describe("booking actions", () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: true, court: true, match: { matchPlayers: true } },
+        relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
     });

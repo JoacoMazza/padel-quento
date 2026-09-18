@@ -39,6 +39,7 @@ export default async function MyBookingsPage() {
         (sum, mp) => sum + (mp.playersCount ?? 1),
         0,
       ),
+      chatId: b.match?.chat?.id ?? null,
       // Turno creado por otro jugador al que este jugador se sumó (no es quien reservó).
       joinedAsParticipant: player ? b.player?.id !== player.id : false,
     }));

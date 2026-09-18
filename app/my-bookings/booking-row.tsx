@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, UserPlus, Users, Volleyball, X } from "lucide-react";
+import Link from "next/link";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { updateBooking } from "@/src/actions/booking";
@@ -155,6 +156,15 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
               <CalendarCheck className="h-4 w-4" />
               Ver detalle
             </button>
+            {booking.chatId !== null ? (
+              <Link
+                href={`/chats/${booking.chatId}`}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line px-4 text-sm font-semibold text-foreground/70 transition-colors hover:border-primary hover:text-primary"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Chat
+              </Link>
+            ) : null}
             {canCloseManually ? (
               <button
                 type="button"
