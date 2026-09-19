@@ -7,6 +7,7 @@ import { Chat } from "../../src/entities/Chat";
 import { Court } from "../../src/entities/Court";
 import { Match } from "../../src/entities/Match";
 import { MatchPlayer } from "../../src/entities/MatchPlayer";
+import { Message } from "../../src/entities/Message";
 import { OutOfService } from "../../src/entities/OutOfService";
 import { Player } from "../../src/entities/Player";
 import { Schedule } from "../../src/entities/Schedule";
@@ -26,7 +27,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [User, Player, Penalty, Court, Booking, Match, MatchPlayer, Chat, OutOfService, Schedule],
+    entities: [User, Player, Penalty, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule],
     synchronize: true,
     dropSchema: true,
   });

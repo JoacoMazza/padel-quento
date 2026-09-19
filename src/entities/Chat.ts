@@ -1,6 +1,7 @@
 import "reflect-metadata";
-import { CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { CreateDateColumn, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import type { Match } from "@/src/entities/Match";
+import type { Message } from "@/src/entities/Message";
 
 /**
  * Sala de chat temporal de un partido abierto. Se crea y asocia automáticamente
@@ -16,6 +17,9 @@ export class Chat {
   @OneToOne("Match", "chat", { onDelete: "CASCADE" })
   @JoinColumn({ name: "match_id" })
   match!: Match;
+
+  @OneToMany("Message", "chat")
+  messages!: Message[];
 
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
