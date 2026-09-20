@@ -10,6 +10,7 @@ import { toPlain, type ActionResult } from "@/src/lib/action-result";
 export type CreateCourtInput = {
   number: number;
   state?: CourtState;
+  location?: string;
 };
 
 export type UpdateCourtInput = Partial<CreateCourtInput>;
@@ -24,6 +25,7 @@ export async function createCourt(
     const court = courts.create({
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
+      location: input.location ?? "Cam. Centenario 8907, B1894 Villa Elisa, Provincia de Buenos Aires",
     });
 
     const saved = await courts.save(court);

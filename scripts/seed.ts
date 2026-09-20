@@ -21,7 +21,13 @@ async function main() {
   for (let number = 1; number <= COURT_COUNT; number++) {
     const exists = await courts.findOne({ where: { number } });
     if (exists) continue;
-    await courts.save(courts.create({ number, state: CourtState.AVAILABLE }));
+    await courts.save(
+      courts.create({
+        number,
+        state: CourtState.AVAILABLE,
+        location: "Cam. Centenario 8907, B1894 Villa Elisa",
+      }),
+    );
     courtsCreated++;
   }
 

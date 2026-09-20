@@ -172,6 +172,7 @@ export function BookingsBoard({
         bookingId: slot.bookingId!,
         courtId: court.id,
         courtNumber: court.number,
+        courtLocation: court.location,
         start: slot.start,
         end: slot.end,
         confirmedPlayers: slot.confirmedPlayers ?? 0,
@@ -189,7 +190,13 @@ export function BookingsBoard({
 
     setSelectedOpenMatch(null);
     setJoinGroupSize(1);
-    setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
+    setSelectedSlot({
+      courtId: court.id,
+      courtNumber: court.number,
+      courtLocation: court.location,
+      start: slot.start,
+      end: slot.end,
+    });
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
   }

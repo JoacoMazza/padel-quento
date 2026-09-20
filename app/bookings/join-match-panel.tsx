@@ -1,4 +1,4 @@
-import { Banknote, Calendar, Clock, LayoutGrid, Users } from "lucide-react";
+import { Banknote, Calendar, Clock, LayoutGrid, MapPin, Users } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import type { SelectedOpenMatch } from "@/app/bookings/types";
@@ -51,6 +51,11 @@ export function JoinMatchPanel({
           icon={<LayoutGrid className="h-5 w-5" />}
           label="Cancha"
           value={`Cancha ${selectedMatch.courtNumber}`}
+        />
+        <SummaryRow
+          icon={<MapPin className="h-5 w-5" />}
+          label="Ubicación"
+          value={selectedMatch.courtLocation ?? "Cam. Centenario 8907, Villa Elisa"}
         />
         <SummaryRow
           icon={<Clock className="h-5 w-5" />}

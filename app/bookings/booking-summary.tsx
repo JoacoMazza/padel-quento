@@ -1,4 +1,4 @@
-import { Banknote, Calendar, Clock, LayoutGrid, Users } from "lucide-react";
+import { Banknote, Calendar, Clock, LayoutGrid, MapPin, Users } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   SLOT_DURATION_MINUTES,
@@ -56,6 +56,11 @@ export function BookingSummary({
             icon={<LayoutGrid className="h-5 w-5" />}
             label="Cancha"
             value={`Cancha ${selectedSlot.courtNumber}`}
+          />
+          <SummaryRow
+            icon={<MapPin className="h-5 w-5" />}
+            label="Ubicación"
+            value={selectedSlot.courtLocation ?? "Cam. Centenario 8907, Villa Elisa"}
           />
           <SummaryRow
             icon={<Clock className="h-5 w-5" />}

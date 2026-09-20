@@ -1,6 +1,6 @@
 import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
 
-export type CourtProp = { id: number; number: number; state: CourtState };
+export type CourtProp = { id: number; number: number; state: CourtState; location?: string };
 
 export type ScheduleProp = {
   id: number;
@@ -47,6 +47,7 @@ export type Slot = {
 export type SelectedSlot = {
   courtId: number;
   courtNumber: number;
+  courtLocation?: string;
   start: Date;
   end: Date;
 };
@@ -55,6 +56,7 @@ export type SelectedOpenMatch = {
   bookingId: number;
   courtId: number;
   courtNumber: number;
+  courtLocation?: string;
   start: Date;
   end: Date;
   confirmedPlayers: number;
