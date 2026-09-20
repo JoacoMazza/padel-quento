@@ -82,7 +82,6 @@ export default async function BookingsPage() {
             id: c.id,
             number: c.number,
             state: c.state,
-            location: c.location,
             price: c.price,
           }))}
           schedules={schedules.map((s) => ({

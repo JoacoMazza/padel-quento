@@ -33,7 +33,6 @@ export default async function MyBookingsPage() {
       durationMinutes: b.durationMinutes,
       bookingState: b.bookingState,
       courtNumber: b.court?.number ?? 0,
-      courtLocation: b.court?.location,
       price: b.price ?? 10000,
       matchId: b.match?.id ?? null,
       needPlayers: b.match?.needPlayers ?? false,

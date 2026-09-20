@@ -173,7 +173,6 @@ export function BookingsBoard({
         bookingId: slot.bookingId!,
         courtId: court.id,
         courtNumber: court.number,
-        courtLocation: court.location,
         price: openBooking?.price ?? court.price ?? DEFAULT_SLOT_PRICE,
         start: slot.start,
         end: slot.end,
@@ -195,7 +194,6 @@ export function BookingsBoard({
     setSelectedSlot({
       courtId: court.id,
       courtNumber: court.number,
-      courtLocation: court.location,
       price: court.price ?? DEFAULT_SLOT_PRICE,
       start: slot.start,
       end: slot.end,

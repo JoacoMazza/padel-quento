@@ -25,7 +25,6 @@ async function main() {
       courts.create({
         number,
         state: CourtState.AVAILABLE,
-        location: "Cam. Centenario 8907, B1894 Villa Elisa",
         price: 10000,
       }),
     );

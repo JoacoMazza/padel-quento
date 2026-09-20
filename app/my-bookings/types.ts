@@ -6,7 +6,6 @@ export type MyBookingItem = {
   durationMinutes: number;
   bookingState: BookingState;
   courtNumber: number;
-  courtLocation?: string;
   price: number;
   /** Id del partido abierto asociado, si lo hay. */
   matchId: number | null;

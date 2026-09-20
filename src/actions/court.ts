@@ -10,7 +10,6 @@ import { toPlain, type ActionResult } from "@/src/lib/action-result";
 export type CreateCourtInput = {
   number: number;
   state?: CourtState;
-  location?: string;
   price?: number;
 };
 
@@ -26,7 +25,6 @@ export async function createCourt(
     const court = courts.create({
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
-      location: input.location ?? "Cam. Centenario 8907, B1894 Villa Elisa, Provincia de Buenos Aires",
       price: input.price ?? 10000,
     });
 

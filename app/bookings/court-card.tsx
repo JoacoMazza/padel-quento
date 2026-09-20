@@ -35,7 +35,7 @@ export function CourtCard({
       </div>
       <p className="mt-1 flex items-center gap-1.5 text-xs text-foreground/50">
         <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-        <span className="truncate">{court.location ?? "Cam. Centenario 8907, Villa Elisa"}</span>
+        <span className="truncate">Cam. Centenario 8907, Villa Elisa</span>
       </p>
 
       <div className="mt-4 border-t border-line pt-4">

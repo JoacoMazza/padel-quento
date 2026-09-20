@@ -13,13 +13,6 @@ export class Court {
   @Column({ type: "enum", enum: CourtState })
   state!: CourtState;
 
-  @Column({
-    type: "varchar",
-    length: 255,
-    default: "Cam. Centenario 8907, B1894 Villa Elisa, Provincia de Buenos Aires",
-  })
-  location!: string;
-
   @Column({ type: "int", default: 10000 })
   price!: number;
 

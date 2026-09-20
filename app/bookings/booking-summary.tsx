@@ -60,7 +60,7 @@ export function BookingSummary({
           <SummaryRow
             icon={<MapPin className="h-5 w-5" />}
             label="Ubicación"
-            value={selectedSlot.courtLocation ?? "Cam. Centenario 8907, Villa Elisa"}
+            value="Cam. Centenario 8907, Villa Elisa"
           />
           <SummaryRow
             icon={<Clock className="h-5 w-5" />}
