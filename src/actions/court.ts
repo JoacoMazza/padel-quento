@@ -11,6 +11,7 @@ export type CreateCourtInput = {
   number: number;
   state?: CourtState;
   location?: string;
+  price?: number;
 };
 
 export type UpdateCourtInput = Partial<CreateCourtInput>;
@@ -26,6 +27,7 @@ export async function createCourt(
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
       location: input.location ?? "Cam. Centenario 8907, B1894 Villa Elisa, Provincia de Buenos Aires",
+      price: input.price ?? 10000,
     });
 
     const saved = await courts.save(court);

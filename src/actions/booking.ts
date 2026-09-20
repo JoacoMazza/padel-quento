@@ -4,6 +4,7 @@ import "reflect-metadata";
 import { EntityManager } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
+import { Court } from "@/src/entities/Court";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
@@ -16,6 +17,7 @@ export type CreateBookingInput = {
   fromDateTime: Date;
   durationMinutes?: number;
   bookingState?: BookingState;
+  price?: number;
   /**
    * Cantidad de jugadores con la que reserva quien crea el turno (1 a 4, contando
    * a los acompañantes que trae y no tienen cuenta propia). Menos de 4 y sin un
@@ -148,11 +150,16 @@ export async function createBooking(
         }
       }
 
+      const courts = manager.getRepository<Court>("Court");
+      const court = await courts.findOne({ where: { id: input.courtId } });
+      const price = input.price ?? court?.price ?? 10000;
+
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = bookings.create({
         fromDateTime: input.fromDateTime,
         durationMinutes,
         bookingState,
+        price,
         player: { id: input.playerId },
         court: { id: input.courtId },
       });

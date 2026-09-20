@@ -78,7 +78,13 @@ export default async function BookingsPage() {
 
         <BookingsBoard
           playerId={player?.id ?? null}
-          courts={courts.map((c) => ({ id: c.id, number: c.number, state: c.state, location: c.location }))}
+          courts={courts.map((c) => ({
+            id: c.id,
+            number: c.number,
+            state: c.state,
+            location: c.location,
+            price: c.price,
+          }))}
           schedules={schedules.map((s) => ({
             id: s.id,
             dayOfWeek: s.dayOfWeek,
@@ -91,6 +97,7 @@ export default async function BookingsPage() {
             fromDateTime: b.fromDateTime,
             durationMinutes: b.durationMinutes,
             bookingState: b.bookingState,
+            price: b.price,
             needPlayers: b.match?.needPlayers ?? false,
             courtId: b.court?.id,
             confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(

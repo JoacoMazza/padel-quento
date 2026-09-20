@@ -1,6 +1,6 @@
 import { MapPin } from "lucide-react";
 import { CourtState } from "@/src/domain/enums";
-import { minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import type { CourtProp, Slot } from "@/app/bookings/types";
 
 export function CourtCard({
@@ -27,7 +27,12 @@ export function CourtCard({
           {isAvailable ? "Disponible" : "Fuera de servicio"}
         </span>
       </div>
-      <p className="mt-0.5 text-sm text-foreground/60">Pista de pádel · Nivel estándar</p>
+      <div className="mt-0.5 flex items-center justify-between">
+        <p className="text-sm text-foreground/60">Pista de pádel · Nivel estándar</p>
+        <span className="text-xs font-semibold text-primary">
+          {formatPrice(court.price ?? 10000)} / turno
+        </span>
+      </div>
       <p className="mt-1 flex items-center gap-1.5 text-xs text-foreground/50">
         <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
         <span className="truncate">{court.location ?? "Cam. Centenario 8907, Villa Elisa"}</span>

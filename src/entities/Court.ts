@@ -20,6 +20,9 @@ export class Court {
   })
   location!: string;
 
+  @Column({ type: "int", default: 10000 })
+  price!: number;
+
   @OneToMany("Booking", (booking: any) => booking.court)
   bookings!: any[];
 

@@ -19,6 +19,9 @@ export class Booking {
   @Column({ type: "enum", enum: BookingState, name: "booking_state" })
   bookingState!: BookingState;
 
+  @Column({ type: "int", default: 10000 })
+  price!: number;
+
   @ManyToOne("Player", (player: any) => player.bookings)
   @JoinColumn({ name: "player_id" })
   player!: Player;

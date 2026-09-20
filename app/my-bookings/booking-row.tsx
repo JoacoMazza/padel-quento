@@ -3,12 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
+import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { updateBooking } from "@/src/actions/booking";
 import { closeMatch } from "@/src/actions/match";
-import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import {
   getBookingBadgeClasses,
   getBookingEnd,
@@ -97,6 +97,10 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
           <span>Cancha {booking.courtNumber}</span>
           <span className="text-xs text-foreground/40">· Villa Elisa</span>
         </a>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+          <Banknote className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+          {formatPrice(booking.price)}
+        </p>
       </div>
 
       <div className="flex flex-col items-start gap-1.5">

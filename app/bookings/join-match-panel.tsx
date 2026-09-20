@@ -1,6 +1,6 @@
-import { Banknote, Calendar, Clock, LayoutGrid, MapPin, Users } from "lucide-react";
+import { Banknote, Calendar, Clock, LayoutGrid, MapPin, UserCheck, Users } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import type { SelectedOpenMatch } from "@/app/bookings/types";
 
 export function JoinMatchPanel({
@@ -67,7 +67,8 @@ export function JoinMatchPanel({
           label="Jugadores anotados"
           value={`${selectedMatch.confirmedPlayers}/${OPEN_MATCH_MAX_PLAYERS}`}
         />
-        <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Lugares libres" value={`${remainingSpots}`} />
+        <SummaryRow icon={<UserCheck className="h-5 w-5" />} label="Lugares libres" value={`${remainingSpots}`} />
+        <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio total turno" value={formatPrice(selectedMatch.price)} />
 
         {alreadyJoined ? (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-center text-sm font-medium text-foreground/70">
