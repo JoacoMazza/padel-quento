@@ -25,7 +25,7 @@ export async function createCourt(
     const court = courts.create({
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
-      price: input.price ?? 10000,
+      ...(input.price !== undefined ? { price: input.price } : {}),
     });
 
     const saved = await courts.save(court);

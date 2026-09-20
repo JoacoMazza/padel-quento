@@ -150,18 +150,14 @@ export async function createBooking(
         }
       }
 
-      const courts = manager.getRepository<Court>("Court");
-      const court = await courts.findOne({ where: { id: input.courtId } });
-      const price = input.price ?? court?.price ?? 10000;
-
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = bookings.create({
         fromDateTime: input.fromDateTime,
         durationMinutes,
         bookingState,
-        price,
         player: { id: input.playerId },
         court: { id: input.courtId },
+        ...(input.price !== undefined ? { price: input.price } : {}),
       });
 
       const saved = await bookings.save(booking);
