@@ -23,7 +23,7 @@ export default async function AdminPage() {
 
   return (
     <AdminPanel
-      courts={courts.map((c) => ({ id: c.id, number: c.number, state: c.state }))}
+      courts={courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price }))}
       courtsError={!courtsResult.success ? courtsResult.error : null}
       schedules={schedules.map((s) => ({
         id: s.id,
@@ -37,6 +37,7 @@ export default async function AdminPage() {
         fromDateTime: b.fromDateTime,
         durationMinutes: b.durationMinutes,
         bookingState: b.bookingState,
+        price: b.price,
         needPlayers: b.match?.needPlayers ?? false,
         courtId: b.court?.id,
         confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(

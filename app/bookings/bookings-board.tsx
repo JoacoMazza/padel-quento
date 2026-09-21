@@ -31,8 +31,6 @@ import type {
   SlotStatus,
 } from "@/app/bookings/types";
 
-const SLOT_PRICE = 10000;
-
 export function BookingsBoard({
   playerId,
   courts,
@@ -168,10 +166,12 @@ export function BookingsBoard({
       setIsOpenMatch(false);
       setOpenMatchGroupSize(1);
       setJoinGroupSize(1);
+      const openBooking = bookings.find((b) => b.id === slot.bookingId);
       setSelectedOpenMatch({
         bookingId: slot.bookingId!,
         courtId: court.id,
         courtNumber: court.number,
+        price: openBooking?.price ?? court.price,
         start: slot.start,
         end: slot.end,
         confirmedPlayers: slot.confirmedPlayers ?? 0,
@@ -189,7 +189,13 @@ export function BookingsBoard({
 
     setSelectedOpenMatch(null);
     setJoinGroupSize(1);
-    setSelectedSlot({ courtId: court.id, courtNumber: court.number, start: slot.start, end: slot.end });
+    setSelectedSlot({
+      courtId: court.id,
+      courtNumber: court.number,
+      price: court.price,
+      start: slot.start,
+      end: slot.end,
+    });
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
   }
@@ -209,6 +215,7 @@ export function BookingsBoard({
       const result = await createBooking({
         fromDateTime: selectedSlot.start,
         durationMinutes: SLOT_DURATION_MINUTES,
+        price: selectedSlot.price,
         groupSize,
         playerId,
         courtId: selectedSlot.courtId,
@@ -307,7 +314,6 @@ export function BookingsBoard({
             selectedSlot={selectedSlot}
             feedback={feedback}
             isPending={isPending}
-            price={SLOT_PRICE}
             isOpenMatch={isOpenMatch}
             onIsOpenMatchChange={setIsOpenMatch}
             openMatchGroupSize={openMatchGroupSize}

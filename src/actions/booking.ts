@@ -4,6 +4,7 @@ import "reflect-metadata";
 import { EntityManager } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
+import { Court } from "@/src/entities/Court";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
@@ -16,6 +17,7 @@ export type CreateBookingInput = {
   fromDateTime: Date;
   durationMinutes?: number;
   bookingState?: BookingState;
+  price?: number;
   /**
    * Cantidad de jugadores con la que reserva quien crea el turno (1 a 4, contando
    * a los acompañantes que trae y no tienen cuenta propia). Menos de 4 y sin un
@@ -51,6 +53,7 @@ const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
 const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
 const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
+const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
 
@@ -66,6 +69,7 @@ class NotOpenMatchError extends Error {}
 class AlreadyJoinedError extends Error {}
 class MatchFullError extends Error {}
 class BlockedPlayerError extends Error {}
+class InvalidPriceError extends Error {}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
@@ -148,11 +152,19 @@ export async function createBooking(
         }
       }
 
+      const courts = manager.getRepository<Court>("Court");
+      const court = await courts.findOne({ where: { id: input.courtId } });
+      const price = input.price ?? court?.price;
+      if (price === undefined || price === null || typeof price !== "number" || isNaN(price) || price <= 0) {
+        throw new InvalidPriceError();
+      }
+
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = bookings.create({
         fromDateTime: input.fromDateTime,
         durationMinutes,
         bookingState,
+        price,
         player: { id: input.playerId },
         court: { id: input.courtId },
       });
@@ -193,6 +205,9 @@ export async function createBooking(
     }
     if (error instanceof OpenMatchTooSoonError) {
       return { success: false, error: OPEN_MATCH_TOO_SOON_MESSAGE };
+    }
+    if (error instanceof InvalidPriceError) {
+      return { success: false, error: INVALID_PRICE_MESSAGE };
     }
     console.error("createBooking", error);
     return { success: false, error: "No se pudo crear la reserva." };

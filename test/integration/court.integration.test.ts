@@ -22,26 +22,26 @@ describe("court actions (integración con Postgres real)", () => {
   it("crea una cancha con el estado AVAILABLE por defecto y la persiste", async () => {
     const number = uniqueCourtNumber();
 
-    const result = await createCourt({ number });
+    const result = await createCourt({ number, price: 10000 });
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE });
+    expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE, price: 10000 });
     expect(result.data.id).toBeDefined();
   });
 
   it("no permite crear dos canchas con el mismo número", async () => {
     const number = uniqueCourtNumber();
-    await createCourt({ number });
+    await createCourt({ number, price: 10000 });
 
-    const result = await createCourt({ number });
+    const result = await createCourt({ number, price: 10000 });
 
     expect(result).toEqual({ success: false, error: "Ya existe una cancha con ese número." });
   });
 
   it("lista las canchas creadas", async () => {
     const number = uniqueCourtNumber();
-    await createCourt({ number, state: CourtState.MAINTENANCE });
+    await createCourt({ number, state: CourtState.MAINTENANCE, price: 10000 });
 
     const result = await getCourts();
 
@@ -52,7 +52,7 @@ describe("court actions (integración con Postgres real)", () => {
 
   it("obtiene una cancha por id y null si no existe", async () => {
     const number = uniqueCourtNumber();
-    const created = await createCourt({ number });
+    const created = await createCourt({ number, price: 10000 });
     if (!created.success) throw new Error("expected success");
 
     const found = await getCourtById(created.data.id);
@@ -63,7 +63,7 @@ describe("court actions (integración con Postgres real)", () => {
   });
 
   it("actualiza el estado de una cancha existente", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber() });
+    const created = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!created.success) throw new Error("expected success");
 
     const result = await updateCourt(created.data.id, { state: CourtState.CLOSED_DOWN });
@@ -81,7 +81,7 @@ describe("court actions (integración con Postgres real)", () => {
   });
 
   it("elimina una cancha existente y falla al eliminarla de nuevo", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber() });
+    const created = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!created.success) throw new Error("expected success");
 
     const result = await deleteCourt(created.data.id);

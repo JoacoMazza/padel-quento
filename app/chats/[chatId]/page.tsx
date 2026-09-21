@@ -71,10 +71,16 @@ export default async function ChatPage({
             <div className="flex-1">
               <h1 className="text-base font-extrabold text-foreground">Chat del partido</h1>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-foreground/60">
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  Cancha {booking.courtNumber}
-                </span>
+                <a
+                  href="https://maps.google.com/?q=Cam.+Centenario+8907,+B1894+Villa+Elisa,+Provincia+de+Buenos+Aires"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                  title="Ver en Google Maps"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  Cancha {booking.courtNumber} · Villa Elisa
+                </a>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
                   {formatLongDate(booking.fromDateTime)}

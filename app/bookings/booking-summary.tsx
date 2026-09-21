@@ -1,4 +1,4 @@
-import { Banknote, Calendar, Clock, LayoutGrid, Users } from "lucide-react";
+import { Banknote, Calendar, Clock, LayoutGrid, MapPin, Users } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   SLOT_DURATION_MINUTES,
@@ -13,7 +13,6 @@ export function BookingSummary({
   selectedSlot,
   feedback,
   isPending,
-  price,
   isOpenMatch,
   onIsOpenMatchChange,
   openMatchGroupSize,
@@ -24,7 +23,6 @@ export function BookingSummary({
   selectedSlot: SelectedSlot | null;
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
-  price: number;
   isOpenMatch: boolean;
   onIsOpenMatchChange: (value: boolean) => void;
   openMatchGroupSize: number;
@@ -58,12 +56,17 @@ export function BookingSummary({
             value={`Cancha ${selectedSlot.courtNumber}`}
           />
           <SummaryRow
+            icon={<MapPin className="h-5 w-5" />}
+            label="Ubicación"
+            value="Cam. Centenario 8907, Villa Elisa"
+          />
+          <SummaryRow
             icon={<Clock className="h-5 w-5" />}
             label="Horario"
             value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} – ${minutesToTimeLabel(selectedSlot.end.getHours() * 60 + selectedSlot.end.getMinutes())}`}
           />
           <SummaryRow icon={<Clock className="h-5 w-5" />} label="Duración" value={`${SLOT_DURATION_MINUTES} min`} />
-          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(price)} />
+          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(selectedSlot.price)} />
 
           <label
             className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${

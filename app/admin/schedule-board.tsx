@@ -74,7 +74,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
         const result = await getScheduleBoardData();
         if (result.success) {
           setData({
-            courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state })),
+            courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
             schedules: result.data.schedules.map((s) => ({
               id: s.id,
               dayOfWeek: s.dayOfWeek,
@@ -87,6 +87,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
               fromDateTime: new Date(b.fromDateTime),
               durationMinutes: b.durationMinutes,
               bookingState: b.bookingState,
+              price: b.price,
               needPlayers: b.match?.needPlayers ?? false,
               courtId: b.court?.id,
               confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(

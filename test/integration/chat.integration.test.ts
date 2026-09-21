@@ -42,7 +42,10 @@ describe("chat actions (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000) });
+    const court = await createCourt({
+      number: Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000),
+      price: 10000,
+    });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
 
     const ana = await newPlayer("Ana", { names: "Ana", category: PlayerCategory.FOURTH });
