@@ -6,6 +6,7 @@ vi.mock("next-auth/next", () => ({
 
 import { getServerSession } from "next-auth/next";
 import { PlayerCategory } from "@/src/domain/enums";
+import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
@@ -111,5 +112,52 @@ describe("chat actions (integración con Postgres real)", () => {
       success: false,
       error: "No tenés acceso a este chat.",
     });
+  });
+
+  it("una vez finalizado el horario del turno la sala queda en solo lectura", async () => {
+    const court = await createCourt({
+      number: Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000),
+      price: 10000,
+    });
+    if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
+    const ana = await newPlayer("Ana");
+    const beto = await newPlayer("Beto");
+
+    const fromDateTime = new Date(Date.now() + 41 * 24 * 60 * 60 * 1000);
+    fromDateTime.setHours(9, 0, 0, 0);
+    const booking = await createBooking({ fromDateTime, playerId: ana.id, courtId: court.data.id, groupSize: 1 });
+    if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
+    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
+    const found = await getBookingById(booking.data.id);
+    if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
+    const closingChatId = found.data.match.chat.id;
+
+    // Con el turno por delante la sala está abierta y se puede escribir.
+    actAs(ana.email);
+    expect((await sendMessage(closingChatId, "Nos vemos en la cancha")).success).toBe(true);
+    const open = await getChatById(closingChatId);
+    expect(open).toMatchObject({ success: true, data: { isClosed: false } });
+
+    // El turno terminó hace un rato (ya pasaron los 90 minutos de duración).
+    const dataSource = await getDataSource();
+    await dataSource
+      .getRepository("Booking")
+      .update(booking.data.id, { fromDateTime: new Date(Date.now() - 3 * 60 * 60 * 1000) });
+
+    const closed = await getChatById(closingChatId);
+    expect(closed).toMatchObject({ success: true, data: { isClosed: true } });
+
+    const rejected = await sendMessage(closingChatId, "¿Llegaron bien?");
+    expect(rejected).toEqual({
+      success: false,
+      error: "El chat se cerró porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.",
+    });
+
+    // La conversación se conserva y sigue siendo legible para los participantes.
+    actAs(beto.email);
+    const history = await getChatMessages(closingChatId);
+    if (!history.success) throw new Error("expected success");
+    expect(history.data.map((message) => message.content)).toEqual(["Nos vemos en la cancha"]);
   });
 });

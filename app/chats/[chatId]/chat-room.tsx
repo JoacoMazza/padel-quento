@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { MessageCircle, Send } from "lucide-react";
+import { Lock, MessageCircle, Send } from "lucide-react";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { getChatMessages, sendMessage, type ChatMessage } from "@/src/actions/chat";
@@ -17,10 +17,12 @@ export function ChatRoom({
   chatId,
   currentPlayerId,
   initialMessages,
+  isClosed,
 }: {
   chatId: number;
   currentPlayerId: number;
   initialMessages: ChatMessage[];
+  isClosed: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -30,14 +32,16 @@ export function ChatRoom({
 
   // Sin websockets en el proyecto: se consulta periódicamente. El servidor es la
   // fuente de verdad, por eso se reemplaza la lista completa en vez de mezclarla.
+  // Con la sala cerrada no pueden llegar mensajes nuevos, así que no se sondea.
   useEffect(() => {
+    if (isClosed) return;
     const timer = setInterval(async () => {
       if (document.visibilityState !== "visible") return;
       const result = await getChatMessages(chatId);
       if (result.success) setMessages(result.data);
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [chatId]);
+  }, [chatId, isClosed]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -108,34 +112,41 @@ export function ChatRoom({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="border-t border-line p-3">
-        {error && (
-          <p role="alert" className="mb-2 px-1 text-xs text-red-400">
-            {error}
-          </p>
-        )}
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            name="content"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={CHAT_MESSAGE_MAX_LENGTH}
-            autoComplete="off"
-            placeholder="Escribir mensaje…"
-            aria-label="Mensaje"
-            className="flex-1 rounded-full border border-line bg-background px-4 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <button
-            type="submit"
-            disabled={isPending || draft.trim().length === 0}
-            aria-label="Enviar mensaje"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+      {isClosed ? (
+        <div className="flex items-center gap-2 border-t border-line bg-line/20 px-4 py-3 text-xs text-foreground/60">
+          <Lock className="h-4 w-4 shrink-0" />
+          <p>Este chat está cerrado porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.</p>
         </div>
-      </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="border-t border-line p-3">
+          {error && (
+            <p role="alert" className="mb-2 px-1 text-xs text-red-400">
+              {error}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              name="content"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              maxLength={CHAT_MESSAGE_MAX_LENGTH}
+              autoComplete="off"
+              placeholder="Escribir mensaje…"
+              aria-label="Mensaje"
+              className="flex-1 rounded-full border border-line bg-background px-4 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <button
+              type="submit"
+              disabled={isPending || draft.trim().length === 0}
+              aria-label="Enviar mensaje"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      )}
     </>
   );
 }
