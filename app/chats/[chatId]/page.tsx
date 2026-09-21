@@ -1,12 +1,13 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock, MapPin, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, MessageCircle, Users } from "lucide-react";
 import { AppHeader } from "@/app/components/app-header";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
-import { getChatById } from "@/src/actions/chat";
+import { getChatById, getChatMessages } from "@/src/actions/chat";
+import { ChatRoom } from "./chat-room";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 
 function initialsOf(names: string, lastnames: string) {
@@ -32,15 +33,17 @@ export default async function ChatPage({
 
   const result = Number.isInteger(id) ? await getChatById(id) : null;
   const chat = result?.success ? result.data : null;
-  const participants = chat?.match?.matchPlayers ?? [];
+  const participants = chat?.participants ?? [];
   // Solo los jugadores que se sumaron con su cuenta al partido pueden entrar a la sala.
-  const isParticipant = player ? participants.some((mp) => mp.player?.id === player.id) : false;
+  const isParticipant = player ? participants.some((participant) => participant.id === player.id) : false;
 
-  if (!chat || !isParticipant) {
+  if (!player || !chat || !isParticipant) {
     redirect("/my-bookings");
   }
 
-  const booking = chat.match.booking;
+  const booking = chat.booking;
+  const messagesResult = await getChatMessages(chat.id);
+  const initialMessages = messagesResult.success ? messagesResult.data : [];
 
   return (
     <div className="flex min-h-screen flex-1 flex-col bg-background">
@@ -76,7 +79,7 @@ export default async function ChatPage({
                   title="Ver en Google Maps"
                 >
                   <MapPin className="h-3.5 w-3.5 text-primary" />
-                  Cancha {booking.court?.number} · Villa Elisa
+                  Cancha {booking.courtNumber} · Villa Elisa
                 </a>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
@@ -94,51 +97,21 @@ export default async function ChatPage({
           <div className="flex items-start gap-2 border-b border-line px-4 py-3">
             <Users className="mt-1 h-4 w-4 shrink-0 text-foreground/50" />
             <div className="flex flex-wrap items-center gap-2">
-              {participants.map((mp) => (
+              {participants.map((participant) => (
                 <span
-                  key={mp.player.id}
+                  key={participant.id}
                   className="flex items-center gap-1.5 rounded-full bg-line/40 px-2.5 py-1 text-xs font-medium text-foreground/80"
                 >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                    {initialsOf(mp.player.names, mp.player.lastnames)}
+                    {initialsOf(participant.names, participant.lastnames)}
                   </span>
-                  {mp.player.names} {mp.player.lastnames}
+                  {participant.names} {participant.lastnames}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Mensajes: el envío llega en otra entrega, por ahora solo se ve la sala vacía */}
-          <div className="flex min-h-[320px] flex-1 flex-col items-center justify-center gap-2 bg-background/60 p-8 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-line/50 text-foreground/40">
-              <MessageCircle className="h-6 w-6" />
-            </span>
-            <p className="text-sm font-semibold text-foreground/70">Todavía no hay mensajes</p>
-            <p className="max-w-sm text-xs text-foreground/50">
-              Esta sala se creó automáticamente para que coordinen el partido (lado de juego, pelotas, llegada).
-              Muy pronto vas a poder escribir acá.
-            </p>
-          </div>
-
-          {/* Compositor deshabilitado: el envío de mensajes es una historia futura */}
-          <div className="border-t border-line p-3">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                disabled
-                placeholder="Escribir mensaje… (disponible próximamente)"
-                className="flex-1 rounded-full border border-line bg-background px-4 py-2 text-sm text-foreground/50 placeholder:text-foreground/40 disabled:cursor-not-allowed"
-              />
-              <button
-                type="button"
-                disabled
-                aria-label="Enviar mensaje"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/40 text-white disabled:cursor-not-allowed"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          <ChatRoom chatId={chat.id} currentPlayerId={player.id} initialMessages={initialMessages} />
         </div>
       </main>
     </div>
