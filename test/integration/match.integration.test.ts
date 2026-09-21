@@ -31,7 +31,7 @@ describe("match actions (integración con Postgres real)", () => {
   let playerId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber() });
+    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 

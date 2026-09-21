@@ -61,16 +61,18 @@ describe("booking actions", () => {
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
     playerFindOne.mockResolvedValue({ id: 1, isBlocked: false });
+    findOne.mockResolvedValue({ id: 2, price: 10000 });
   });
 
   describe("createBooking", () => {
-    it("crea una reserva con los valores por defecto", async () => {
+    it("crea una reserva con los valores por defecto (tomando el precio de la cancha)", async () => {
       const result = await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
 
       expect(create).toHaveBeenCalledWith({
         fromDateTime,
         durationMinutes: 90,
         bookingState: BookingState.RESERVED,
+        price: 10000,
         player: { id: 1 },
         court: { id: 2 },
       });
@@ -80,9 +82,29 @@ describe("booking actions", () => {
           fromDateTime,
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
+          price: 10000,
           player: { id: 1 },
           court: { id: 2 },
         },
+      });
+    });
+
+    it("permite especificar un precio custom en el input", async () => {
+      await createBooking({ fromDateTime, playerId: 1, courtId: 2, price: 15000 });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ price: 15000 }),
+      );
+    });
+
+    it("falla si la cancha no tiene precio y no se provee en el input", async () => {
+      findOne.mockResolvedValueOnce({ id: 2, price: undefined });
+
+      const result = await createBooking({ fromDateTime, playerId: 1, courtId: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "El precio de la reserva es obligatorio y debe ser mayor a 0.",
       });
     });
 

@@ -56,6 +56,10 @@ export function CourtModal(props: CourtModalProps) {
             <dt className="font-medium text-foreground/60">Número</dt>
             <dd className="font-semibold text-foreground">{court.number}</dd>
           </div>
+          <div className="flex justify-between border-b border-line pb-2">
+            <dt className="font-medium text-foreground/60">Precio</dt>
+            <dd className="font-semibold text-foreground">${court.price}</dd>
+          </div>
           <div className="flex items-center justify-between">
             <dt className="font-medium text-foreground/60">Estado</dt>
             <dd>
@@ -90,6 +94,7 @@ function EditForm({
 }) {
   const [number, setNumber] = useState(court.number);
   const [state, setState] = useState<CourtState>(court.state);
+  const [price, setPrice] = useState(court.price);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -98,14 +103,14 @@ function EditForm({
     setError(null);
     setIsSaving(true);
 
-    const result = await updateCourt(court.id, { number, state });
+    const result = await updateCourt(court.id, { number, state, price });
 
     setIsSaving(false);
     if (!result.success) {
       setError(result.error);
       return;
     }
-    onSaved({ id: result.data.id, number: result.data.number, state: result.data.state });
+    onSaved({ id: result.data.id, number: result.data.number, state: result.data.state, price: result.data.price });
   }
 
   return (
@@ -122,6 +127,21 @@ function EditForm({
             required
             value={number}
             onChange={(e) => setNumber(Number(e.target.value))}
+            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="edit-price" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70">
+            Precio ($)
+          </label>
+          <input
+            id="edit-price"
+            type="number"
+            min={1}
+            required
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
             className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>

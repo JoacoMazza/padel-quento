@@ -36,23 +36,45 @@ describe("court actions", () => {
   });
 
   describe("createCourt", () => {
-    it("crea una cancha con el estado AVAILABLE por defecto", async () => {
-      const result = await createCourt({ number: 3 });
+    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado", async () => {
+      const result = await createCourt({ number: 3, price: 10000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE });
-      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE } });
+      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000 });
+      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE, price: 10000 } });
     });
 
-    it("respeta el estado indicado", async () => {
-      await createCourt({ number: 5, state: CourtState.MAINTENANCE });
+    it("respeta el estado y precio indicados", async () => {
+      await createCourt({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE });
+      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+    });
+
+    it("devuelve error si el precio no se proporciona o no es mayor a 0", async () => {
+      const missingPrice = await createCourt({ number: 2 } as any);
+      expect(missingPrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      const zeroPrice = await createCourt({ number: 2, price: 0 });
+      expect(zeroPrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      const negativePrice = await createCourt({ number: 2, price: -100 });
+      expect(negativePrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      expect(create).not.toHaveBeenCalled();
     });
 
     it("devuelve error de número duplicado ante una violación de unicidad", async () => {
       save.mockRejectedValueOnce(duplicateError());
 
-      const result = await createCourt({ number: 1 });
+      const result = await createCourt({ number: 1, price: 10000 });
 
       expect(result).toEqual({ success: false, error: "Ya existe una cancha con ese número." });
     });
@@ -60,7 +82,7 @@ describe("court actions", () => {
     it("devuelve un error genérico ante cualquier otra falla", async () => {
       save.mockRejectedValueOnce(new Error("boom"));
 
-      const result = await createCourt({ number: 1 });
+      const result = await createCourt({ number: 1, price: 10000 });
 
       expect(result).toEqual({ success: false, error: "No se pudo crear la cancha." });
     });

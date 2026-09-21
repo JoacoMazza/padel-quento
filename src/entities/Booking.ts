@@ -19,7 +19,15 @@ export class Booking {
   @Column({ type: "enum", enum: BookingState, name: "booking_state" })
   bookingState!: BookingState;
 
-  @Column({ type: "int", default: 10000 })
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => (typeof value === "string" ? parseFloat(value) : value),
+    },
+  })
   price!: number;
 
   @ManyToOne("Player", (player: any) => player.bookings)

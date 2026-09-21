@@ -50,7 +50,7 @@ describe("booking actions (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber() });
+    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 
@@ -436,7 +436,7 @@ describe("booking actions (integración con Postgres real)", () => {
     });
 
     it("no permite mover una reserva a un horario ya ocupado en otra cancha", async () => {
-      const otherCourt = await createCourt({ number: uniqueCourtNumber() });
+      const otherCourt = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
       if (!otherCourt.success) throw new Error("no se pudo crear la segunda cancha de prueba");
 
       const fromDateTime = uniqueFromDateTime();

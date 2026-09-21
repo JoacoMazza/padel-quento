@@ -30,7 +30,7 @@ export function CourtCard({
       <div className="mt-0.5 flex items-center justify-between">
         <p className="text-sm text-foreground/60">Pista de pádel · Nivel estándar</p>
         <span className="text-xs font-semibold text-primary">
-          {formatPrice(court.price ?? 10000)} / turno
+          {formatPrice(court.price)} / turno
         </span>
       </div>
       <p className="mt-1 flex items-center gap-1.5 text-xs text-foreground/50">

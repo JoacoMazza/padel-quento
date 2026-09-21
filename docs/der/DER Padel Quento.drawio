@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net">
   <diagram id="-HeX5IaRnInibqbhBOgu" name="Página-1">
-    <mxGraphModel dx="2816" dy="1705" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2454" dy="1509" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -359,7 +359,7 @@
             <mxRectangle height="30" width="161" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="WLvYHJea7pikylyVjhTg-70" parent="WLvYHJea7pikylyVjhTg-67" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" value="int" vertex="1">
+        <mxCell id="WLvYHJea7pikylyVjhTg-70" parent="WLvYHJea7pikylyVjhTg-67" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" value="decimal(10,2)" vertex="1">
           <mxGeometry height="30" width="71" x="191" as="geometry">
             <mxRectangle height="30" width="71" as="alternateBounds" />
           </mxGeometry>
@@ -692,7 +692,7 @@
             <mxRectangle height="30" width="161" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="WLvYHJea7pikylyVjhTg-66" parent="WLvYHJea7pikylyVjhTg-63" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" value="int" vertex="1">
+        <mxCell id="WLvYHJea7pikylyVjhTg-66" parent="WLvYHJea7pikylyVjhTg-63" style="shape=partialRectangle;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;whiteSpace=wrap;html=1;" value="decimal(10,2)" vertex="1">
           <mxGeometry height="30" width="71" x="191" as="geometry">
             <mxRectangle height="30" width="71" as="alternateBounds" />
           </mxGeometry>

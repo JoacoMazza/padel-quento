@@ -10,7 +10,7 @@ import { toPlain, type ActionResult } from "@/src/lib/action-result";
 export type CreateCourtInput = {
   number: number;
   state?: CourtState;
-  price?: number;
+  price: number;
 };
 
 export type UpdateCourtInput = Partial<CreateCourtInput>;
@@ -18,6 +18,16 @@ export type UpdateCourtInput = Partial<CreateCourtInput>;
 export async function createCourt(
   input: CreateCourtInput,
 ): Promise<ActionResult<Court>> {
+  if (
+    input.price === undefined ||
+    input.price === null ||
+    typeof input.price !== "number" ||
+    isNaN(input.price) ||
+    input.price <= 0
+  ) {
+    return { success: false, error: "El precio de la cancha es obligatorio y debe ser mayor a 0." };
+  }
+
   try {
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
@@ -25,7 +35,7 @@ export async function createCourt(
     const court = courts.create({
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
-      ...(input.price !== undefined ? { price: input.price } : {}),
+      price: input.price,
     });
 
     const saved = await courts.save(court);

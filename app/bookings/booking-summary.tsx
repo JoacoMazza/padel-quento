@@ -13,7 +13,6 @@ export function BookingSummary({
   selectedSlot,
   feedback,
   isPending,
-  price,
   isOpenMatch,
   onIsOpenMatchChange,
   openMatchGroupSize,
@@ -24,7 +23,6 @@ export function BookingSummary({
   selectedSlot: SelectedSlot | null;
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
-  price: number;
   isOpenMatch: boolean;
   onIsOpenMatchChange: (value: boolean) => void;
   openMatchGroupSize: number;
@@ -68,7 +66,7 @@ export function BookingSummary({
             value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} – ${minutesToTimeLabel(selectedSlot.end.getHours() * 60 + selectedSlot.end.getMinutes())}`}
           />
           <SummaryRow icon={<Clock className="h-5 w-5" />} label="Duración" value={`${SLOT_DURATION_MINUTES} min`} />
-          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(price)} />
+          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(selectedSlot.price)} />
 
           <label
             className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${

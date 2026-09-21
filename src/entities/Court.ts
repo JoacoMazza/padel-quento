@@ -13,7 +13,15 @@ export class Court {
   @Column({ type: "enum", enum: CourtState })
   state!: CourtState;
 
-  @Column({ type: "int", default: 10000 })
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => (typeof value === "string" ? parseFloat(value) : value),
+    },
+  })
   price!: number;
 
   @OneToMany("Booking", (booking: any) => booking.court)

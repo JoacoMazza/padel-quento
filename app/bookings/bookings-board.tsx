@@ -31,8 +31,6 @@ import type {
   SlotStatus,
 } from "@/app/bookings/types";
 
-const DEFAULT_SLOT_PRICE = 10000;
-
 export function BookingsBoard({
   playerId,
   courts,
@@ -173,7 +171,7 @@ export function BookingsBoard({
         bookingId: slot.bookingId!,
         courtId: court.id,
         courtNumber: court.number,
-        price: openBooking?.price ?? court.price ?? DEFAULT_SLOT_PRICE,
+        price: openBooking?.price ?? court.price,
         start: slot.start,
         end: slot.end,
         confirmedPlayers: slot.confirmedPlayers ?? 0,
@@ -194,7 +192,7 @@ export function BookingsBoard({
     setSelectedSlot({
       courtId: court.id,
       courtNumber: court.number,
-      price: court.price ?? DEFAULT_SLOT_PRICE,
+      price: court.price,
       start: slot.start,
       end: slot.end,
     });
@@ -316,7 +314,6 @@ export function BookingsBoard({
             selectedSlot={selectedSlot}
             feedback={feedback}
             isPending={isPending}
-            price={selectedSlot?.price ?? DEFAULT_SLOT_PRICE}
             isOpenMatch={isOpenMatch}
             onIsOpenMatchChange={setIsOpenMatch}
             openMatchGroupSize={openMatchGroupSize}

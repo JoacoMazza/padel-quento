@@ -26,4 +26,4 @@ export const STATE_BADGE_STYLES: Record<CourtState, { badge: string; dot: string
   },
 };
 
-export type CourtItem = { id: number; number: number; state: CourtState };
+export type CourtItem = { id: number; number: number; state: CourtState; price: number };

@@ -150,14 +150,21 @@ export async function createBooking(
         }
       }
 
+      const courts = manager.getRepository<Court>("Court");
+      const court = await courts.findOne({ where: { id: input.courtId } });
+      const price = input.price ?? court?.price;
+      if (price === undefined || price === null || typeof price !== "number" || isNaN(price) || price <= 0) {
+        throw new Error("El precio de la reserva es obligatorio y debe ser mayor a 0.");
+      }
+
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = bookings.create({
         fromDateTime: input.fromDateTime,
         durationMinutes,
         bookingState,
+        price,
         player: { id: input.playerId },
         court: { id: input.courtId },
-        ...(input.price !== undefined ? { price: input.price } : {}),
       });
 
       const saved = await bookings.save(booking);
