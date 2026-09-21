@@ -43,9 +43,11 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
     setError(null);
     startTransition(async () => {
       const result = await updateBooking(booking.id, { bookingState: BookingState.CANCELLED });
+      // La fila sigue montada tras el refresh (los cancelados se siguen listando),
+      // así que la confirmación se cierra siempre, salga bien o mal.
+      setPendingAction(null);
       if (!result.success) {
         setError(result.error);
-        setPendingAction(null);
         return;
       }
       router.refresh();
@@ -57,9 +59,9 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
     setError(null);
     startTransition(async () => {
       const result = await closeMatch(booking.matchId!);
+      setPendingAction(null);
       if (!result.success) {
         setError(result.error);
-        setPendingAction(null);
         return;
       }
       router.refresh();
