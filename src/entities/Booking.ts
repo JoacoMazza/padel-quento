@@ -41,4 +41,20 @@ export class Booking {
   /** Partido asociado si el turno se reservó como partido abierto. */
   @OneToOne("Match", "booking")
   match?: Match;
+
+  /**
+   * Asistencia del jugador que reservó el turno. Solo aplica cuando el turno
+   * NO tiene un partido abierto asociado (ver MatchPlayer.attended para ese caso).
+   * Arranca en true: el administrador solo interviene para marcar la ausencia.
+   */
+  @Column({ type: "boolean", default: true, name: "attended" })
+  attended!: boolean;
+
+  /**
+   * true una vez que el job de puntos por asistencia (ver
+   * src/jobs/attendance-points.ts) ya procesó este turno, para no acreditar
+   * los puntos dos veces.
+   */
+  @Column({ type: "boolean", default: false, name: "points_awarded" })
+  pointsAwarded!: boolean;
 }

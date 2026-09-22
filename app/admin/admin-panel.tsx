@@ -7,7 +7,8 @@ import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import type { CourtItem } from "@/app/admin/court-status";
-import type { BookingProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
+import type { AdminBookingProp } from "@/app/admin/types";
+import type { OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
 import type { PlayerAdminItem } from "@/src/actions/player";
 
 const SECTIONS = [
@@ -31,7 +32,7 @@ export function AdminPanel({
   courts: CourtItem[];
   courtsError?: string | null;
   schedules: ScheduleProp[];
-  bookings: BookingProp[];
+  bookings: AdminBookingProp[];
   outOfServices: OutOfServiceProp[];
   players: PlayerAdminItem[];
 }) {
