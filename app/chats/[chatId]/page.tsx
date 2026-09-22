@@ -111,7 +111,12 @@ export default async function ChatPage({
             </div>
           </div>
 
-          <ChatRoom chatId={chat.id} currentPlayerId={player.id} initialMessages={initialMessages} />
+          <ChatRoom
+            chatId={chat.id}
+            currentPlayerId={player.id}
+            initialMessages={initialMessages}
+            isClosed={chat.isClosed}
+          />
         </div>
       </main>
     </div>

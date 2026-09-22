@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-auth/next", () => ({
   getServerSession: vi.fn(),
@@ -62,10 +62,25 @@ function mockSession(email: string | null) {
   vi.mocked(getServerSession).mockResolvedValue((email ? { user: { email } } : null) as never);
 }
 
+// El turno es el 2026-10-01 de 18:00 a 19:30; "ahora" se fija antes o después según el caso.
+const BOOKING_START = new Date("2026-10-01T18:00:00");
+const BEFORE_BOOKING_END = new Date("2026-10-01T19:29:59");
+const AT_BOOKING_END = new Date("2026-10-01T19:30:00");
+
+function chatWithBooking() {
+  return { id: 1, match: { id: 2, booking: { fromDateTime: BOOKING_START, durationMinutes: 90 } } };
+}
+
 describe("chat actions", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     messages.create.mockImplementation((entity: unknown) => entity);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(BEFORE_BOOKING_END);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("getChatById", () => {
@@ -75,7 +90,7 @@ describe("chat actions", () => {
         id: 1,
         match: {
           id: 2,
-          booking: { fromDateTime, court: { number: 3 } },
+          booking: { fromDateTime, durationMinutes: 90, court: { number: 3 } },
           matchPlayers: [{ player: fullPlayer() }],
         },
       });
@@ -94,9 +109,22 @@ describe("chat actions", () => {
           id: 1,
           booking: { fromDateTime, courtNumber: 3 },
           participants: [{ id: 7, names: "Ana", lastnames: "Gómez", category: PlayerCategory.FOURTH }],
+          isClosed: false,
         },
       });
       expectNoPrivateData(result);
+    });
+
+    it("marca la sala como cerrada una vez finalizado el horario del turno", async () => {
+      vi.setSystemTime(AT_BOOKING_END);
+      chats.findOne.mockResolvedValueOnce({
+        ...chatWithBooking(),
+        match: { ...chatWithBooking().match, matchPlayers: [{ player: fullPlayer() }] },
+      });
+
+      const result = await getChatById(1);
+
+      expect(result).toMatchObject({ success: true, data: { id: 1, isClosed: true } });
     });
 
     it("devuelve data null cuando no existe", async () => {
@@ -151,6 +179,19 @@ describe("chat actions", () => {
       expectNoPrivateData(result);
     });
 
+    it("sigue mostrando los mensajes una vez finalizado el turno (solo lectura)", async () => {
+      vi.setSystemTime(AT_BOOKING_END);
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      matchPlayers.count.mockResolvedValueOnce(1);
+      const sentAt = new Date("2026-10-01T18:10:00");
+      messages.find.mockResolvedValueOnce([{ id: 1, content: "Hola!", sentAt, sender: fullPlayer() }]);
+
+      const result = await getChatMessages(1);
+
+      expect(result).toMatchObject({ success: true, data: [{ id: 1, content: "Hola!" }] });
+    });
+
     it("rechaza a quien no está autenticado", async () => {
       mockSession(null);
 
@@ -177,6 +218,7 @@ describe("chat actions", () => {
       mockSession("ana@test.com");
       players.findOne.mockResolvedValueOnce(fullPlayer());
       matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
       const sentAt = new Date("2026-10-01T10:00:00");
       messages.save.mockImplementationOnce(async (entity: object) => ({ ...entity, id: 5, sentAt }));
 
@@ -245,10 +287,27 @@ describe("chat actions", () => {
       expect(messages.save).not.toHaveBeenCalled();
     });
 
+    it("rechaza mensajes una vez finalizado el horario del turno (chat en solo lectura)", async () => {
+      vi.setSystemTime(AT_BOOKING_END);
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+
+      const result = await sendMessage(1, "Hola");
+
+      expect(result).toEqual({
+        success: false,
+        error: "El chat se cerró porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.",
+      });
+      expect(messages.save).not.toHaveBeenCalled();
+    });
+
     it("devuelve un error genérico si falla el guardado", async () => {
       mockSession("ana@test.com");
       players.findOne.mockResolvedValueOnce(fullPlayer());
       matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
       messages.save.mockRejectedValueOnce(new Error("db down"));
 
       const result = await sendMessage(1, "Hola");

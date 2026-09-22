@@ -56,7 +56,7 @@ docs/
 
 ### Requisitos previos
 
-- Node.js 20+
+- Node.js 24+ (Vitest 5 y jsdom, usado en los tests de componentes, no soportan Node 20)
 - [pnpm](https://pnpm.io/) 10+ (`corepack enable` es suficiente si ya tenés Node instalado)
 - Docker (para levantar Postgres local y de tests)
 

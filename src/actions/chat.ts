@@ -9,6 +9,7 @@ import { Message } from "@/src/entities/Message";
 import { Player } from "@/src/entities/Player";
 import type { PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
+import { isChatClosed } from "@/src/domain/chat-closure";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 
@@ -35,6 +36,8 @@ export type ChatRoom = {
   id: number;
   booking: { fromDateTime: Date; courtNumber: number | null };
   participants: ChatParticipant[];
+  /** true cuando el turno ya finalizó: la sala queda en solo lectura. */
+  isClosed: boolean;
 };
 
 /** Cuántos mensajes se traen como máximo: los más recientes de la sala. */
@@ -43,6 +46,8 @@ const MESSAGES_PAGE_SIZE = 200;
 const NOT_AUTHENTICATED_MESSAGE = "No estás autenticado.";
 const NOT_PARTICIPANT_MESSAGE = "No tenés acceso a este chat.";
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede enviar mensajes.";
+const CHAT_CLOSED_MESSAGE =
+  "El chat se cerró porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.";
 const EMPTY_MESSAGE_MESSAGE = "Escribí un mensaje para enviarlo.";
 const MESSAGE_TOO_LONG_MESSAGE = `El mensaje no puede superar los ${CHAT_MESSAGE_MAX_LENGTH} caracteres.`;
 
@@ -107,6 +112,7 @@ export async function getChatById(id: number): Promise<ActionResult<ChatRoom | n
         courtNumber: chat.match.booking.court?.number ?? null,
       },
       participants: chat.match.matchPlayers.map((matchPlayer) => toParticipant(matchPlayer.player)),
+      isClosed: isChatClosed(chat.match.booking),
     };
     return { success: true, data: toPlain(room) };
   } catch (error) {
@@ -162,6 +168,14 @@ export async function sendMessage(chatId: number, content: string): Promise<Acti
     }
 
     const dataSource = await getDataSource();
+    const chat = await dataSource.getRepository<Chat>("Chat").findOne({
+      where: { id: chatId },
+      relations: { match: { booking: true } },
+    });
+    if (chat && isChatClosed(chat.match.booking)) {
+      return { success: false, error: CHAT_CLOSED_MESSAGE };
+    }
+
     const messages = dataSource.getRepository<Message>("Message");
     const saved = await messages.save(
       messages.create({
