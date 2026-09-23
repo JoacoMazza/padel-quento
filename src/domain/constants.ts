@@ -11,3 +11,6 @@ export const OPEN_MATCH_MIN_HOURS_BEFORE_START = 3;
 
 /** Largo máximo, en caracteres, de un mensaje de chat (sin contar espacios de los extremos). */
 export const CHAT_MESSAGE_MAX_LENGTH = 500;
+
+/** Puntos de fidelidad que se acreditan por asistir a un turno reservado. */
+export const ATTENDANCE_POINTS = 10;

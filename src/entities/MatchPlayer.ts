@@ -43,6 +43,13 @@ export class MatchPlayer {
   @Column({ type: "int", default: 1, name: "players_count" })
   playersCount!: number;
 
+  /**
+   * Asistencia de este jugador al partido. Arranca en true: el administrador
+   * solo interviene desde la turnera global para marcar la ausencia.
+   */
+  @Column({ type: "boolean", default: true, name: "attended" })
+  attended!: boolean;
+
   @CreateDateColumn({ name: "joined_at" })
   joinedAt!: Date;
 }

@@ -4,6 +4,7 @@ import { getBookings } from "@/src/actions/booking";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { getPlayersAdmin } from "@/src/actions/player";
 import { AdminPanel } from "@/app/admin/admin-panel";
+import { mapBookingToAdminProp } from "@/app/admin/types";
 
 export default async function AdminPage() {
   const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult, playersResult] =
@@ -32,19 +33,7 @@ export default async function AdminPage() {
         closingTime: String(s.closingTime),
         courtId: s.court?.id,
       }))}
-      bookings={bookings.map((b) => ({
-        id: b.id,
-        fromDateTime: b.fromDateTime,
-        durationMinutes: b.durationMinutes,
-        bookingState: b.bookingState,
-        price: b.price,
-        needPlayers: b.match?.needPlayers ?? false,
-        courtId: b.court?.id,
-        confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
-          (sum, mp) => sum + (mp.playersCount ?? 1),
-          0,
-        ),
-      }))}
+      bookings={bookings.map(mapBookingToAdminProp)}
       outOfServices={outOfServices.map((o) => ({
         id: o.id,
         fromDateTime: o.fromDateTime,
