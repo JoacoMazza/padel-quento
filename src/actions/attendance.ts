@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { BookingState } from "@/src/domain/enums";
-import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS } from "@/src/domain/constants";
+import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS, PENALTY_POINTS } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { requireAdmin } from "@/src/lib/rbac";
@@ -16,6 +16,7 @@ const OPEN_MATCH_BOOKING_MESSAGE =
   "Este turno es un partido abierto: marcá la asistencia de cada jugador por separado.";
 const ATTENDANCE_POINTS_REASON = "Asistencia a turno reservado";
 const OPEN_MATCH_JOIN_BONUS_REASON = "Bonus por sumarse a un partido abierto";
+const NO_SHOW_PENALTY_REASON = "Inasistencia a turno reservado";
 
 /**
  * Marca si el jugador que reservó un turno sin partido abierto asociado
@@ -121,11 +122,16 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
               );
             }
             awarded += 1;
+          } else {
+            await recordPointsMovement(matchPlayer.player.id, PENALTY_POINTS, "penalty", NO_SHOW_PENALTY_REASON);
           }
         }
       } else if (booking.attended) {
         await recordPointsMovement(booking.player.id, ATTENDANCE_POINTS, "bonus", ATTENDANCE_POINTS_REASON);
         awarded += 1;
+      } else {
+        // Inasistencia marcada por el administrador (RN-04).
+        await recordPointsMovement(booking.player.id, PENALTY_POINTS, "penalty", NO_SHOW_PENALTY_REASON);
       }
 
       await bookings.update(booking.id, { pointsAwarded: true });

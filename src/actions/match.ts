@@ -3,17 +3,27 @@
 import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
 import { Match } from "@/src/entities/Match";
+import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
+import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POINTS } from "@/src/domain/constants";
+import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { recordPointsMovement } from "@/src/actions/profile";
 
 const NOT_OPEN_MESSAGE = "Este partido ya no está buscando jugadores.";
 const INVALID_PLAYERS_TO_CLOSE_MESSAGE = `El cierre manual solo está disponible con entre 1 y ${OPEN_MATCH_MAX_PLAYERS - 1} jugadores confirmados.`;
 const CANCEL_EXPIRED_MATCHES_ERROR_MESSAGE = "No se pudieron cancelar los partidos abiertos vencidos.";
+const NOT_A_MATCH_PLAYER_MESSAGE = "No formás parte de este partido.";
+const CREATOR_CANNOT_LEAVE_MESSAGE = "Creaste este partido: para darte de baja tenés que cancelar el turno.";
+const BOOKING_ALREADY_CANCELLED_MESSAGE = "El turno ya fue cancelado.";
+const LATE_LEAVE_REASON = "Baja de un partido con menos de 3 horas de anticipación";
 
 class NotOpenError extends Error {}
 class InvalidPlayersToCloseError extends Error {}
+class NotAMatchPlayerError extends Error {}
+class CreatorCannotLeaveError extends Error {}
+class BookingAlreadyCancelledError extends Error {}
 
 /**
  * Cierre manual de la convocatoria de un partido abierto: quien lo creó ya
@@ -74,10 +84,70 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
 }
 
 /**
+ * Baja de un jugador que se sumó al partido abierto de otro. Si faltan menos
+ * de 3 horas para el turno se lo penaliza (RN-03) y el partido queda como
+ * está; si no, se libera su lugar y el partido vuelve a buscar jugadores. Quien
+ * creó el partido no se da de baja: cancela el turno (ver updateBooking).
+ */
+export async function leaveMatch(matchId: number, playerId: number): Promise<ActionResult<null>> {
+  try {
+    const dataSource = await getDataSource();
+
+    const late = await dataSource.transaction(async (manager) => {
+      const matchPlayers = manager.getRepository<MatchPlayer>("MatchPlayer");
+      const matchPlayer = await matchPlayers.findOne({
+        where: { match: { id: matchId }, player: { id: playerId } },
+        relations: { match: { booking: { player: true } } },
+      });
+      if (!matchPlayer) {
+        throw new NotAMatchPlayerError();
+      }
+
+      const booking = matchPlayer.match.booking;
+      if (booking.player.id === playerId) {
+        throw new CreatorCannotLeaveError();
+      }
+      if (booking.bookingState === BookingState.CANCELLED) {
+        throw new BookingAlreadyCancelledError();
+      }
+
+      await matchPlayers.delete(matchPlayer.id);
+
+      const isLate = isLateCancellation(booking.fromDateTime);
+      if (!isLate) {
+        await manager.getRepository<Match>("Match").update(matchId, { needPlayers: true });
+      }
+      return isLate;
+    });
+
+    // Fuera de la transacción, igual que en updateBooking: solo se penaliza si
+    // la baja efectivamente se guardó.
+    if (late) {
+      await recordPointsMovement(playerId, PENALTY_POINTS, "penalty", LATE_LEAVE_REASON);
+    }
+
+    return { success: true, data: null };
+  } catch (error) {
+    if (error instanceof NotAMatchPlayerError) {
+      return { success: false, error: NOT_A_MATCH_PLAYER_MESSAGE };
+    }
+    if (error instanceof CreatorCannotLeaveError) {
+      return { success: false, error: CREATOR_CANNOT_LEAVE_MESSAGE };
+    }
+    if (error instanceof BookingAlreadyCancelledError) {
+      return { success: false, error: BOOKING_ALREADY_CANCELLED_MESSAGE };
+    }
+    console.error("leaveMatch", error);
+    return { success: false, error: "No se pudo dar de baja del partido." };
+  }
+}
+
+/**
  * Cancelación automática de partidos abiertos que no llegaron a completar el
  * cupo a horas de su inicio: pensada para correr periódicamente desde un
  * proceso en segundo plano (ver src/jobs/open-match-expiration.ts). Cancela el
- * turno asociado para liberar la cancha y marca el partido como cerrado; los
+ * turno asociado para liberar la cancha y marca el partido como cerrado, sin
+ * penalizar a nadie: la cancelación no la pidió ningún jugador. Los
  * cerrados manualmente ya tienen needPlayers en false y no los toca esta consulta.
  */
 export async function cancelExpiredMatches(): Promise<ActionResult<number>> {
