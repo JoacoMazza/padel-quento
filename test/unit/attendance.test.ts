@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState, Role } from "@/src/domain/enums";
+import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS } from "@/src/domain/constants";
 
 vi.mock("next-auth/next", () => ({
   getServerSession: vi.fn(),
@@ -232,9 +233,61 @@ describe("attendance actions", () => {
       expect(recordPointsMovement).toHaveBeenCalledWith(1, expect.any(Number), "bonus", expect.any(String));
       expect(recordPointsMovement).toHaveBeenCalledWith(3, expect.any(Number), "bonus", expect.any(String));
       expect(recordPointsMovement).not.toHaveBeenCalledWith(2, expect.any(Number), "bonus", expect.any(String));
-      expect(recordPointsMovement).toHaveBeenCalledTimes(2);
+      // Jugadores 1 y 3 por asistencia, más el bonus del 3 por haberse sumado
+      // al partido abierto de otro (ver test de bonus más abajo).
+      expect(recordPointsMovement).toHaveBeenCalledTimes(3);
       expect(update).toHaveBeenCalledWith(2, { pointsAwarded: true });
       expect(result).toEqual({ success: true, data: 2 });
+    });
+
+    it("acredita el bonus por sumarse a un partido abierto solo a quienes se sumaron y asistieron", async () => {
+      const past = new Date(Date.now() - 2 * 60 * 60_000);
+      find.mockResolvedValueOnce([
+        {
+          id: 3,
+          fromDateTime: past,
+          durationMinutes: 90,
+          bookingState: BookingState.RESERVED,
+          attended: true,
+          player: { id: 1 },
+          match: {
+            id: 1,
+            matchPlayers: [
+              { id: 10, attended: true, player: { id: 1 } },
+              { id: 11, attended: false, player: { id: 2 } },
+              { id: 12, attended: true, player: { id: 3 } },
+            ],
+          },
+        },
+      ]);
+
+      await awardAttendancePoints();
+
+      const joinBonusReason = "Bonus por sumarse a un partido abierto";
+      expect(recordPointsMovement).toHaveBeenCalledWith(3, ATTENDANCE_POINTS, "bonus", "Asistencia a turno reservado");
+      expect(recordPointsMovement).toHaveBeenCalledWith(3, OPEN_MATCH_JOIN_BONUS_POINTS, "bonus", joinBonusReason);
+      expect(recordPointsMovement).not.toHaveBeenCalledWith(1, expect.any(Number), "bonus", joinBonusReason);
+      expect(recordPointsMovement).not.toHaveBeenCalledWith(2, expect.any(Number), "bonus", joinBonusReason);
+    });
+
+    it("no acredita el bonus por partido abierto en un turno simple", async () => {
+      const past = new Date(Date.now() - 2 * 60 * 60_000);
+      find.mockResolvedValueOnce([
+        {
+          id: 4,
+          fromDateTime: past,
+          durationMinutes: 90,
+          bookingState: BookingState.RESERVED,
+          attended: true,
+          player: { id: 42 },
+          match: null,
+        },
+      ]);
+
+      await awardAttendancePoints();
+
+      expect(recordPointsMovement).toHaveBeenCalledTimes(1);
+      expect(recordPointsMovement).toHaveBeenCalledWith(42, ATTENDANCE_POINTS, "bonus", "Asistencia a turno reservado");
     });
 
     it("devuelve error genérico si falla la consulta", async () => {
