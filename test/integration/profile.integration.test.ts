@@ -130,4 +130,29 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const playerInDb = await players.findOne({ where: { id: playerId } });
     expect(playerInDb?.scoring).toBe(35);
   });
+
+  it("solo suma los movimientos del propio jugador, no los de otros", async () => {
+    const dataSource = await getDataSource();
+    const players = dataSource.getRepository<Player>("Player");
+    const other = await players.save(
+      players.create({
+        names: "Otro",
+        lastnames: "Jugador",
+        email: `otro.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
+        passwordHash: "hash123",
+        scoring: 0,
+        photoUrl: null,
+      }),
+    );
+
+    expect(await recordPointsMovement(other.id, 100, "bonus", "Bonificación de otro jugador")).toBe(true);
+    expect(await recordPointsMovement(playerId, 20, "bonus", "Bonificación propia")).toBe(true);
+
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(20);
+    expect(profile?.movements.map((m) => m.description)).toEqual(["Bonificación propia"]);
+
+    const otherInDb = await players.findOne({ where: { id: other.id } });
+    expect(otherInDb?.scoring).toBe(100);
+  });
 });
