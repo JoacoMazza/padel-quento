@@ -10,7 +10,11 @@ vi.mock("next-auth/next", () => ({
 
 import { getServerSession } from "next-auth/next";
 import { BookingState, Role } from "@/src/domain/enums";
-import { ATTENDANCE_POINTS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
+import {
+  ATTENDANCE_POINTS,
+  OPEN_MATCH_JOIN_BONUS_POINTS,
+  OPEN_MATCH_MIN_HOURS_BEFORE_START,
+} from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
@@ -340,6 +344,38 @@ describe("attendance actions (integración con Postgres real)", () => {
       const joinerProfile = await getProfileData(joiner.email);
       expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
       expect(joinerProfile?.scoring).toBe(0);
+    });
+
+    it("acredita el bonus extra a quien se sumó a un partido abierto y asistió, pero no al creador", async () => {
+      const creator = await createTestPlayer("bonus-creador");
+      const joiner = await createTestPlayer("bonus-sumado");
+
+      // Mismo esquema de horario cercano + fake timer que el test anterior. Se
+      // desplaza unas horas más para no solapar con ese turno en la misma cancha.
+      const startTime = new Date(Date.now() + (OPEN_MATCH_MIN_HOURS_BEFORE_START + 3) * 60 * 60_000);
+      const created = await createBooking({
+        fromDateTime: startTime,
+        playerId: creator.id,
+        courtId,
+        groupSize: 2,
+      });
+      if (!created.success) throw new Error("expected success");
+
+      const joined = await joinOpenMatch({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
+      if (!joined.success) throw new Error("expected success");
+
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(startTime.getTime() + 91 * 60_000));
+
+      const result = await awardAttendancePoints();
+      vi.useRealTimers();
+
+      expect(result.success).toBe(true);
+
+      const creatorProfile = await getProfileData(creator.email);
+      const joinerProfile = await getProfileData(joiner.email);
+      expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
+      expect(joinerProfile?.scoring).toBe(ATTENDANCE_POINTS + OPEN_MATCH_JOIN_BONUS_POINTS);
     });
   });
 });

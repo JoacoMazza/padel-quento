@@ -14,3 +14,9 @@ export const CHAT_MESSAGE_MAX_LENGTH = 500;
 
 /** Puntos de fidelidad que se acreditan por asistir a un turno reservado. */
 export const ATTENDANCE_POINTS = 10;
+
+/**
+ * Puntos extra que recibe un jugador por sumarse al partido abierto de otro
+ * usuario y asistir, para incentivar el armado colaborativo de partidos.
+ */
+export const OPEN_MATCH_JOIN_BONUS_POINTS = 5;

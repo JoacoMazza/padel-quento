@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { BookingState } from "@/src/domain/enums";
-import { ATTENDANCE_POINTS } from "@/src/domain/constants";
+import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { requireAdmin } from "@/src/lib/rbac";
@@ -15,6 +15,7 @@ const MATCH_PLAYER_NOT_FOUND_MESSAGE = "El jugador no forma parte de este partid
 const OPEN_MATCH_BOOKING_MESSAGE =
   "Este turno es un partido abierto: marcá la asistencia de cada jugador por separado.";
 const ATTENDANCE_POINTS_REASON = "Asistencia a turno reservado";
+const OPEN_MATCH_JOIN_BONUS_REASON = "Bonus por sumarse a un partido abierto";
 
 /**
  * Marca si el jugador que reservó un turno sin partido abierto asociado
@@ -83,7 +84,9 @@ export async function setMatchPlayerAttendance(
  * procesados. Pensada para correr periódicamente desde un proceso en segundo
  * plano (ver src/jobs/attendance-points.ts): el jugador que reservó el turno
  * (o cada jugador confirmado, si es un partido abierto) recibe los puntos
- * salvo que el administrador ya lo haya marcado como ausente. Booking.pointsAwarded
+ * salvo que el administrador ya lo haya marcado como ausente. Quienes se sumaron
+ * al partido abierto de otro jugador (no el que lo creó) reciben además
+ * OPEN_MATCH_JOIN_BONUS_POINTS, también solo si asistieron. Booking.pointsAwarded
  * evita procesar el mismo turno más de una vez.
  */
 export async function awardAttendancePoints(): Promise<ActionResult<number>> {
@@ -109,6 +112,14 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
         for (const matchPlayer of booking.match.matchPlayers ?? []) {
           if (matchPlayer.attended) {
             await recordPointsMovement(matchPlayer.player.id, ATTENDANCE_POINTS, "bonus", ATTENDANCE_POINTS_REASON);
+            if (matchPlayer.player.id !== booking.player.id) {
+              await recordPointsMovement(
+                matchPlayer.player.id,
+                OPEN_MATCH_JOIN_BONUS_POINTS,
+                "bonus",
+                OPEN_MATCH_JOIN_BONUS_REASON,
+              );
+            }
             awarded += 1;
           }
         }
