@@ -11,7 +11,7 @@ import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
 import { cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
-import { getProfileData } from "@/src/actions/profile";
+import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
 
 function uniqueCourtNumber() {
   return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
@@ -24,6 +24,8 @@ function uniqueEmail(prefix: string) {
 // Partidos abiertos a 30 días y con horario propio (igual que en
 // match.integration.test.ts): se crean con la antelación mínima requerida y
 // después se simula con fake timers que faltan menos de 3 horas.
+const INITIAL_POINTS = 50;
+
 let slotOffset = 0;
 function uniqueFromDateTime() {
   const date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -60,6 +62,9 @@ describe("penalización por cancelación tardía (integración con Postgres real
       lastnames: prefix,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
+    // Saldo inicial mayor a la penalización: con saldo 0 no habría nada que
+    // descontar (el piso es 0) y no se podría distinguir si se penalizó.
+    await recordPointsMovement(player.data.id, INITIAL_POINTS, "bonus", "Puntos iniciales de prueba");
     return { id: player.data.id, email };
   }
 
@@ -76,7 +81,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
     expect(result.success).toBe(true);
 
     const profile = await getProfileData(player.email);
-    expect(profile?.scoring).toBe(-PENALTY_POINTS);
+    expect(profile?.scoring).toBe(INITIAL_POINTS - PENALTY_POINTS);
   });
 
   it("no descuenta puntos al cancelar un turno con 3 horas o más de anticipación", async () => {
@@ -92,7 +97,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
     expect(result.success).toBe(true);
 
     const profile = await getProfileData(player.email);
-    expect(profile?.scoring).toBe(0);
+    expect(profile?.scoring).toBe(INITIAL_POINTS);
   });
 
   describe("partidos abiertos", () => {
@@ -121,8 +126,8 @@ describe("penalización por cancelación tardía (integración con Postgres real
       vi.useRealTimers();
       expect(result.success).toBe(true);
 
-      expect((await getProfileData(creator.email))?.scoring).toBe(-PENALTY_POINTS);
-      expect((await getProfileData(joiner.email))?.scoring).toBe(0);
+      expect((await getProfileData(creator.email))?.scoring).toBe(INITIAL_POINTS - PENALTY_POINTS);
+      expect((await getProfileData(joiner.email))?.scoring).toBe(INITIAL_POINTS);
     });
 
     it("penaliza al jugador sumado que se da de baja a menos de 3 horas, no al creador", async () => {
@@ -134,8 +139,8 @@ describe("penalización por cancelación tardía (integración con Postgres real
       vi.useRealTimers();
       expect(result.success).toBe(true);
 
-      expect((await getProfileData(joiner.email))?.scoring).toBe(-PENALTY_POINTS);
-      expect((await getProfileData(creator.email))?.scoring).toBe(0);
+      expect((await getProfileData(joiner.email))?.scoring).toBe(INITIAL_POINTS - PENALTY_POINTS);
+      expect((await getProfileData(creator.email))?.scoring).toBe(INITIAL_POINTS);
 
       const found = await getBookingById(bookingId);
       if (!found.success) throw new Error("expected success");
@@ -149,7 +154,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
       const result = await leaveMatch(matchId, joiner.id);
       expect(result.success).toBe(true);
 
-      expect((await getProfileData(joiner.email))?.scoring).toBe(0);
+      expect((await getProfileData(joiner.email))?.scoring).toBe(INITIAL_POINTS);
 
       const found = await getBookingById(bookingId);
       if (!found.success) throw new Error("expected success");
@@ -168,8 +173,8 @@ describe("penalización por cancelación tardía (integración con Postgres real
       if (!found.success) throw new Error("expected success");
       expect(found.data?.bookingState).toBe(BookingState.CANCELLED);
 
-      expect((await getProfileData(creator.email))?.scoring).toBe(0);
-      expect((await getProfileData(joiner.email))?.scoring).toBe(0);
+      expect((await getProfileData(creator.email))?.scoring).toBe(INITIAL_POINTS);
+      expect((await getProfileData(joiner.email))?.scoring).toBe(INITIAL_POINTS);
     });
   });
 });

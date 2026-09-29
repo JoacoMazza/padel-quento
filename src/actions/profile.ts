@@ -140,19 +140,29 @@ export async function recordPointsMovement(
     if (!player) return false;
 
     // Asegurar que penalización sea negativa y bonificación positiva si fuera necesario
-    const signedAmount = type === "penalty" && amount > 0 ? -amount : amount;
+    let signedAmount = type === "penalty" && amount > 0 ? -amount : amount;
 
-    const penaltyRecord = penaltyRepo.create({
-      player,
-      penalizedScoring: signedAmount,
-      reason: description,
-    });
-    await penaltyRepo.save(penaltyRecord);
+    const previousPenalties = await penaltyRepo.find({ where: { player: { id: playerId } } });
+    const previousScoring = previousPenalties.reduce((sum, p) => sum + Number(p.penalizedScoring), 0);
+
+    // El saldo nunca baja de 0: una penalización solo descuenta lo que el
+    // jugador tiene, y se registra ese monto real para que el historial sume
+    // igual que el saldo. Sin saldo no hay nada que descontar ni registrar.
+    if (signedAmount < 0) {
+      signedAmount = -Math.min(-signedAmount, Math.max(previousScoring, 0));
+    }
+
+    if (signedAmount !== 0) {
+      const penaltyRecord = penaltyRepo.create({
+        player,
+        penalizedScoring: signedAmount,
+        reason: description,
+      });
+      await penaltyRepo.save(penaltyRecord);
+    }
 
     // Recalcular saldo total de puntos en el jugador
-    const allPenalties = await penaltyRepo.find({ where: { player: { id: playerId } } });
-    const netScoring = allPenalties.reduce((sum, p) => sum + Number(p.penalizedScoring), 0);
-    player.scoring = netScoring;
+    player.scoring = previousScoring + signedAmount;
     await playerRepo.save(player);
 
     revalidatePath("/profile");

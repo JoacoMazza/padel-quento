@@ -20,7 +20,7 @@ import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
-import { getProfileData } from "@/src/actions/profile";
+import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
 import {
   setBookingAttendance,
   setMatchPlayerAttendance,
@@ -222,6 +222,8 @@ describe("attendance actions (integración con Postgres real)", () => {
 
     it("no acredita puntos y descuenta la penalización si el turno fue marcado como ausente antes de finalizar", async () => {
       const player = await createTestPlayer("puntos-ausente");
+      // Con saldo 0 no habría nada que descontar (el piso es 0).
+      await recordPointsMovement(player.id, 50, "bonus", "Puntos iniciales de prueba");
       const past = uniquePastFromDateTime();
       const created = await createBooking({
         fromDateTime: past,
@@ -243,7 +245,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       expect(found.data?.pointsAwarded).toBe(true);
 
       const profile = await getProfileData(player.email);
-      expect(profile?.scoring).toBe(-PENALTY_POINTS);
+      expect(profile?.scoring).toBe(50 - PENALTY_POINTS);
     });
 
     it("no procesa turnos cancelados ni turnos futuros", async () => {
@@ -304,6 +306,7 @@ describe("attendance actions (integración con Postgres real)", () => {
     it("acredita puntos a los jugadores presentes del partido abierto y penaliza a los marcados ausentes", async () => {
       const creator = await createTestPlayer("partido-creador");
       const joiner = await createTestPlayer("partido-sumado");
+      await recordPointsMovement(joiner.id, 50, "bonus", "Puntos iniciales de prueba");
 
       // Horario cercano (no a 30 días, como uniqueFromDateTime): el fake timer de
       // abajo solo necesita saltar unas horas para que el turno termine, sin
@@ -344,7 +347,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const creatorProfile = await getProfileData(creator.email);
       const joinerProfile = await getProfileData(joiner.email);
       expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
-      expect(joinerProfile?.scoring).toBe(-PENALTY_POINTS);
+      expect(joinerProfile?.scoring).toBe(50 - PENALTY_POINTS);
     });
 
     it("acredita el bonus extra a quien se sumó a un partido abierto y asistió, pero no al creador", async () => {

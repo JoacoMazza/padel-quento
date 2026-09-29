@@ -17,9 +17,9 @@ export const LATE_CANCELLATION_HOURS = 3;
 
 /**
  * Puntos que se descuentan por cancelar un turno tarde (RN-03) o por no asistir
- * a él (RN-04).
+ * a él (RN-04). El saldo nunca baja de 0 (ver recordPointsMovement).
  */
-export const PENALTY_POINTS = 10;
+export const PENALTY_POINTS = 20;
 
 /** Largo máximo, en caracteres, de un mensaje de chat (sin contar espacios de los extremos). */
 export const CHAT_MESSAGE_MAX_LENGTH = 500;

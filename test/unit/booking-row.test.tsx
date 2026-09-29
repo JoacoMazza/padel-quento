@@ -17,7 +17,6 @@ vi.mock("@/src/actions/booking", () => ({ updateBooking }));
 vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch }));
 
 import { BookingState } from "@/src/domain/enums";
-import { PENALTY_POINTS } from "@/src/domain/constants";
 import { BookingRow } from "@/app/my-bookings/booking-row";
 import type { MyBookingItem } from "@/app/my-bookings/types";
 
@@ -84,7 +83,7 @@ describe("BookingRow", () => {
       fireEvent.click(screen.getByRole("button", { name: "Cancelar turno" }));
 
       expect(screen.getByRole("alert").textContent).toBe(
-        `Faltan menos de 3 horas para el turno: si cancelás se te descontarán ${PENALTY_POINTS} puntos.`,
+        `Faltan menos de 3 horas para el turno: si cancelás se te descontarán 20 puntos.`,
       );
     });
 
@@ -160,7 +159,7 @@ describe("BookingRow", () => {
       fireEvent.click(screen.getByRole("button", { name: "Darme de baja del partido" }));
 
       expect(screen.getByRole("alert").textContent).toBe(
-        `Faltan menos de 3 horas para el turno: si te das de baja se te descontarán ${PENALTY_POINTS} puntos.`,
+        `Faltan menos de 3 horas para el turno: si te das de baja se te descontarán 20 puntos.`,
       );
     });
 
