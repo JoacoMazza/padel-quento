@@ -14,6 +14,7 @@ import {
   ATTENDANCE_POINTS,
   OPEN_MATCH_JOIN_BONUS_POINTS,
   OPEN_MATCH_MIN_HOURS_BEFORE_START,
+  PENALTY_POINTS,
 } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
@@ -219,7 +220,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       expect(profile?.scoring).toBe(ATTENDANCE_POINTS);
     });
 
-    it("no acredita puntos si el turno fue marcado como ausente antes de finalizar", async () => {
+    it("no acredita puntos y descuenta la penalización si el turno fue marcado como ausente antes de finalizar", async () => {
       const player = await createTestPlayer("puntos-ausente");
       const past = uniquePastFromDateTime();
       const created = await createBooking({
@@ -242,7 +243,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       expect(found.data?.pointsAwarded).toBe(true);
 
       const profile = await getProfileData(player.email);
-      expect(profile?.scoring).toBe(0);
+      expect(profile?.scoring).toBe(-PENALTY_POINTS);
     });
 
     it("no procesa turnos cancelados ni turnos futuros", async () => {
@@ -300,7 +301,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       expect(profile?.scoring).toBe(ATTENDANCE_POINTS);
     });
 
-    it("acredita puntos solo a los jugadores del partido abierto que no fueron marcados ausentes", async () => {
+    it("acredita puntos a los jugadores presentes del partido abierto y penaliza a los marcados ausentes", async () => {
       const creator = await createTestPlayer("partido-creador");
       const joiner = await createTestPlayer("partido-sumado");
 
@@ -337,13 +338,13 @@ describe("attendance actions (integración con Postgres real)", () => {
       vi.useRealTimers();
 
       // Ídem: no se afirma un "data" global exacto (ver comentario en el test
-      // de idempotencia), solo que el jugador ausente no cobra y el presente sí.
+      // de idempotencia), solo que el jugador ausente es penalizado y el presente cobra.
       expect(result.success).toBe(true);
 
       const creatorProfile = await getProfileData(creator.email);
       const joinerProfile = await getProfileData(joiner.email);
       expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
-      expect(joinerProfile?.scoring).toBe(0);
+      expect(joinerProfile?.scoring).toBe(-PENALTY_POINTS);
     });
 
     it("acredita el bonus extra a quien se sumó a un partido abierto y asistió, pero no al creador", async () => {

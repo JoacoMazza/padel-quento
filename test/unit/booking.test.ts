@@ -39,6 +39,13 @@ const { create, save, update, find, findOne, playerFindOne, merge, deleteFn, get
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
+const { recordPointsMovement } = vi.hoisted(() => ({
+  recordPointsMovement: vi.fn(async () => true),
+}));
+
+vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
+
+import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
   createBooking,
   getBookings,
@@ -573,6 +580,75 @@ describe("booking actions", () => {
 
       expect(result).toEqual({ success: false, error: DOUBLE_BOOKING_MESSAGE });
       expect(save).not.toHaveBeenCalled();
+    });
+
+    it("descuenta los puntos de penalización al cancelar con menos de 3 horas de anticipación", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date(Date.now() + 2 * 60 * 60_000),
+        bookingState: BookingState.RESERVED,
+        player: { id: 7 },
+      });
+
+      const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(result.success).toBe(true);
+      expect(recordPointsMovement).toHaveBeenCalledWith(7, PENALTY_POINTS, "penalty", expect.any(String));
+    });
+
+    it("no penaliza al cancelar con 3 horas o más de anticipación", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date(Date.now() + 4 * 60 * 60_000),
+        bookingState: BookingState.RESERVED,
+        player: { id: 7 },
+      });
+
+      const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(result.success).toBe(true);
+      expect(recordPointsMovement).not.toHaveBeenCalled();
+    });
+
+    it("no penaliza otra vez si el turno ya estaba cancelado", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date(Date.now() + 60 * 60_000),
+        bookingState: BookingState.CANCELLED,
+        player: { id: 7 },
+      });
+
+      await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(recordPointsMovement).not.toHaveBeenCalled();
+    });
+
+    it("no penaliza cambios que no sean una cancelación, aunque falten menos de 3 horas", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date(Date.now() + 60 * 60_000),
+        bookingState: BookingState.RESERVED,
+        player: { id: 7 },
+      });
+
+      await updateBooking(1, { bookingState: BookingState.PAID });
+
+      expect(recordPointsMovement).not.toHaveBeenCalled();
+    });
+
+    it("no penaliza si la cancelación falla", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date(Date.now() + 60 * 60_000),
+        bookingState: BookingState.RESERVED,
+        player: { id: 7 },
+      });
+      save.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(result.success).toBe(false);
+      expect(recordPointsMovement).not.toHaveBeenCalled();
     });
 
     it("devuelve error si la reserva no existe", async () => {

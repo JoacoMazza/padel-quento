@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
+import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { updateBooking } from "@/src/actions/booking";
 import { closeMatch } from "@/src/actions/match";
 import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
@@ -128,6 +129,13 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
 
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
         {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}
+
+        {pendingAction === "cancel" && isLateCancellation(booking.fromDateTime, now) ? (
+          <p role="alert" className="max-w-xs text-xs font-medium text-amber-600">
+            Faltan menos de {LATE_CANCELLATION_HOURS} horas para el turno: si cancelás se te descontarán{" "}
+            {PENALTY_POINTS} puntos.
+          </p>
+        ) : null}
 
         {pendingAction ? (
           <div className="flex items-center gap-2">

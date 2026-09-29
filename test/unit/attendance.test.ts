@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState, Role } from "@/src/domain/enums";
-import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS } from "@/src/domain/constants";
+import { ATTENDANCE_POINTS, OPEN_MATCH_JOIN_BONUS_POINTS, PENALTY_POINTS } from "@/src/domain/constants";
 
 vi.mock("next-auth/next", () => ({
   getServerSession: vi.fn(),
@@ -144,7 +144,7 @@ describe("attendance actions", () => {
       expect(result).toEqual({ success: true, data: 1 });
     });
 
-    it("no acredita puntos si el turno fue marcado como ausente", async () => {
+    it("no acredita puntos y descuenta la penalización si el turno fue marcado como ausente", async () => {
       const past = new Date(Date.now() - 2 * 60 * 60_000);
       find.mockResolvedValueOnce([
         {
@@ -160,7 +160,9 @@ describe("attendance actions", () => {
 
       const result = await awardAttendancePoints();
 
-      expect(recordPointsMovement).not.toHaveBeenCalled();
+      expect(recordPointsMovement).not.toHaveBeenCalledWith(42, expect.any(Number), "bonus", expect.any(String));
+      expect(recordPointsMovement).toHaveBeenCalledWith(42, PENALTY_POINTS, "penalty", expect.any(String));
+      expect(recordPointsMovement).toHaveBeenCalledTimes(1);
       expect(update).toHaveBeenCalledWith(1, { pointsAwarded: true });
       expect(result).toEqual({ success: true, data: 0 });
     });
@@ -233,9 +235,11 @@ describe("attendance actions", () => {
       expect(recordPointsMovement).toHaveBeenCalledWith(1, expect.any(Number), "bonus", expect.any(String));
       expect(recordPointsMovement).toHaveBeenCalledWith(3, expect.any(Number), "bonus", expect.any(String));
       expect(recordPointsMovement).not.toHaveBeenCalledWith(2, expect.any(Number), "bonus", expect.any(String));
+      expect(recordPointsMovement).toHaveBeenCalledWith(2, PENALTY_POINTS, "penalty", expect.any(String));
       // Jugadores 1 y 3 por asistencia, más el bonus del 3 por haberse sumado
-      // al partido abierto de otro (ver test de bonus más abajo).
-      expect(recordPointsMovement).toHaveBeenCalledTimes(3);
+      // al partido abierto de otro (ver test de bonus más abajo), más la
+      // penalización del 2 por inasistencia.
+      expect(recordPointsMovement).toHaveBeenCalledTimes(4);
       expect(update).toHaveBeenCalledWith(2, { pointsAwarded: true });
       expect(result).toEqual({ success: true, data: 2 });
     });

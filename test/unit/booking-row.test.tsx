@@ -16,6 +16,7 @@ vi.mock("@/src/actions/booking", () => ({ updateBooking }));
 vi.mock("@/src/actions/match", () => ({ closeMatch }));
 
 import { BookingState } from "@/src/domain/enums";
+import { PENALTY_POINTS } from "@/src/domain/constants";
 import { BookingRow } from "@/app/my-bookings/booking-row";
 import type { MyBookingItem } from "@/app/my-bookings/types";
 
@@ -74,6 +75,25 @@ describe("BookingRow", () => {
       await waitFor(() => expect(screen.getByText("No se pudo actualizar la reserva.")).toBeTruthy());
       expect(screen.queryByText("¿Cancelar turno?")).toBeNull();
       expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("advierte que se descontarán puntos si faltan menos de 3 horas para el turno", () => {
+      render(<BookingRow booking={booking({ fromDateTime: new Date("2026-10-01T12:00:00") })} now={NOW} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar turno" }));
+
+      expect(screen.getByRole("alert").textContent).toBe(
+        `Faltan menos de 3 horas para el turno: si cancelás se te descontarán ${PENALTY_POINTS} puntos.`,
+      );
+    });
+
+    it("no muestra la advertencia de penalización si faltan 3 horas o más", () => {
+      render(<BookingRow booking={booking({ fromDateTime: new Date("2026-10-01T13:00:00") })} now={NOW} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar turno" }));
+
+      expect(screen.getByText("¿Cancelar turno?")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
     });
 
     it("permite volver atrás sin cancelar", () => {
