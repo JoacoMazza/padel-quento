@@ -9,9 +9,11 @@ import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
+import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POINTS } from "@/src/domain/constants";
+import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { recordPointsMovement } from "@/src/actions/profile";
 
 export type CreateBookingInput = {
   fromDateTime: Date;
@@ -53,6 +55,7 @@ const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
 const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
 const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
+const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
@@ -368,11 +371,22 @@ export async function updateBooking(
   try {
     const dataSource = await getDataSource();
 
+    let lateCancellationPlayerId: number | null = null;
+
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
-      const booking = await bookings.findOne({ where: { id }, relations: { court: true } });
+      const booking = await bookings.findOne({ where: { id }, relations: { court: true, player: true } });
       if (!booking) {
         throw new Error("NOT_FOUND");
+      }
+
+      if (
+        input.bookingState === BookingState.CANCELLED &&
+        booking.bookingState !== BookingState.CANCELLED &&
+        booking.player &&
+        isLateCancellation(booking.fromDateTime)
+      ) {
+        lateCancellationPlayerId = booking.player.id;
       }
 
       const { playerId, courtId, ...rest } = input;
@@ -404,6 +418,12 @@ export async function updateBooking(
 
       return bookings.save(booking);
     });
+
+    // Fuera de la transacción: recordPointsMovement usa su propia conexión, y
+    // solo se penaliza si la cancelación efectivamente se guardó (RN-03).
+    if (lateCancellationPlayerId !== null) {
+      await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
+    }
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {

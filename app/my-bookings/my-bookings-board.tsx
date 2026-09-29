@@ -11,10 +11,12 @@ export function MyBookingsBoard({
   userName,
   userEmail,
   bookings,
+  playerId,
 }: {
   userName?: string | null;
   userEmail?: string | null;
   bookings: MyBookingItem[];
+  playerId: number | null;
 }) {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -58,7 +60,7 @@ export function MyBookingsBoard({
             {upcoming.length === 0 ? (
               <p className="text-sm text-foreground/50">No tenés turnos próximos con estos filtros.</p>
             ) : (
-              upcoming.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} />)
+              upcoming.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} playerId={playerId} />)
             )}
           </div>
         </section>
@@ -72,7 +74,7 @@ export function MyBookingsBoard({
             {past.length === 0 ? (
               <p className="text-sm text-foreground/50">No tenés turnos anteriores con estos filtros.</p>
             ) : (
-              past.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} />)
+              past.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} playerId={playerId} />)
             )}
           </div>
         </section>

@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
+import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
+import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { updateBooking } from "@/src/actions/booking";
-import { closeMatch } from "@/src/actions/match";
+import { closeMatch, leaveMatch } from "@/src/actions/match";
 import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import {
   getBookingBadgeClasses,
@@ -21,16 +22,37 @@ function timeLabel(date: Date) {
   return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
 }
 
-export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date }) {
+const CONFIRM_LABELS = {
+  cancel: { question: "¿Cancelar turno?", confirm: "Sí, cancelar", pending: "Cancelando…" },
+  close: { question: "¿Cerrar búsqueda de jugadores?", confirm: "Sí, cerrar", pending: "Cerrando…" },
+  leave: { question: "¿Darte de baja del partido?", confirm: "Sí, darme de baja", pending: "Dándote de baja…" },
+};
+
+export function BookingRow({
+  booking,
+  now,
+  playerId = null,
+}: {
+  booking: MyBookingItem;
+  now: Date;
+  /** Jugador logueado: lo necesita la baja de un partido al que se sumó. */
+  playerId?: number | null;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [pendingAction, setPendingAction] = useState<"cancel" | "close" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"cancel" | "close" | "leave" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
   // Quien se sumó a un partido de otro jugador no puede cancelar el turno completo.
   const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant;
+  // En cambio, sí puede darse de baja del partido y liberar su lugar.
+  const canLeave =
+    (tone === "confirmed" || tone === "pending") &&
+    booking.joinedAsParticipant &&
+    booking.matchId !== null &&
+    playerId !== null;
   // El cierre manual es una acción del creador del partido, no de quien se sumó.
   const canCloseManually =
     booking.needPlayers &&
@@ -45,6 +67,20 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
       const result = await updateBooking(booking.id, { bookingState: BookingState.CANCELLED });
       // La fila sigue montada tras el refresh (los cancelados se siguen listando),
       // así que la confirmación se cierra siempre, salga bien o mal.
+      setPendingAction(null);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleLeave() {
+    if (booking.matchId === null || playerId === null) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await leaveMatch(booking.matchId!, playerId);
       setPendingAction(null);
       if (!result.success) {
         setError(result.error);
@@ -129,26 +165,28 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
         {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}
 
+        {(pendingAction === "cancel" || pendingAction === "leave") && isLateCancellation(booking.fromDateTime, now) ? (
+          <p role="alert" className="max-w-xs text-xs font-medium text-amber-600">
+            Faltan menos de {LATE_CANCELLATION_HOURS} horas para el turno:{" "}
+            {pendingAction === "cancel" ? "si cancelás" : "si te das de baja"} se te descontarán {PENALTY_POINTS}{" "}
+            puntos.
+          </p>
+        ) : null}
+
         {pendingAction ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/60">
-              {pendingAction === "cancel" ? "¿Cancelar turno?" : "¿Cerrar búsqueda de jugadores?"}
-            </span>
+            <span className="text-xs text-foreground/60">{CONFIRM_LABELS[pendingAction].question}</span>
             <button
               type="button"
               disabled={isPending}
-              onClick={pendingAction === "cancel" ? handleCancel : handleClose}
+              onClick={
+                pendingAction === "cancel" ? handleCancel : pendingAction === "leave" ? handleLeave : handleClose
+              }
               className={`h-8 rounded-full px-3 text-xs font-semibold text-white transition-colors disabled:opacity-60 cursor-pointer ${
-                pendingAction === "cancel" ? "bg-danger hover:bg-danger/90" : "bg-primary hover:bg-primary/90"
+                pendingAction === "close" ? "bg-primary hover:bg-primary/90" : "bg-danger hover:bg-danger/90"
               }`}
             >
-              {pendingAction === "cancel"
-                ? isPending
-                  ? "Cancelando…"
-                  : "Sí, cancelar"
-                : isPending
-                  ? "Cerrando…"
-                  : "Sí, cerrar"}
+              {isPending ? CONFIRM_LABELS[pendingAction].pending : CONFIRM_LABELS[pendingAction].confirm}
             </button>
             <button
               type="button"
@@ -187,6 +225,17 @@ export function BookingRow({ booking, now }: { booking: MyBookingItem; now: Date
                 title="Cerrar búsqueda de jugadores"
               >
                 <Lock className="h-4 w-4" />
+              </button>
+            ) : null}
+            {canLeave ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("leave")}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-danger hover:text-danger cursor-pointer"
+                aria-label="Darme de baja del partido"
+                title="Darme de baja del partido"
+              >
+                <LogOut className="h-4 w-4" />
               </button>
             ) : null}
             {canCancel ? (

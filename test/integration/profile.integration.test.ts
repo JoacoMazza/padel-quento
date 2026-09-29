@@ -155,4 +155,25 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const otherInDb = await players.findOne({ where: { id: other.id } });
     expect(otherInDb?.scoring).toBe(100);
   });
+
+  it("una penalización no deja el saldo por debajo de 0: registra solo lo que efectivamente descuenta", async () => {
+    expect(await recordPointsMovement(playerId, 10, "bonus", "Asistencia a turno reservado")).toBe(true);
+    expect(await recordPointsMovement(playerId, 20, "penalty", "Inasistencia a turno reservado")).toBe(true);
+
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(0);
+    expect(profile?.movements[0]).toMatchObject({ amount: -10, type: "penalty" });
+
+    const dataSource = await getDataSource();
+    const playerInDb = await dataSource.getRepository<Player>("Player").findOne({ where: { id: playerId } });
+    expect(playerInDb?.scoring).toBe(0);
+  });
+
+  it("con saldo 0 la penalización no descuenta nada y una bonificación posterior suma completa", async () => {
+    expect(await recordPointsMovement(playerId, 20, "penalty", "Inasistencia a turno reservado")).toBe(true);
+    expect((await getProfileData(playerEmail))?.scoring).toBe(0);
+
+    expect(await recordPointsMovement(playerId, 10, "bonus", "Asistencia a turno reservado")).toBe(true);
+    expect((await getProfileData(playerEmail))?.scoring).toBe(10);
+  });
 });
