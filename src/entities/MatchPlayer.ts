@@ -24,7 +24,7 @@ import type { Player } from "@/src/entities/Player";
  * ese caso. La combinación sigue siendo única gracias al @Unique de abajo.
  */
 @Entity({ name: "match_players" })
-@Unique(["match", "player"])
+@Unique("UQ_match_players_match_player", ["match", "player"])
 export class MatchPlayer {
   @PrimaryGeneratedColumn()
   id!: number;
