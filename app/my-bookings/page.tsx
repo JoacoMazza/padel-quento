@@ -57,7 +57,12 @@ export default async function MyBookingsPage() {
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Mis turnos</h1>
         <p className="mt-1.5 text-foreground/60">Acá podés ver y administrar todos tus turnos</p>
 
-        <MyBookingsBoard userName={session.user.name} userEmail={session.user.email} bookings={myBookings} />
+        <MyBookingsBoard
+          userName={session.user.name}
+          userEmail={session.user.email}
+          bookings={myBookings}
+          playerId={player?.id ?? null}
+        />
       </main>
     </div>
   );

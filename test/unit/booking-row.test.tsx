@@ -2,10 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { refresh, updateBooking, closeMatch } = vi.hoisted(() => ({
+const { refresh, updateBooking, closeMatch, leaveMatch } = vi.hoisted(() => ({
   refresh: vi.fn(),
   updateBooking: vi.fn(),
   closeMatch: vi.fn(),
+  leaveMatch: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -13,7 +14,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
-vi.mock("@/src/actions/match", () => ({ closeMatch }));
+vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch }));
 
 import { BookingState } from "@/src/domain/enums";
 import { PENALTY_POINTS } from "@/src/domain/constants";
@@ -121,6 +122,68 @@ describe("BookingRow", () => {
       await waitFor(() => expect(refresh).toHaveBeenCalled());
       expect(closeMatch).toHaveBeenCalledWith(3);
       await waitFor(() => expect(screen.queryByText("¿Cerrar búsqueda de jugadores?")).toBeNull());
+    });
+  });
+
+  describe("darse de baja de un partido ajeno", () => {
+    const joinedMatch = (overrides: Partial<MyBookingItem> = {}) =>
+      booking({ matchId: 3, needPlayers: true, confirmedPlayers: 3, joinedAsParticipant: true, ...overrides });
+
+    it("da de baja al jugador del partido y refresca cuando sale bien", async () => {
+      leaveMatch.mockResolvedValueOnce({ success: true, data: null });
+      render(<BookingRow booking={joinedMatch()} now={NOW} playerId={5} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Darme de baja del partido" }));
+      expect(screen.getByText("¿Darte de baja del partido?")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Sí, darme de baja" }));
+
+      await waitFor(() => expect(refresh).toHaveBeenCalled());
+      expect(leaveMatch).toHaveBeenCalledWith(3, 5);
+    });
+
+    it("muestra el error cuando falla", async () => {
+      leaveMatch.mockResolvedValueOnce({ success: false, error: "No se pudo dar de baja del partido." });
+      render(<BookingRow booking={joinedMatch()} now={NOW} playerId={5} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Darme de baja del partido" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sí, darme de baja" }));
+
+      await waitFor(() => expect(screen.getByText("No se pudo dar de baja del partido.")).toBeTruthy());
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("advierte que se descontarán puntos si faltan menos de 3 horas para el turno", () => {
+      render(
+        <BookingRow booking={joinedMatch({ fromDateTime: new Date("2026-10-01T12:00:00") })} now={NOW} playerId={5} />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Darme de baja del partido" }));
+
+      expect(screen.getByRole("alert").textContent).toBe(
+        `Faltan menos de 3 horas para el turno: si te das de baja se te descontarán ${PENALTY_POINTS} puntos.`,
+      );
+    });
+
+    it("no muestra la advertencia de penalización si faltan 3 horas o más", () => {
+      render(<BookingRow booking={joinedMatch()} now={NOW} playerId={5} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Darme de baja del partido" }));
+
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("no ofrece darse de baja a quien creó el partido", () => {
+      render(<BookingRow booking={joinedMatch({ joinedAsParticipant: false })} now={NOW} playerId={5} />);
+
+      expect(screen.queryByRole("button", { name: "Darme de baja del partido" })).toBeNull();
+    });
+
+    it("no ofrece darse de baja de un turno cancelado", () => {
+      render(
+        <BookingRow booking={joinedMatch({ bookingState: BookingState.CANCELLED })} now={NOW} playerId={5} />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Darme de baja del partido" })).toBeNull();
     });
   });
 });
