@@ -46,7 +46,7 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   }
 
   const penalties = await penaltyRepo.find({
-    where: { playerId: player.id },
+    where: { player: { id: player.id } },
     order: { createdAt: "DESC" },
   });
 
@@ -143,7 +143,6 @@ export async function recordPointsMovement(
     const signedAmount = type === "penalty" && amount > 0 ? -amount : amount;
 
     const penaltyRecord = penaltyRepo.create({
-      playerId,
       player,
       penalizedScoring: signedAmount,
       reason: description,
@@ -151,7 +150,7 @@ export async function recordPointsMovement(
     await penaltyRepo.save(penaltyRecord);
 
     // Recalcular saldo total de puntos en el jugador
-    const allPenalties = await penaltyRepo.find({ where: { playerId } });
+    const allPenalties = await penaltyRepo.find({ where: { player: { id: playerId } } });
     const netScoring = allPenalties.reduce((sum, p) => sum + Number(p.penalizedScoring), 0);
     player.scoring = netScoring;
     await playerRepo.save(player);

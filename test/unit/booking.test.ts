@@ -486,7 +486,7 @@ describe("booking actions", () => {
       const result = await getBookings();
 
       expect(find).toHaveBeenCalledWith({
-        relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
+        relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
@@ -508,7 +508,7 @@ describe("booking actions", () => {
 
       expect(findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
+        relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
     });

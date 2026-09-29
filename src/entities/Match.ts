@@ -10,7 +10,7 @@ import type { MatchPlayer } from "@/src/entities/MatchPlayer";
  * (match_players) hasta completar el cupo, momento en el que needPlayers pasa
  * a false (también se puede cerrar manualmente antes de completar el cupo).
  */
-@Entity({ name: "matchs" })
+@Entity({ name: "matches" })
 export class Match {
   @PrimaryGeneratedColumn()
   id!: number;

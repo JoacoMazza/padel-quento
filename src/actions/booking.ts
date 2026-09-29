@@ -335,7 +335,7 @@ export async function getBookings(): Promise<ActionResult<Booking[]>> {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.find({
-      relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
+      relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -352,7 +352,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true, match: { matchPlayers: true, chat: true } },
+      relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {

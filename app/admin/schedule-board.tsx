@@ -15,7 +15,9 @@ import {
   timeStringToMinutes,
   toISODate,
 } from "@/app/bookings/slot-utils";
-import type { BookingProp, CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
+import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
+import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
+import { AttendanceModal } from "@/app/admin/attendance-modal";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 15_000;
 const MIN_REFRESH_INTERVAL_MS = 5_000;
@@ -53,7 +55,7 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
 type BoardData = {
   courts: CourtProp[];
   schedules: ScheduleProp[];
-  bookings: BookingProp[];
+  bookings: AdminBookingProp[];
   outOfServices: OutOfServiceProp[];
 };
 
@@ -63,6 +65,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<AdminBookingProp | null>(null);
   const isFetchingRef = useRef(false);
 
   useEffect(() => {
@@ -82,19 +85,7 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
               closingTime: String(s.closingTime),
               courtId: s.court?.id,
             })),
-            bookings: result.data.bookings.map((b) => ({
-              id: b.id,
-              fromDateTime: new Date(b.fromDateTime),
-              durationMinutes: b.durationMinutes,
-              bookingState: b.bookingState,
-              price: b.price,
-              needPlayers: b.match?.needPlayers ?? false,
-              courtId: b.court?.id,
-              confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
-                (sum, mp) => sum + (mp.playersCount ?? 1),
-                0,
-              ),
-            })),
+            bookings: result.data.bookings.map(mapBookingToAdminProp),
             outOfServices: result.data.outOfServices.map((o) => ({
               id: o.id,
               fromDateTime: new Date(o.fromDateTime),
@@ -154,26 +145,28 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
     return slots;
   }, [courtSchedules]);
 
-  function cellState(
+  function cellInfo(
     court: CourtProp,
     openMinutes: number | null,
     closeMinutes: number | null,
     minutesOfDay: number,
-  ): CellState {
-    if (openMinutes === null || closeMinutes === null) return "closed";
-    if (minutesOfDay < openMinutes || minutesOfDay + SLOT_DURATION_MINUTES > closeMinutes) return "closed";
+  ): { state: CellState; booking?: AdminBookingProp } {
+    if (openMinutes === null || closeMinutes === null) return { state: "closed" };
+    if (minutesOfDay < openMinutes || minutesOfDay + SLOT_DURATION_MINUTES > closeMinutes) {
+      return { state: "closed" };
+    }
 
     const start = buildSlotDate(selectedDate, minutesOfDay);
     const end = new Date(start.getTime() + SLOT_DURATION_MINUTES * 60_000);
 
-    if (court.state !== CourtState.AVAILABLE) return "blocked";
+    if (court.state !== CourtState.AVAILABLE) return { state: "blocked" };
 
     const isBlockedByOutOfService = outOfServices.some(
       (o) =>
         o.courtId === court.id &&
         rangesOverlap(start, end, new Date(o.fromDateTime), new Date(o.toDateTime)),
     );
-    if (isBlockedByOutOfService) return "blocked";
+    if (isBlockedByOutOfService) return { state: "blocked" };
 
     const overlappingBooking = bookings.find((b) => {
       if (b.courtId !== court.id || b.bookingState === BookingState.CANCELLED) return false;
@@ -182,15 +175,23 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
       return rangesOverlap(start, end, bookingStart, bookingEnd);
     });
 
-    if (overlappingBooking?.needPlayers) return "pending";
+    if (overlappingBooking?.needPlayers) return { state: "pending", booking: overlappingBooking };
     if (
       overlappingBooking?.bookingState === BookingState.RESERVED ||
       overlappingBooking?.bookingState === BookingState.PAID
     ) {
-      return "reserved";
+      return { state: "reserved", booking: overlappingBooking };
     }
 
-    return "available";
+    return { state: "available" };
+  }
+
+  function handleAttendanceUpdated(updated: AdminBookingProp) {
+    setSelectedBooking(updated);
+    setData((prev) => ({
+      ...prev,
+      bookings: prev.bookings.map((b) => (b.id === updated.id ? updated : b)),
+    }));
   }
 
   return (
@@ -272,11 +273,16 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
                     {minutesToTimeLabel(minutesOfDay)}
                   </td>
                   {courtSchedules.map(({ court, openMinutes, closeMinutes }) => {
-                    const state = cellState(court, openMinutes, closeMinutes, minutesOfDay);
+                    const { state, booking } = cellInfo(court, openMinutes, closeMinutes, minutesOfDay);
+                    const isClickable = booking !== undefined;
                     return (
                       <td key={court.id} className="px-2 py-1.5 text-center">
                         <span
-                          className={`inline-flex h-9 w-full items-center justify-center rounded-lg text-xs font-semibold ${CELL_STYLES[state]}`}
+                          role={isClickable ? "button" : undefined}
+                          tabIndex={isClickable ? 0 : undefined}
+                          onClick={isClickable ? () => setSelectedBooking(booking) : undefined}
+                          title={isClickable ? "Ver y marcar asistencia" : undefined}
+                          className={`inline-flex h-9 w-full items-center justify-center rounded-lg text-xs font-semibold ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""}`}
                         >
                           {state === "closed" ? "—" : LEGEND.find((l) => l.state === state)?.label}
                         </span>
@@ -307,6 +313,14 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
           Fuera de horario
         </span>
       </div>
+
+      {selectedBooking ? (
+        <AttendanceModal
+          booking={selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          onUpdated={handleAttendanceUpdated}
+        />
+      ) : null}
     </div>
   );
 }
