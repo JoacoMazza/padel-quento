@@ -8,15 +8,18 @@ import {
   updateCourt,
   deleteCourt,
 } from "@/src/actions/court";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 describe("court actions (integración con Postgres real)", () => {
   afterAll(async () => {
     const dataSource = await getDataSource();
     await dataSource.destroy();
+  });
+
+  it("genera números de cancha distintos en llamadas consecutivas", () => {
+    const numbers = Array.from({ length: 1000 }, () => uniqueCourtNumber());
+
+    expect(new Set(numbers).size).toBe(numbers.length);
   });
 
   it("crea una cancha con el estado AVAILABLE por defecto y la persiste", async () => {

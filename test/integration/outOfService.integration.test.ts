@@ -9,10 +9,7 @@ import {
   updateOutOfService,
   deleteOutOfService,
 } from "@/src/actions/outOfService";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
 const toDateTime = new Date("2026-01-01T12:00:00Z");

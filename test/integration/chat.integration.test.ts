@@ -11,6 +11,7 @@ import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
+import { uniqueCourtNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -44,7 +45,7 @@ describe("chat actions (integración con Postgres real)", () => {
 
   beforeAll(async () => {
     const court = await createCourt({
-      number: Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000),
+      number: uniqueCourtNumber(),
       price: 10000,
     });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
@@ -116,7 +117,7 @@ describe("chat actions (integración con Postgres real)", () => {
 
   it("una vez finalizado el horario del turno la sala queda en solo lectura", async () => {
     const court = await createCourt({
-      number: Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000),
+      number: uniqueCourtNumber(),
       price: 10000,
     });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");

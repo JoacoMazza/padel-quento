@@ -12,10 +12,7 @@ import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
 import { cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;

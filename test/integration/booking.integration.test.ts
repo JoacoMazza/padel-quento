@@ -11,10 +11,7 @@ import {
   deleteBooking,
   joinOpenMatch,
 } from "@/src/actions/booking";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
