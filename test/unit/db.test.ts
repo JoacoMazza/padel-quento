@@ -20,7 +20,9 @@ vi.mock("typeorm", async (importOriginal) => {
 
 const ORIGINAL_ENV = process.env;
 
-describe("getDataSource", () => {
+// After vi.resetModules() the first import loads TypeORM and every entity from scratch,
+// which can exceed the default 5s timeout when the whole suite runs in parallel.
+describe("getDataSource", { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...ORIGINAL_ENV };

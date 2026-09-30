@@ -9,10 +9,7 @@ import {
   updateSchedule,
   deleteSchedule,
 } from "@/src/actions/schedule";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 const openingTime = new Date("1970-01-01T09:00:00Z");
 const closingTime = new Date("1970-01-01T23:00:00Z");
