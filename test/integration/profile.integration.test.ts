@@ -17,6 +17,8 @@ import { getServerSession } from "next-auth/next";
 import { PlayerCategory } from "@/src/domain/enums";
 import { Player } from "@/src/entities/Player";
 import { getDataSource } from "@/src/lib/db";
+import { createPlayer } from "@/src/actions/player";
+import { uniquePhoneNumber } from "./helpers";
 import {
   getProfileData,
   recordPointsMovement,
@@ -35,21 +37,16 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
 
     playerEmail = `jugador.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
 
-    const dataSource = await getDataSource();
-    const players = dataSource.getRepository<Player>("Player");
-
-    const player = players.create({
+    const created = await createPlayer({
       names: "Esteban",
       lastnames: "Quito",
       email: playerEmail,
-      passwordHash: "hash123",
+      password: "secreto123",
+      phoneNumber: uniquePhoneNumber(),
       category: PlayerCategory.SIXTH,
-      scoring: 0,
-      photoUrl: null,
     });
-
-    const saved = await players.save(player);
-    playerId = saved.id;
+    if (!created.success) throw new Error("no se pudo crear el jugador de prueba");
+    playerId = created.data.id;
   });
 
   afterAll(async () => {
@@ -87,12 +84,15 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     // Verificar persistencia inmediata en la BD
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
-    const updated = await players.findOne({ where: { email: playerEmail } });
+    const updated = await players.findOne({
+      where: { account: { email: playerEmail } },
+      relations: { account: true, booker: true },
+    });
 
-    expect(updated?.names).toBe("Esteban Modificado");
-    expect(updated?.lastnames).toBe("Quito Nuevo");
+    expect(updated?.booker.names).toBe("Esteban Modificado");
+    expect(updated?.booker.lastnames).toBe("Quito Nuevo");
     expect(updated?.category).toBe(PlayerCategory.THIRD);
-    expect(updated?.photoUrl).toBe("https://ejemplo.com/foto.png");
+    expect(updated?.account.photoUrl).toBe("https://ejemplo.com/foto.png");
   });
 
   it("registra movimientos de bonificación y penalización y calcula el saldo neto en solo lectura", async () => {
@@ -134,16 +134,15 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
   it("solo suma los movimientos del propio jugador, no los de otros", async () => {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
-    const other = await players.save(
-      players.create({
-        names: "Otro",
-        lastnames: "Jugador",
-        email: `otro.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
-        passwordHash: "hash123",
-        scoring: 0,
-        photoUrl: null,
-      }),
-    );
+    const created = await createPlayer({
+      names: "Otro",
+      lastnames: "Jugador",
+      email: `otro.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
+      password: "secreto123",
+      phoneNumber: uniquePhoneNumber(),
+    });
+    if (!created.success) throw new Error("no se pudo crear el otro jugador de prueba");
+    const other = created.data;
 
     expect(await recordPointsMovement(other.id, 100, "bonus", "Bonificación de otro jugador")).toBe(true);
     expect(await recordPointsMovement(playerId, 20, "bonus", "Bonificación propia")).toBe(true);

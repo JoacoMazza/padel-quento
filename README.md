@@ -28,6 +28,8 @@ El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quent
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
+Las personas se modelan en cuatro tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, foto, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador (`players`); el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). Cada jugador tiene su booker con sus datos personales; para reservar turnos hace falta tener una cuenta de jugador, así que un booker sin cuenta no puede reservar ni sumarse a partidos.
+
 ## Estructura del proyecto
 
 ```
@@ -38,7 +40,7 @@ app/                  Rutas y páginas (App Router de Next.js)
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
   components/         Componentes de UI compartidos (header, menú de usuario, logo)
 src/
-  entities/           Entidades de TypeORM (User, Player, Court, Booking, Schedule, OutOfService)
+  entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, ...)
   domain/             Enums y tipos de dominio
   actions/            Server Actions con CRUD básico por entidad (incluye validación de solapamiento en reservas)
   lib/                Infraestructura (conexión a DB en runtime, DataSource de CLI, auth, validaciones)
@@ -128,6 +130,10 @@ pnpm db:seed
 ```
 
 Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+
+También crea, si no existen, una cuenta de administrador (`admin@quento.com` / `admin123`) y una de jugador (`jugador@quento.com` / `jugador123`).
+
+> Si tu base de desarrollo es anterior a la división de `users` en `accounts`/`admins`/`players`/`bookers`, `synchronize` no migra los datos (crea las tablas nuevas vacías y deja `users` huérfana). Lo más simple es recrearla (`docker compose down -v && docker compose up -d`), levantar la app una vez (`pnpm dev`) para que `synchronize` cree las tablas y recién ahí correr el seed: el seed usa la `DataSource` de CLI, que no sincroniza el esquema, así que sobre una base vacía falla con `no existe la relación «courts»`. Las bases gestionadas con migraciones conservan sus datos: `SplitUsersIntoAccounts` los copia de `users` a las tablas nuevas.
 
 ## Comandos importantes
 

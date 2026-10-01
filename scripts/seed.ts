@@ -2,9 +2,11 @@ import "reflect-metadata";
 import dataSource from "@/src/lib/data-source";
 import { Court } from "@/src/entities/Court";
 import { Schedule } from "@/src/entities/Schedule";
-import { User } from "@/src/entities/User";
+import { Account } from "@/src/entities/Account";
+import { Admin } from "@/src/entities/Admin";
+import { Booker } from "@/src/entities/Booker";
 import { Player } from "@/src/entities/Player";
-import { CourtState, DayOfWeek, Role } from "@/src/domain/enums";
+import { CourtState, DayOfWeek } from "@/src/domain/enums";
 
 const COURT_COUNT = 8;
 const OPENING_TIME = "09:00:00";
@@ -60,40 +62,31 @@ async function main() {
     `Horarios creados: ${schedulesCreated} (${existingKeys.size}/${allCourts.length * ALL_DAYS.length} en total)`,
   );
 
-  // Crear usuarios de prueba (Admin y Jugador)
+  // Crear cuentas de prueba (Admin y Jugador)
   const bcrypt = await import("bcrypt");
-  const users = dataSource.getRepository(User);
+  const accounts = dataSource.getRepository(Account);
+  const admins = dataSource.getRepository(Admin);
+  const bookers = dataSource.getRepository(Booker);
   const players = dataSource.getRepository(Player);
 
   const adminEmail = "admin@quento.com";
-  const existingAdmin = await users.findOne({ where: { email: adminEmail } });
+  const existingAdmin = await accounts.findOne({ where: { email: adminEmail } });
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash("admin123", 12);
-    await users.save(
-      users.create({
-        email: adminEmail,
-        names: "Administrador",
-        lastnames: "Quento",
-        passwordHash,
-        role: Role.ADMIN,
-      }),
-    );
+    const account = await accounts.save(accounts.create({ email: adminEmail, passwordHash }));
+    await admins.save(admins.create({ account, names: "Administrador", lastnames: "Quento" }));
     console.log("Usuario Administrador creado: admin@quento.com / admin123");
   }
 
   const playerEmail = "jugador@quento.com";
-  const existingPlayer = await players.findOne({ where: { email: playerEmail } });
+  const existingPlayer = await accounts.findOne({ where: { email: playerEmail } });
   if (!existingPlayer) {
     const passwordHash = await bcrypt.hash("jugador123", 12);
-    await players.save(
-      players.create({
-        email: playerEmail,
-        names: "Juan",
-        lastnames: "Perez",
-        passwordHash,
-        role: Role.PLAYER,
-      }),
+    const account = await accounts.save(accounts.create({ email: playerEmail, passwordHash }));
+    const booker = await bookers.save(
+      bookers.create({ names: "Juan", lastnames: "Perez", phoneNumber: "2215550000" }),
     );
+    await players.save(players.create({ account, booker }));
     console.log("Usuario Jugador creado: jugador@quento.com / jugador123");
   }
 

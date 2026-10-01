@@ -1,12 +1,28 @@
 import "reflect-metadata";
-import { ChildEntity, Column, OneToMany } from "typeorm";
+import { Column, Entity, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { PlayerCategory } from "@/src/domain/enums";
-import { User } from "@/src/entities/User";
+import type { Account } from "@/src/entities/Account";
+import type { Booker } from "@/src/entities/Booker";
 import type { Penalty } from "@/src/entities/Penalty";
 import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 
-@ChildEntity()
-export class Player extends User {
+/**
+ * Jugador registrado en la plataforma: su cuenta (Account) guarda las
+ * credenciales y su Booker los datos personales con los que reserva turnos.
+ */
+@Entity({ name: "players" })
+export class Player {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @OneToOne("Account", "player", { onDelete: "CASCADE" })
+  @JoinColumn({ name: "account_id" })
+  account!: Account;
+
+  @OneToOne("Booker", "player")
+  @JoinColumn({ name: "booker_id" })
+  booker!: Booker;
+
   @Column({
     type: "varchar",
     default: PlayerCategory.WITHOUT_CATEGORY,
@@ -18,8 +34,6 @@ export class Player extends User {
 
   @OneToMany("Penalty", "player")
   penalties!: Penalty[];
-  @OneToMany("Booking", (booking: any) => booking.player)
-  bookings!: any[];
   @OneToMany("MatchPlayer", "player")
   matchParticipations!: MatchPlayer[];
 }

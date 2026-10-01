@@ -49,6 +49,15 @@ export function RegisterForm() {
         error={state.errors?.email}
       />
       <Field
+        id="phoneNumber"
+        name="phoneNumber"
+        label="Teléfono"
+        type="tel"
+        autoComplete="tel"
+        placeholder="221 555-0101"
+        error={state.errors?.phoneNumber}
+      />
+      <Field
         id="password"
         name="password"
         label="Contraseña"

@@ -12,7 +12,7 @@ import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
 import { cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -53,6 +53,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
   async function createTestPlayer(prefix: string) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",
       names: "Jugador",
@@ -62,14 +63,14 @@ describe("penalización por cancelación tardía (integración con Postgres real
     // Saldo inicial mayor a la penalización: con saldo 0 no habría nada que
     // descontar (el piso es 0) y no se podría distinguir si se penalizó.
     await recordPointsMovement(player.data.id, INITIAL_POINTS, "bonus", "Puntos iniciales de prueba");
-    return { id: player.data.id, email };
+    return { id: player.data.id, bookerId: player.data.booker.id, email };
   }
 
   it("descuenta la penalización al cancelar un turno a menos de 3 horas", async () => {
     const player = await createTestPlayer("cancela-tarde");
     const created = await createBooking({
       fromDateTime: new Date(Date.now() + 2 * 60 * 60_000),
-      playerId: player.id,
+      bookerId: player.bookerId,
       courtId,
     });
     if (!created.success) throw new Error("expected success");
@@ -85,7 +86,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
     const player = await createTestPlayer("cancela-a-tiempo");
     const created = await createBooking({
       fromDateTime: new Date(Date.now() + 5 * 60 * 60_000),
-      playerId: player.id,
+      bookerId: player.bookerId,
       courtId,
     });
     if (!created.success) throw new Error("expected success");
@@ -103,7 +104,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
       const joiner = await createTestPlayer(`${prefix}-sumado`);
       const startTime = uniqueFromDateTime();
 
-      const created = await createBooking({ fromDateTime: startTime, playerId: creator.id, courtId, groupSize: 2 });
+      const created = await createBooking({ fromDateTime: startTime, bookerId: creator.bookerId, courtId, groupSize: 2 });
       if (!created.success) throw new Error("expected success");
       const joined = await joinOpenMatch({ bookingId: created.data.id, playerId: joiner.id });
       if (!joined.success) throw new Error("expected success");

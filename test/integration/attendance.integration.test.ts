@@ -26,7 +26,7 @@ import {
   setMatchPlayerAttendance,
   awardAttendancePoints,
 } from "@/src/actions/attendance";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -87,13 +87,14 @@ describe("attendance actions (integración con Postgres real)", () => {
   async function createTestPlayer(prefix: string) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",
       names: "Jugador",
       lastnames: prefix,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    return { id: player.data.id, email };
+    return { id: player.data.id, bookerId: player.data.booker.id, email };
   }
 
   describe("setBookingAttendance", () => {
@@ -101,7 +102,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const player = await createTestPlayer("asistencia-simple");
       const created = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -121,7 +122,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const player = await createTestPlayer("asistencia-abierto");
       const created = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         groupSize: 2,
       });
@@ -146,7 +147,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const player = await createTestPlayer("asistencia-no-admin");
       const created = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -164,7 +165,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const creator = await createTestPlayer("mp-creador");
       const created = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId: creator.id,
+        bookerId: creator.bookerId,
         courtId,
         groupSize: 2,
       });
@@ -200,7 +201,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const created = await createBooking({
         fromDateTime: past,
         durationMinutes: 90,
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -225,7 +226,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const created = await createBooking({
         fromDateTime: past,
         durationMinutes: 90,
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -251,7 +252,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const cancelled = await createBooking({
         fromDateTime: past,
         durationMinutes: 90,
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.CANCELLED,
       });
@@ -260,7 +261,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const future = await createBooking({
         fromDateTime: uniqueFromDateTime(),
         durationMinutes: 90,
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -281,7 +282,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const created = await createBooking({
         fromDateTime: past,
         durationMinutes: 90,
-        playerId: player.id,
+        bookerId: player.bookerId,
         courtId,
         bookingState: BookingState.RESERVED,
       });
@@ -312,7 +313,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const startTime = new Date(Date.now() + (OPEN_MATCH_MIN_HOURS_BEFORE_START + 1) * 60 * 60_000);
       const created = await createBooking({
         fromDateTime: startTime,
-        playerId: creator.id,
+        bookerId: creator.bookerId,
         courtId,
         groupSize: 2,
       });
@@ -356,7 +357,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       const startTime = new Date(Date.now() + (OPEN_MATCH_MIN_HOURS_BEFORE_START + 3) * 60 * 60_000);
       const created = await createBooking({
         fromDateTime: startTime,
-        playerId: creator.id,
+        bookerId: creator.bookerId,
         courtId,
         groupSize: 2,
       });

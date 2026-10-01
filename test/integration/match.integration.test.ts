@@ -5,7 +5,7 @@ import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById } from "@/src/actions/booking";
 import { closeMatch, cancelExpiredMatches } from "@/src/actions/match";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -25,7 +25,7 @@ function uniqueFromDateTime() {
 
 describe("match actions (integración con Postgres real)", () => {
   let courtId: number;
-  let playerId: number;
+  let bookerId: number;
 
   beforeAll(async () => {
     const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
@@ -33,13 +33,14 @@ describe("match actions (integración con Postgres real)", () => {
     courtId = court.data.id;
 
     const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("match-player"),
       password: "secreto123",
       names: "Jugador",
       lastnames: "De Prueba",
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    playerId = player.data.id;
+    bookerId = player.data.booker.id;
   });
 
   afterAll(async () => {
@@ -48,7 +49,7 @@ describe("match actions (integración con Postgres real)", () => {
   });
 
   async function createOpenMatch(fromDateTime: Date, groupSize = 2) {
-    const created = await createBooking({ fromDateTime, playerId, courtId, groupSize });
+    const created = await createBooking({ fromDateTime, bookerId, courtId, groupSize });
     if (!created.success) throw new Error("expected success");
 
     const found = await getBookingById(created.data.id);

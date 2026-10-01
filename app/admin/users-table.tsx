@@ -72,7 +72,7 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
             <tr>
               <th className="px-5 py-3 font-semibold text-foreground/70">Jugador</th>
               <th className="px-5 py-3 font-semibold text-foreground/70">Email</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">DNI</th>
+              <th className="px-5 py-3 font-semibold text-foreground/70">Teléfono</th>
               <th className="px-5 py-3 font-semibold text-foreground/70">Categoría</th>
               <th className="px-5 py-3 font-semibold text-foreground/70">Estado</th>
               <th className="px-5 py-3 text-right font-semibold text-foreground/70">Acciones</th>
@@ -102,9 +102,9 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
                       {player.email}
                     </td>
 
-                    {/* DNI */}
+                    {/* Teléfono */}
                     <td className="whitespace-nowrap px-5 py-3.5 text-foreground/70">
-                      {player.dni ?? <span className="italic text-foreground/35">—</span>}
+                      {player.phoneNumber}
                     </td>
 
                     {/* Categoría */}

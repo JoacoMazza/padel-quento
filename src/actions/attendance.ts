@@ -19,7 +19,7 @@ const OPEN_MATCH_JOIN_BONUS_REASON = "Bonus por sumarse a un partido abierto";
 const NO_SHOW_PENALTY_REASON = "Inasistencia a turno reservado";
 
 /**
- * Marca si el jugador que reservó un turno sin partido abierto asociado
+ * Marca si quien reservó un turno sin partido abierto asociado
  * asistió o no. Todo turno arranca con attended = true (ver Booking.attended):
  * el administrador solo interviene desde la turnera global para marcar la
  * ausencia antes de que corra el job de puntos (src/jobs/attendance-points.ts).
@@ -97,7 +97,7 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
 
     const pending = await bookings.find({
       where: { pointsAwarded: false },
-      relations: { player: true, match: { matchPlayers: { player: true } } },
+      relations: { booker: { player: true }, match: { matchPlayers: { player: true } } },
     });
 
     const now = Date.now();
@@ -109,11 +109,13 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
 
     let awarded = 0;
     for (const booking of ended) {
+      // Quien reservó sin cuenta en la plataforma no acumula puntos.
+      const bookerPlayerId = booking.booker?.player?.id ?? null;
       if (booking.match) {
         for (const matchPlayer of booking.match.matchPlayers ?? []) {
           if (matchPlayer.attended) {
             await recordPointsMovement(matchPlayer.player.id, ATTENDANCE_POINTS, "bonus", ATTENDANCE_POINTS_REASON);
-            if (matchPlayer.player.id !== booking.player.id) {
+            if (matchPlayer.player.id !== bookerPlayerId) {
               await recordPointsMovement(
                 matchPlayer.player.id,
                 OPEN_MATCH_JOIN_BONUS_POINTS,
@@ -126,12 +128,14 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
             await recordPointsMovement(matchPlayer.player.id, PENALTY_POINTS, "penalty", NO_SHOW_PENALTY_REASON);
           }
         }
+      } else if (bookerPlayerId === null) {
+        // Sin jugador registrado no hay a quién acreditar ni descontar puntos.
       } else if (booking.attended) {
-        await recordPointsMovement(booking.player.id, ATTENDANCE_POINTS, "bonus", ATTENDANCE_POINTS_REASON);
+        await recordPointsMovement(bookerPlayerId, ATTENDANCE_POINTS, "bonus", ATTENDANCE_POINTS_REASON);
         awarded += 1;
       } else {
         // Inasistencia marcada por el administrador (RN-04).
-        await recordPointsMovement(booking.player.id, PENALTY_POINTS, "penalty", NO_SHOW_PENALTY_REASON);
+        await recordPointsMovement(bookerPlayerId, PENALTY_POINTS, "penalty", NO_SHOW_PENALTY_REASON);
       }
 
       await bookings.update(booking.id, { pointsAwarded: true });

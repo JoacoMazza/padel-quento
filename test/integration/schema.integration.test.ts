@@ -19,6 +19,49 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
     return rows.map((row) => row.column_name);
   }
 
+  it("las cuentas se dividen en accounts, admins, players y bookers, y ya no existe users", async () => {
+    expect(await columnsOf("accounts")).toEqual(
+      expect.arrayContaining(["id", "email", "photo_url", "password_hashed", "is_blocked"]),
+    );
+    expect(await columnsOf("admins")).toEqual(
+      expect.arrayContaining(["id", "account_id", "dni", "names", "last_names"]),
+    );
+    expect(await columnsOf("players")).toEqual(
+      expect.arrayContaining(["id", "account_id", "booker_id", "category", "scoring"]),
+    );
+    expect(await columnsOf("bookers")).toEqual(
+      expect.arrayContaining(["id", "names", "last_names", "phone_number"]),
+    );
+    expect(await columnsOf("users")).toEqual([]);
+  });
+
+  it("bookings referencia a quien reservó por booker_phone_number, no por player_id", async () => {
+    const columns = await columnsOf("bookings");
+
+    expect(columns).toContain("booker_phone_number");
+    expect(columns).not.toContain("player_id");
+
+    const dataSource = await getDataSource();
+    const rows: { referenced_table: string; referenced_column: string }[] = await dataSource.query(
+      `SELECT ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
+         FROM information_schema.key_column_usage kcu
+         JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = kcu.constraint_name
+        WHERE kcu.table_name = 'bookings' AND kcu.column_name = 'booker_phone_number'`,
+    );
+    expect(rows).toEqual([{ referenced_table: "bookers", referenced_column: "phone_number" }]);
+  });
+
+  it("email y phone_number son únicos con restricciones nombradas", async () => {
+    const dataSource = await getDataSource();
+    const rows: { conname: string }[] = await dataSource.query(
+      `SELECT conname FROM pg_constraint WHERE contype = 'u' AND conrelid IN ('accounts'::regclass, 'bookers'::regclass)`,
+    );
+
+    expect(rows.map((row) => row.conname)).toEqual(
+      expect.arrayContaining(["UQ_accounts_email", "UQ_bookers_phone_number"]),
+    );
+  });
+
   it("la tabla de partidos se llama matches", async () => {
     expect(await columnsOf("matches")).toEqual(expect.arrayContaining(["id", "booking_id", "need_players"]));
     expect(await columnsOf("matchs")).toEqual([]);

@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
-import { PlayerCategory, Role } from "@/src/domain/enums";
+import { PlayerCategory } from "@/src/domain/enums";
 
 vi.mock("bcrypt", () => ({
   default: { hash: vi.fn(async () => "hashed-password") },
 }));
 
-const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoisted(() => {
-  const create = vi.fn((data: unknown) => data);
-  const save = vi.fn(async (entity: unknown) => entity);
-  const find = vi.fn();
-  const findOne = vi.fn();
-  const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
-  const deleteFn = vi.fn();
-  const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
-  const getDataSource = vi.fn(async () => ({ getRepository }));
-  return { create, save, find, findOne, merge, deleteFn, getDataSource };
+const { repos, getDataSource } = vi.hoisted(() => {
+  const makeRepo = () => ({
+    create: vi.fn((data: unknown) => data),
+    save: vi.fn(async (entity: object) => ({ id: 1, ...entity })),
+    find: vi.fn(),
+    findOne: vi.fn(),
+    update: vi.fn(async () => ({ affected: 1 })),
+    delete: vi.fn(async () => ({ affected: 1 })),
+  });
+  const repos = { Account: makeRepo(), Booker: makeRepo(), Player: makeRepo() };
+  const getRepository = vi.fn((entity: keyof typeof repos) => repos[entity]);
+  const manager = { getRepository };
+  const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
+  const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
+  return { repos, getDataSource };
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
@@ -29,98 +34,113 @@ import {
   deletePlayer,
 } from "@/src/actions/player";
 
-function duplicateError() {
-  return new QueryFailedError("insert into users...", [], { code: "23505" } as never);
+function uniqueViolation(constraint: string) {
+  return new QueryFailedError("insert into ...", [], { code: "23505", constraint } as never);
+}
+
+const input = {
+  email: "ana@test.com",
+  password: "secreto123",
+  names: "Ana",
+  lastnames: "Gomez",
+  phoneNumber: "2215550101",
+};
+
+function storedPlayer() {
+  return {
+    id: 1,
+    category: PlayerCategory.WITHOUT_CATEGORY,
+    scoring: 0,
+    account: { id: 10, email: "ana@test.com", passwordHash: "old-hash", photoUrl: null, isBlocked: false },
+    booker: { id: 20, names: "Ana", lastnames: "Gomez", phoneNumber: "2215550101" },
+  };
 }
 
 describe("player actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    for (const repo of Object.values(repos)) {
+      repo.create.mockImplementation((data: unknown) => data);
+      repo.save.mockImplementation(async (entity: object) => ({ id: 1, ...entity }));
+    }
     vi.mocked(bcrypt.hash).mockResolvedValue("hashed-password" as never);
   });
 
   describe("createPlayer", () => {
-    it("crea un jugador con el hash de contraseña y los valores por defecto", async () => {
-      const result = await createPlayer({
-        email: "ana@test.com",
-        password: "secreto123",
-        names: "Ana",
-        lastnames: "Gomez",
-      });
+    it("crea la cuenta, el booker y el jugador con el hash de contraseña y los valores por defecto", async () => {
+      const result = await createPlayer(input);
 
       expect(bcrypt.hash).toHaveBeenCalledWith("secreto123", 12);
-      expect(create).toHaveBeenCalledWith({
+      expect(repos.Account.create).toHaveBeenCalledWith({
         email: "ana@test.com",
         passwordHash: "hashed-password",
+        photoUrl: null,
+      });
+      expect(repos.Booker.create).toHaveBeenCalledWith({
         names: "Ana",
         lastnames: "Gomez",
-        dni: null,
-        phoneNumber: null,
-        photoUrl: null,
-        role: Role.PLAYER,
+        phoneNumber: "2215550101",
+      });
+      expect(repos.Player.create).toHaveBeenCalledWith({
+        account: expect.objectContaining({ email: "ana@test.com" }),
+        booker: expect.objectContaining({ phoneNumber: "2215550101" }),
         category: PlayerCategory.WITHOUT_CATEGORY,
         scoring: 0,
       });
       expect(result).toEqual({
         success: true,
-        data: expect.objectContaining({ email: "ana@test.com", role: Role.PLAYER }),
+        data: expect.objectContaining({
+          account: expect.objectContaining({ email: "ana@test.com" }),
+          booker: expect.objectContaining({ names: "Ana" }),
+        }),
       });
     });
 
     it("respeta la categoría indicada", async () => {
-      await createPlayer({
-        email: "ana@test.com",
-        password: "secreto123",
-        names: "Ana",
-        lastnames: "Gomez",
-        category: PlayerCategory.THIRD,
-      });
+      await createPlayer({ ...input, category: PlayerCategory.THIRD });
 
-      expect(create).toHaveBeenCalledWith(
+      expect(repos.Player.create).toHaveBeenCalledWith(
         expect.objectContaining({ category: PlayerCategory.THIRD }),
       );
     });
 
-    it("devuelve un mensaje de correo duplicado ante una violación de unicidad", async () => {
-      save.mockRejectedValueOnce(duplicateError());
+    it("devuelve un mensaje de correo duplicado ante una violación de unicidad del email", async () => {
+      repos.Account.save.mockRejectedValueOnce(uniqueViolation("UQ_accounts_email"));
 
-      const result = await createPlayer({
-        email: "ana@test.com",
-        password: "secreto123",
-        names: "Ana",
-        lastnames: "Gomez",
-      });
+      const result = await createPlayer(input);
 
       expect(result).toEqual({ success: false, error: "El correo ya está en uso." });
     });
 
-    it("devuelve un error genérico ante cualquier otra falla", async () => {
-      save.mockRejectedValueOnce(new Error("boom"));
+    it("devuelve un mensaje de teléfono duplicado ante una violación de unicidad del teléfono", async () => {
+      repos.Booker.save.mockRejectedValueOnce(uniqueViolation("UQ_bookers_phone_number"));
 
-      const result = await createPlayer({
-        email: "ana@test.com",
-        password: "secreto123",
-        names: "Ana",
-        lastnames: "Gomez",
-      });
+      const result = await createPlayer(input);
+
+      expect(result).toEqual({ success: false, error: "El teléfono ya está en uso." });
+    });
+
+    it("devuelve un error genérico ante cualquier otra falla", async () => {
+      repos.Player.save.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await createPlayer(input);
 
       expect(result).toEqual({ success: false, error: "No se pudo crear el jugador." });
     });
   });
 
   describe("getPlayers", () => {
-    it("devuelve todos los jugadores", async () => {
-      find.mockResolvedValueOnce([{ id: 1 }]);
+    it("devuelve todos los jugadores con su cuenta y su booker", async () => {
+      repos.Player.find.mockResolvedValueOnce([{ id: 1 }]);
 
       const result = await getPlayers();
 
+      expect(repos.Player.find).toHaveBeenCalledWith({ relations: { account: true, booker: true } });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
 
     it("devuelve un error si falla la consulta", async () => {
-      find.mockRejectedValueOnce(new Error("db down"));
+      repos.Player.find.mockRejectedValueOnce(new Error("db down"));
 
       const result = await getPlayers();
 
@@ -130,7 +150,7 @@ describe("player actions", () => {
 
   describe("getPlayerById", () => {
     it("devuelve el jugador encontrado", async () => {
-      findOne.mockResolvedValueOnce({ id: 1 });
+      repos.Player.findOne.mockResolvedValueOnce({ id: 1 });
 
       const result = await getPlayerById(1);
 
@@ -138,7 +158,7 @@ describe("player actions", () => {
     });
 
     it("devuelve data null cuando no existe", async () => {
-      findOne.mockResolvedValueOnce(null);
+      repos.Player.findOne.mockResolvedValueOnce(null);
 
       const result = await getPlayerById(999);
 
@@ -147,42 +167,45 @@ describe("player actions", () => {
   });
 
   describe("updatePlayer", () => {
-    it("actualiza los campos provistos sin tocar la contraseña", async () => {
-      findOne.mockResolvedValueOnce({ id: 1, names: "Ana", passwordHash: "old-hash" });
+    it("actualiza nombre en el booker y categoría en el jugador sin tocar la contraseña", async () => {
+      repos.Player.findOne.mockResolvedValueOnce(storedPlayer());
 
-      const result = await updatePlayer(1, { names: "Ana María" });
+      const result = await updatePlayer(1, { names: "Ana María", category: PlayerCategory.FIFTH });
 
       expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(repos.Booker.save).toHaveBeenCalledWith(expect.objectContaining({ names: "Ana María" }));
       expect(result).toEqual({
         success: true,
-        data: { id: 1, names: "Ana María", passwordHash: "old-hash" },
+        data: expect.objectContaining({
+          category: PlayerCategory.FIFTH,
+          booker: expect.objectContaining({ names: "Ana María" }),
+          account: expect.objectContaining({ passwordHash: "old-hash" }),
+        }),
       });
     });
 
-    it("rehashea la contraseña cuando se provee una nueva", async () => {
-      findOne.mockResolvedValueOnce({ id: 1, passwordHash: "old-hash" });
+    it("rehashea la contraseña de la cuenta cuando se provee una nueva", async () => {
+      repos.Player.findOne.mockResolvedValueOnce(storedPlayer());
 
       const result = await updatePlayer(1, { password: "nuevaClave123" });
 
       expect(bcrypt.hash).toHaveBeenCalledWith("nuevaClave123", 12);
-      expect(result).toEqual({
-        success: true,
-        data: { id: 1, passwordHash: "hashed-password" },
-      });
+      expect(repos.Account.save).toHaveBeenCalledWith(expect.objectContaining({ passwordHash: "hashed-password" }));
+      expect(result.success).toBe(true);
     });
 
     it("devuelve error si el jugador no existe", async () => {
-      findOne.mockResolvedValueOnce(null);
+      repos.Player.findOne.mockResolvedValueOnce(null);
 
       const result = await updatePlayer(999, { names: "Nadie" });
 
       expect(result).toEqual({ success: false, error: "El jugador no existe." });
-      expect(save).not.toHaveBeenCalled();
+      expect(repos.Player.save).not.toHaveBeenCalled();
     });
 
     it("devuelve un mensaje de correo duplicado ante una violación de unicidad", async () => {
-      findOne.mockResolvedValueOnce({ id: 1 });
-      save.mockRejectedValueOnce(duplicateError());
+      repos.Player.findOne.mockResolvedValueOnce(storedPlayer());
+      repos.Account.save.mockRejectedValueOnce(uniqueViolation("UQ_accounts_email"));
 
       const result = await updatePlayer(1, { email: "existente@test.com" });
 
@@ -191,20 +214,22 @@ describe("player actions", () => {
   });
 
   describe("deletePlayer", () => {
-    it("elimina el jugador", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 1 });
+    it("elimina la cuenta del jugador (el jugador se borra en cascada)", async () => {
+      repos.Player.findOne.mockResolvedValueOnce(storedPlayer());
 
       const result = await deletePlayer(1);
 
+      expect(repos.Account.delete).toHaveBeenCalledWith(10);
       expect(result).toEqual({ success: true, data: null });
     });
 
     it("devuelve error si el jugador no existe", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 0 });
+      repos.Player.findOne.mockResolvedValueOnce(null);
 
       const result = await deletePlayer(999);
 
       expect(result).toEqual({ success: false, error: "El jugador no existe." });
+      expect(repos.Account.delete).not.toHaveBeenCalled();
     });
   });
 });

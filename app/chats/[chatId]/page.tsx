@@ -29,7 +29,7 @@ export default async function ChatPage({
 
   const dataSource = await getDataSource();
   const players = dataSource.getRepository<Player>("Player");
-  const player = await players.findOne({ where: { email: session.user.email } });
+  const player = await players.findOne({ where: { account: { email: session.user.email } } });
 
   const result = Number.isInteger(id) ? await getChatById(id) : null;
   const chat = result?.success ? result.data : null;

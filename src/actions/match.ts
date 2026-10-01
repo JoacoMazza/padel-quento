@@ -97,14 +97,14 @@ export async function leaveMatch(matchId: number, playerId: number): Promise<Act
       const matchPlayers = manager.getRepository<MatchPlayer>("MatchPlayer");
       const matchPlayer = await matchPlayers.findOne({
         where: { match: { id: matchId }, player: { id: playerId } },
-        relations: { match: { booking: { player: true } } },
+        relations: { match: { booking: { booker: { player: true } } } },
       });
       if (!matchPlayer) {
         throw new NotAMatchPlayerError();
       }
 
       const booking = matchPlayer.match.booking;
-      if (booking.player.id === playerId) {
+      if (booking.booker.player?.id === playerId) {
         throw new CreatorCannotLeaveError();
       }
       if (booking.bookingState === BookingState.CANCELLED) {

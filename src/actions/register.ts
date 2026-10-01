@@ -1,12 +1,9 @@
 "use server";
 
 import "reflect-metadata";
-import bcrypt from "bcrypt";
 import { redirect } from "next/navigation";
-import { QueryFailedError } from "typeorm";
-import { PlayerCategory, Role } from "@/src/domain/enums";
-import { Player } from "@/src/entities/Player";
-import { getDataSource } from "@/src/lib/db";
+import { createPlayer } from "@/src/actions/player";
+import { DUPLICATE_EMAIL_MESSAGE, DUPLICATE_PHONE_NUMBER_MESSAGE } from "@/src/lib/db-errors";
 import {
   parseRegisterForm,
   type FieldErrors,
@@ -17,16 +14,6 @@ export type RegisterState = {
   errors?: FieldErrors;
 };
 
-const DUPLICATE_EMAIL_MESSAGE = "El correo ya está en uso.";
-
-function isUniqueViolation(error: unknown) {
-  if (!(error instanceof QueryFailedError)) {
-    return false;
-  }
-  const driverError = error.driverError as { code?: string };
-  return driverError.code === "23505";
-}
-
 export async function registerPlayer(
   _prev: RegisterState,
   formData: FormData,
@@ -36,44 +23,18 @@ export async function registerPlayer(
     return { errors: parsed.errors };
   }
 
-  const { names, lastnames, email, password } = parsed.data;
+  const { names, lastnames, email, password, phoneNumber } = parsed.data;
 
-  try {
-    const dataSource = await getDataSource();
-    const players = dataSource.getRepository<Player>("Player");
-
-    const existing = await players.findOne({ where: { email } });
-    if (existing) {
-      return { message: DUPLICATE_EMAIL_MESSAGE };
-    }
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const player = players.create({
-      names,
-      lastnames,
-      email,
-      passwordHash,
-      role: Role.PLAYER,
-      category: PlayerCategory.WITHOUT_CATEGORY,
-      scoring: 0,
-      dni: null,
-      phoneNumber: null,
-      photoUrl: null,
-    });
-
-    await players.save(player);
-    console.log(`[Register] Jugador guardado exitosamente en BD: ${email}`);
-  } catch (error) {
-
-    if (isUniqueViolation(error)) {
-      return { message: DUPLICATE_EMAIL_MESSAGE };
-    }
-    console.error("registerPlayer", error);
+  // createPlayer guarda cuenta, booker y jugador en una sola transacción y
+  // traduce las violaciones de unicidad (email o teléfono) a un mensaje.
+  const result = await createPlayer({ names, lastnames, email, password, phoneNumber });
+  if (!result.success) {
+    const isDuplicate = [DUPLICATE_EMAIL_MESSAGE, DUPLICATE_PHONE_NUMBER_MESSAGE].includes(result.error);
     return {
-      message: "No se pudo crear la cuenta. Intentá de nuevo más tarde.",
+      message: isDuplicate ? result.error : "No se pudo crear la cuenta. Intentá de nuevo más tarde.",
     };
   }
+  console.log(`[Register] Jugador guardado exitosamente en BD: ${email}`);
 
   redirect("/login");
 }

@@ -62,21 +62,38 @@ describe("authorize (CredentialsProvider)", () => {
     expect(result).toBeNull();
   });
 
-  it("devuelve los datos del usuario con su rol y normaliza el email en éxito", async () => {
+  it("devuelve los datos de la cuenta de un administrador con rol admin y normaliza el email en éxito", async () => {
     findOne.mockResolvedValueOnce({
       id: 7,
       email: "a@test.com",
       passwordHash: "hash",
-      names: "Ana",
-      lastnames: "Gomez",
-      role: "admin",
+      admin: { id: 1, names: "Ana", lastnames: "Gomez" },
+      player: null,
     });
     vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
 
     const result = await getAuthorize()({ email: "  A@Test.com ", password: "correcta" });
 
     expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin" });
-    expect(findOne).toHaveBeenCalledWith({ where: { email: "a@test.com" } });
+    expect(findOne).toHaveBeenCalledWith({
+      where: { email: "a@test.com" },
+      relations: { admin: true, player: { booker: true } },
+    });
+  });
+
+  it("deduce el rol player y toma el nombre del booker para la cuenta de un jugador", async () => {
+    findOne.mockResolvedValueOnce({
+      id: 8,
+      email: "j@test.com",
+      passwordHash: "hash",
+      admin: null,
+      player: { id: 2, booker: { names: "Luis", lastnames: "Pérez" } },
+    });
+    vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+
+    const result = await getAuthorize()({ email: "j@test.com", password: "correcta" });
+
+    expect(result).toEqual({ id: "8", email: "j@test.com", name: "Luis Pérez", role: "player" });
   });
 
   it("devuelve null cuando el usuario tiene isBlocked = true (aunque la contraseña sea correcta)", async () => {
