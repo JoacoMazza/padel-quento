@@ -3,6 +3,7 @@ import { BookingState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
+import { Booker } from "@/src/entities/Booker";
 import {
   createBooking,
   getBookings,
@@ -11,7 +12,7 @@ import {
   deleteBooking,
   joinOpenMatch,
 } from "@/src/actions/booking";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -34,6 +35,8 @@ function uniqueFromDateTime() {
 describe("booking actions (integración con Postgres real)", () => {
   let courtId: number;
   let playerId: number;
+  let bookerId: number;
+  let bookerPhoneNumber: string;
 
   async function createExtraPlayer(prefix: string) {
     const player = await createPlayer({
@@ -41,6 +44,7 @@ describe("booking actions (integración con Postgres real)", () => {
       password: "secreto123",
       names: "Jugador",
       lastnames: "Extra",
+      phoneNumber: uniquePhoneNumber(),
     });
     if (!player.success) throw new Error("no se pudo crear el jugador extra de prueba");
     return player.data.id;
@@ -56,9 +60,13 @@ describe("booking actions (integración con Postgres real)", () => {
       password: "secreto123",
       names: "Jugador",
       lastnames: "De Prueba",
+      phoneNumber: uniquePhoneNumber(),
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
     playerId = player.data.id;
+    // Player hereda de Booker: el jugador es quien reserva, con su mismo id.
+    bookerId = player.data.id;
+    bookerPhoneNumber = player.data.phoneNumber;
   });
 
   afterAll(async () => {
@@ -67,7 +75,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("crea una reserva con los valores por defecto y la persiste", async () => {
-    const result = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+    const result = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
@@ -75,10 +83,10 @@ describe("booking actions (integración con Postgres real)", () => {
     expect(result.data.id).toBeDefined();
   });
 
-  it("lista las reservas con jugador y cancha cargados", async () => {
+  it("lista las reservas con quien reservó y cancha cargados", async () => {
     await createBooking({
       fromDateTime: uniqueFromDateTime(),
-      playerId,
+      bookerId,
       courtId,
       bookingState: BookingState.PAID,
     });
@@ -88,12 +96,49 @@ describe("booking actions (integración con Postgres real)", () => {
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
     const created = result.data.find((b) => b.bookingState === BookingState.PAID);
-    expect(created?.player).toMatchObject({ id: playerId });
+    expect(created?.booker).toMatchObject({ id: bookerId, phoneNumber: bookerPhoneNumber });
     expect(created?.court).toMatchObject({ id: courtId });
   });
 
+  it("registra el turno sobre el booker, referenciado por su teléfono", async () => {
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
+    if (!created.success) throw new Error("expected success");
+
+    const dataSource = await getDataSource();
+    const rows: { booker_phone_number: string }[] = await dataSource.query(
+      `SELECT booker_phone_number FROM bookings WHERE id = $1`,
+      [created.data.id],
+    );
+    expect(rows[0].booker_phone_number).toBe(bookerPhoneNumber);
+  });
+
+  it.each([
+    ["un turno completo", 4],
+    ["un partido abierto", 2],
+  ])("no permite reservar %s a un booker sin cuenta en la plataforma", async (_label, groupSize) => {
+    const dataSource = await getDataSource();
+    const bookers = dataSource.getRepository<Booker>("Booker");
+    const booker = await bookers.save(
+      bookers.create({ names: "Sin", lastnames: "Cuenta", phoneNumber: uniquePhoneNumber() }),
+    );
+
+    const result = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId: booker.id, courtId, groupSize });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Necesitás una cuenta de jugador para reservar turnos.",
+    });
+    expect(await dataSource.getRepository("Booking").count({ where: { booker: { id: booker.id } } })).toBe(0);
+  });
+
+  it("devuelve error si quien reserva no existe", async () => {
+    const result = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId: 999_999_999, courtId });
+
+    expect(result).toEqual({ success: false, error: "La persona que reserva no existe." });
+  });
+
   it("obtiene una reserva por id y null si no existe", async () => {
-    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const found = await getBookingById(created.data.id);
@@ -106,7 +151,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("actualiza el estado de una reserva existente", async () => {
-    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const result = await updateBooking(created.data.id, { bookingState: BookingState.CANCELLED });
@@ -124,7 +169,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("elimina una reserva existente y falla al eliminarla de nuevo", async () => {
-    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+    const created = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const result = await deleteBooking(created.data.id);
@@ -138,7 +183,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("con groupSize 2 reserva el turno y crea el partido con el creador como primer jugador", async () => {
       const result = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 2,
       });
@@ -158,7 +203,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("con groupSize 4 crea una reserva completa, sin partido asociado", async () => {
       const result = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 4,
       });
@@ -175,7 +220,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("rechaza un groupSize inválido", async () => {
       const result = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 5,
       });
@@ -191,7 +236,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("suma un jugador nuevo sin completar el cupo", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -213,7 +258,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("no crea sala de chat mientras el partido abierto solo tiene al creador", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -227,7 +272,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("crea y asocia automáticamente la sala de chat al sumarse el segundo jugador con cuenta", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -253,7 +298,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("al completar el cupo máximo de 4 jugadores, el partido deja de necesitar jugadores", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -280,7 +325,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("permite sumarse con acompañantes indicando groupSize", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -302,7 +347,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("rechaza un groupSize mayor a los lugares libres", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 3,
       });
@@ -320,7 +365,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("rechaza sumarse a un partido ya completo", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -346,7 +391,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("rechaza sumarse dos veces al mismo partido", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
-        playerId,
+        bookerId,
         courtId,
         groupSize: 1,
       });
@@ -361,7 +406,7 @@ describe("booking actions (integración con Postgres real)", () => {
     });
 
     it("rechaza sumarse a un turno que no es un partido abierto", async () => {
-      const full = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+      const full = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
       if (!full.success) throw new Error("expected success");
 
       const joinerId = await createExtraPlayer("joiner-not-open");
@@ -381,10 +426,10 @@ describe("booking actions (integración con Postgres real)", () => {
   describe("prevención de doble reserva", () => {
     it("no permite crear una reserva en el mismo horario y cancha", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const first = await createBooking({ fromDateTime, playerId, courtId });
+      const first = await createBooking({ fromDateTime, bookerId, courtId });
       if (!first.success) throw new Error("expected success");
 
-      const second = await createBooking({ fromDateTime, playerId, courtId });
+      const second = await createBooking({ fromDateTime, bookerId, courtId });
 
       expect(second).toEqual({
         success: false,
@@ -394,11 +439,11 @@ describe("booking actions (integración con Postgres real)", () => {
 
     it("no permite crear una reserva que se solapa parcialmente", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const first = await createBooking({ fromDateTime, playerId, courtId, durationMinutes: 90 });
+      const first = await createBooking({ fromDateTime, bookerId, courtId, durationMinutes: 90 });
       if (!first.success) throw new Error("expected success");
 
       const overlapping = new Date(fromDateTime.getTime() + 60 * 60_000);
-      const second = await createBooking({ fromDateTime: overlapping, playerId, courtId });
+      const second = await createBooking({ fromDateTime: overlapping, bookerId, courtId });
 
       expect(second).toEqual({
         success: false,
@@ -408,20 +453,20 @@ describe("booking actions (integración con Postgres real)", () => {
 
     it("permite reservar el mismo horario si la reserva anterior fue cancelada", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const first = await createBooking({ fromDateTime, playerId, courtId });
+      const first = await createBooking({ fromDateTime, bookerId, courtId });
       if (!first.success) throw new Error("expected success");
 
       const cancelled = await updateBooking(first.data.id, { bookingState: BookingState.CANCELLED });
       expect(cancelled.success).toBe(true);
 
-      const second = await createBooking({ fromDateTime, playerId, courtId });
+      const second = await createBooking({ fromDateTime, bookerId, courtId });
 
       expect(second.success).toBe(true);
     });
 
     it("no cuenta la reserva propia como solapamiento al actualizarla", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const created = await createBooking({ fromDateTime, playerId, courtId });
+      const created = await createBooking({ fromDateTime, bookerId, courtId });
       if (!created.success) throw new Error("expected success");
 
       const result = await updateBooking(created.data.id, { bookingState: BookingState.PAID });
@@ -437,10 +482,10 @@ describe("booking actions (integración con Postgres real)", () => {
       if (!otherCourt.success) throw new Error("no se pudo crear la segunda cancha de prueba");
 
       const fromDateTime = uniqueFromDateTime();
-      const occupying = await createBooking({ fromDateTime, playerId, courtId: otherCourt.data.id });
+      const occupying = await createBooking({ fromDateTime, bookerId, courtId: otherCourt.data.id });
       if (!occupying.success) throw new Error("expected success");
 
-      const movable = await createBooking({ fromDateTime: uniqueFromDateTime(), playerId, courtId });
+      const movable = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
       if (!movable.success) throw new Error("expected success");
 
       const result = await updateBooking(movable.data.id, {
@@ -459,7 +504,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("rechaza crear un partido abierto con menos de 3 horas de anticipación", async () => {
       const soon = new Date(Date.now() + 2 * 60 * 60_000);
 
-      const result = await createBooking({ fromDateTime: soon, playerId, courtId, groupSize: 2 });
+      const result = await createBooking({ fromDateTime: soon, bookerId, courtId, groupSize: 2 });
 
       expect(result).toEqual({
         success: false,
@@ -470,7 +515,7 @@ describe("booking actions (integración con Postgres real)", () => {
     it("permite crear una reserva completa con menos de 3 horas de anticipación", async () => {
       const soon = new Date(Date.now() + 90 * 60_000);
 
-      const result = await createBooking({ fromDateTime: soon, playerId, courtId, groupSize: 4 });
+      const result = await createBooking({ fromDateTime: soon, bookerId, courtId, groupSize: 4 });
 
       expect(result.success).toBe(true);
     });

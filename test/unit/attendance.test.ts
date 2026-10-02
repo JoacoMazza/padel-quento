@@ -132,7 +132,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: true,
-          player: { id: 42 },
+          booker: { id: 42 },
           match: null,
         },
       ]);
@@ -144,6 +144,27 @@ describe("attendance actions", () => {
       expect(result).toEqual({ success: true, data: 1 });
     });
 
+    it("no acredita ni descuenta puntos en un turno simple sin quien reservó (dato previo a la migración)", async () => {
+      const past = new Date(Date.now() - 2 * 60 * 60_000);
+      find.mockResolvedValueOnce([
+        {
+          id: 1,
+          fromDateTime: past,
+          durationMinutes: 90,
+          bookingState: BookingState.RESERVED,
+          attended: true,
+          booker: null,
+          match: null,
+        },
+      ]);
+
+      const result = await awardAttendancePoints();
+
+      expect(recordPointsMovement).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith(1, { pointsAwarded: true });
+      expect(result).toEqual({ success: true, data: 0 });
+    });
+
     it("no acredita puntos y descuenta la penalización si el turno fue marcado como ausente", async () => {
       const past = new Date(Date.now() - 2 * 60 * 60_000);
       find.mockResolvedValueOnce([
@@ -153,7 +174,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: false,
-          player: { id: 42 },
+          booker: { id: 42 },
           match: null,
         },
       ]);
@@ -176,7 +197,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: true,
-          player: { id: 42 },
+          booker: { id: 42 },
           match: null,
         },
       ]);
@@ -197,7 +218,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.CANCELLED,
           attended: true,
-          player: { id: 42 },
+          booker: { id: 42 },
           match: null,
         },
       ]);
@@ -218,7 +239,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: true,
-          player: { id: 1 },
+          booker: { id: 1 },
           match: {
             id: 1,
             matchPlayers: [
@@ -253,7 +274,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: true,
-          player: { id: 1 },
+          booker: { id: 1 },
           match: {
             id: 1,
             matchPlayers: [
@@ -283,7 +304,7 @@ describe("attendance actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           attended: true,
-          player: { id: 42 },
+          booker: { id: 42 },
           match: null,
         },
       ]);

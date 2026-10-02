@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getDataSource } from "@/src/lib/db";
+import { uniquePhoneNumber } from "./helpers";
 import { getPlayersAdmin, blockPlayer, unblockPlayer, createPlayer } from "@/src/actions/player";
 import { Role } from "@/src/domain/enums";
 
@@ -35,6 +36,7 @@ describe("admin player actions (integración con Postgres real)", () => {
   it("getPlayersAdmin lista los jugadores existentes", async () => {
     // crear un jugador para asegurar que hay al menos uno
     await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("lista"),
       password: "pass123",
       names: "Lista",
@@ -50,10 +52,17 @@ describe("admin player actions (integración con Postgres real)", () => {
     expect(result.data.length).toBeGreaterThan(0);
     // todos los items tienen isBlocked definido
     result.data.forEach((p) => expect(typeof p.isBlocked).toBe("boolean"));
+    // los datos personales salen del jugador (heredados de Booker) y el email de la cuenta
+    expect(result.data.find((p) => p.names === "Lista")).toMatchObject({
+      lastnames: "Test",
+      email: expect.stringContaining("@test.com"),
+      phoneNumber: expect.stringMatching(/^221\d+$/),
+    });
   });
 
   it("blockPlayer marca isBlocked = true en la BD", async () => {
     const created = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("bloquear"),
       password: "pass123",
       names: "Bloquear",
@@ -69,13 +78,14 @@ describe("admin player actions (integración con Postgres real)", () => {
     // verificar directamente en la BD
     const dataSource = await getDataSource();
     const repo = dataSource.getRepository("Player") as any;
-    const player = await repo.findOne({ where: { id } });
-    expect(player?.isBlocked).toBe(true);
+    const player = await repo.findOne({ where: { id }, relations: { account: true } });
+    expect(player?.account.isBlocked).toBe(true);
   });
 
   it("unblockPlayer marca isBlocked = false en la BD", async () => {
     // crear un jugador y bloquearlo primero
     const created = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("desbloquear"),
       password: "pass123",
       names: "Desbloquear",
@@ -94,8 +104,8 @@ describe("admin player actions (integración con Postgres real)", () => {
     // verificar directamente en la BD
     const dataSource = await getDataSource();
     const repo = dataSource.getRepository("Player") as any;
-    const player = await repo.findOne({ where: { id } });
-    expect(player?.isBlocked).toBe(false);
+    const player = await repo.findOne({ where: { id }, relations: { account: true } });
+    expect(player?.account.isBlocked).toBe(false);
   });
 
   it("blockPlayer devuelve error si el jugador no existe", async () => {

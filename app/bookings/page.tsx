@@ -19,7 +19,7 @@ export default async function BookingsPage() {
 
   const dataSource = await getDataSource();
   const players = dataSource.getRepository<Player>("Player");
-  const player = await players.findOne({ where: { email: session.user.email } });
+  const player = await players.findOne({ where: { account: { email: session.user.email } } });
 
   const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult] = await Promise.all([
     getCourts(),
@@ -78,6 +78,7 @@ export default async function BookingsPage() {
 
         <BookingsBoard
           playerId={player?.id ?? null}
+          bookerId={player?.id ?? null}
           courts={courts.map((c) => ({
             id: c.id,
             number: c.number,

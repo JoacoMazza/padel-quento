@@ -40,7 +40,7 @@ function joinedMatchPlayer(hoursBeforeStart: number, overrides: { bookingState?:
         id: 3,
         fromDateTime: new Date(Date.now() + hoursBeforeStart * 60 * 60_000),
         bookingState: overrides.bookingState ?? BookingState.RESERVED,
-        player: { id: overrides.creatorId ?? 9 },
+        booker: { id: overrides.creatorId ?? 9 },
       },
     },
   };

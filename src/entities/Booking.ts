@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
-import type { Player } from "@/src/entities/Player";
+import type { Booker } from "@/src/entities/Booker";
 import type { Court } from "@/src/entities/Court";
 import type { Match } from "@/src/entities/Match";
 
@@ -30,9 +30,13 @@ export class Booking {
   })
   price!: number;
 
-  @ManyToOne("Player", (player: any) => player.bookings)
-  @JoinColumn({ name: "player_id" })
-  player!: Player;
+  /**
+   * Quien reservó el turno, referenciado por su teléfono como en el DER
+   * (bookings.booker_phone_number -> bookers.phone_number).
+   */
+  @ManyToOne("Booker", "bookings", { onUpdate: "CASCADE" })
+  @JoinColumn({ name: "booker_phone_number", referencedColumnName: "phoneNumber" })
+  booker!: Booker;
 
   @ManyToOne("Court", (court: any) => court.bookings)
   @JoinColumn({ name: "court_id" })
@@ -43,7 +47,7 @@ export class Booking {
   match?: Match;
 
   /**
-   * Asistencia del jugador que reservó el turno. Solo aplica cuando el turno
+   * Asistencia de quien reservó el turno. Solo aplica cuando el turno
    * NO tiene un partido abierto asociado (ver MatchPlayer.attended para ese caso).
    * Arranca en true: el administrador solo interviene para marcar la ausencia.
    */

@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth/next";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
+import { Account } from "@/src/entities/Account";
 import { Player } from "@/src/entities/Player";
 import { Penalty } from "@/src/entities/Penalty";
 import {
@@ -40,7 +41,10 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   const playerRepo = dataSource.getRepository<Player>("Player");
   const penaltyRepo = dataSource.getRepository<Penalty>("Penalty");
 
-  const player = await playerRepo.findOne({ where: { email: userEmail } });
+  const player = await playerRepo.findOne({
+    where: { account: { email: userEmail } },
+    relations: { account: true },
+  });
   if (!player) {
     return null;
   }
@@ -58,17 +62,17 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   // Sincronizar el atributo scoring de la entidad Player
   if (player.scoring !== netScoring) {
     player.scoring = netScoring;
-    await playerRepo.save(player);
+    await playerRepo.update(player.id, { scoring: netScoring });
   }
 
   return {
     id: player.id,
-    email: player.email,
+    email: player.account.email,
     names: player.names,
     lastnames: player.lastnames,
     category: player.category,
     scoring: netScoring,
-    photoUrl: player.photoUrl,
+    photoUrl: player.account.photoUrl,
     movements: penalties.map((p) => ({
       id: p.id,
       amount: Number(p.penalizedScoring),
@@ -99,17 +103,19 @@ export async function updatePlayerProfile(
     const dataSource = await getDataSource();
     const playerRepo = dataSource.getRepository<Player>("Player");
 
-    const player = await playerRepo.findOne({ where: { email: session.user.email } });
+    const player = await playerRepo.findOne({
+      where: { account: { email: session.user.email } },
+      relations: { account: true },
+    });
     if (!player) {
       return { message: "No se encontró el perfil de jugador." };
     }
 
-    player.names = names;
-    player.lastnames = lastnames;
-    player.category = category;
-    player.photoUrl = photoUrl;
-
-    await playerRepo.save(player);
+    // La foto vive en la cuenta; nombre, apellido y categoría en el jugador.
+    await dataSource.transaction(async (manager) => {
+      await manager.getRepository<Account>("Account").update(player.account.id, { photoUrl });
+      await manager.getRepository<Player>("Player").update(player.id, { names, lastnames, category });
+    });
     console.log(`[Profile] Perfil actualizado exitosamente para: ${session.user.email}`);
 
     revalidatePath("/profile");

@@ -11,7 +11,7 @@ import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -31,16 +31,15 @@ describe("chat actions (integración con Postgres real)", () => {
   async function newPlayer(prefix: string, overrides: Record<string, unknown> = {}) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",
       names: "Jugador",
       lastnames: prefix,
-      phoneNumber: "+54 221 555-0101",
-      dni: 30111222,
       ...overrides,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    return { email, id: player.data.id };
+    return { email, id: player.data.id, bookerId: player.data.id };
   }
 
   beforeAll(async () => {
@@ -60,7 +59,7 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, playerId: ana.id, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
     const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
@@ -126,7 +125,7 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 41 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, playerId: ana.id, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
     const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");

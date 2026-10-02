@@ -100,7 +100,7 @@ export function AttendanceModal({
             ))
           ) : (
             <li className="flex items-center justify-between py-3">
-              <span className="text-sm font-medium text-foreground">{booking.playerName}</span>
+              <span className="text-sm font-medium text-foreground">{booking.bookerName}</span>
               <button
                 type="button"
                 disabled={pendingId === booking.id}

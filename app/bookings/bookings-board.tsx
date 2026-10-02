@@ -33,12 +33,14 @@ import type {
 
 export function BookingsBoard({
   playerId,
+  bookerId,
   courts,
   schedules,
   bookings,
   outOfServices,
 }: {
   playerId: number | null;
+  bookerId: number | null;
   courts: CourtProp[];
   schedules: ScheduleProp[];
   bookings: BookingProp[];
@@ -203,7 +205,7 @@ export function BookingsBoard({
   function handleConfirm() {
     if (!selectedSlot) return;
 
-    if (!playerId) {
+    if (!bookerId) {
       setFeedback({ type: "error", message: "Tu cuenta no puede reservar turnos." });
       return;
     }
@@ -217,7 +219,7 @@ export function BookingsBoard({
         durationMinutes: SLOT_DURATION_MINUTES,
         price: selectedSlot.price,
         groupSize,
-        playerId,
+        bookerId,
         courtId: selectedSlot.courtId,
       });
 

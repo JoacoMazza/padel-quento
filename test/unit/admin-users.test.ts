@@ -6,13 +6,13 @@ vi.mock("next-auth/next", () => ({
 }));
 
 // ── mocks de la capa de datos ─────────────────────────────────────────────────
-const { find, findOne, save, getDataSource } = vi.hoisted(() => {
+const { find, findOne, update, getDataSource } = vi.hoisted(() => {
   const find = vi.fn();
   const findOne = vi.fn();
-  const save = vi.fn(async (entity: unknown) => entity);
-  const getRepository = vi.fn(() => ({ find, findOne, save }));
+  const update = vi.fn(async () => ({ affected: 1 }));
+  const getRepository = vi.fn(() => ({ find, findOne, update }));
   const getDataSource = vi.fn(async () => ({ getRepository }));
-  return { find, findOne, save, getDataSource };
+  return { find, findOne, update, getDataSource };
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
@@ -44,19 +44,41 @@ function mockNoSession() {
 describe("admin player actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    save.mockImplementation(async (entity: unknown) => entity);
   });
 
   // ── getPlayersAdmin ─────────────────────────────────────────────────────────
   describe("getPlayersAdmin", () => {
-    it("devuelve la lista de jugadores cuando el usuario es admin", async () => {
+    it("devuelve la lista de jugadores cuando el usuario es admin, sin datos sensibles de la cuenta", async () => {
       mockAdminSession();
-      const fakePlayer = { id: 1, names: "Ana", lastnames: "Gomez", email: "ana@test.com", isBlocked: false };
-      find.mockResolvedValueOnce([fakePlayer]);
+      find.mockResolvedValueOnce([
+        {
+          id: 1,
+          category: "4th",
+          scoring: 30,
+          names: "Ana",
+          lastnames: "Gomez",
+          phoneNumber: "2215550101",
+          account: { id: 10, email: "ana@test.com", isBlocked: false, passwordHash: "hash" },
+        },
+      ]);
 
       const result = await getPlayersAdmin();
 
-      expect(result).toEqual({ success: true, data: [fakePlayer] });
+      expect(result).toEqual({
+        success: true,
+        data: [
+          {
+            id: 1,
+            names: "Ana",
+            lastnames: "Gomez",
+            email: "ana@test.com",
+            phoneNumber: "2215550101",
+            category: "4th",
+            scoring: 30,
+            isBlocked: false,
+          },
+        ],
+      });
     });
 
     it("devuelve error genérico si falla la consulta a la BD", async () => {
@@ -89,15 +111,15 @@ describe("admin player actions", () => {
 
   // ── blockPlayer ─────────────────────────────────────────────────────────────
   describe("blockPlayer", () => {
-    it("pone isBlocked en true y guarda el jugador", async () => {
+    it("pone isBlocked en true en la cuenta del jugador", async () => {
       mockAdminSession();
-      const player = { id: 5, names: "Luis", isBlocked: false };
+      const player = { id: 5, account: { id: 50, isBlocked: false } };
       findOne.mockResolvedValueOnce(player);
 
       const result = await blockPlayer(5);
 
       expect(result).toEqual({ success: true, data: null });
-      expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 5, isBlocked: true }));
+      expect(update).toHaveBeenCalledWith(50, { isBlocked: true });
     });
 
     it("devuelve error si el jugador no existe", async () => {
@@ -107,7 +129,7 @@ describe("admin player actions", () => {
       const result = await blockPlayer(999);
 
       expect(result).toEqual({ success: false, error: "El jugador no existe." });
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it("devuelve error genérico si falla la BD", async () => {
@@ -131,15 +153,15 @@ describe("admin player actions", () => {
 
   // ── unblockPlayer ───────────────────────────────────────────────────────────
   describe("unblockPlayer", () => {
-    it("pone isBlocked en false y guarda el jugador", async () => {
+    it("pone isBlocked en false en la cuenta del jugador", async () => {
       mockAdminSession();
-      const player = { id: 7, names: "Marta", isBlocked: true };
+      const player = { id: 7, account: { id: 70, isBlocked: true } };
       findOne.mockResolvedValueOnce(player);
 
       const result = await unblockPlayer(7);
 
       expect(result).toEqual({ success: true, data: null });
-      expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 7, isBlocked: false }));
+      expect(update).toHaveBeenCalledWith(70, { isBlocked: false });
     });
 
     it("devuelve error si el jugador no existe", async () => {
@@ -149,7 +171,7 @@ describe("admin player actions", () => {
       const result = await unblockPlayer(999);
 
       expect(result).toEqual({ success: false, error: "El jugador no existe." });
-      expect(save).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     it("devuelve error genérico si falla la BD", async () => {

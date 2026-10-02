@@ -31,23 +31,25 @@ import { PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 
-// Jugador tal como lo devuelve la base: con todos sus datos de contacto y privados.
-function fullPlayer(overrides: Record<string, unknown> = {}) {
+// Jugador tal como lo devuelve la base: con su teléfono (heredado de Booker) y
+// su cuenta, que traen todos sus datos de contacto y privados.
+function fullPlayer(overrides: { id?: number; names?: string; isBlocked?: boolean } = {}) {
   return {
-    id: 7,
-    email: "ana@test.com",
-    phoneNumber: "+54 221 555-0101",
-    dni: 30111222,
-    passwordHash: "$2b$10$hash",
-    names: "Ana",
+    id: overrides.id ?? 7,
+    names: overrides.names ?? "Ana",
     lastnames: "Gómez",
+    phoneNumber: "+54 221 555-0101",
     category: PlayerCategory.FOURTH,
-    isBlocked: false,
-    ...overrides,
+    account: {
+      id: 70,
+      email: "ana@test.com",
+      passwordHash: "$2b$10$hash",
+      isBlocked: overrides.isBlocked ?? false,
+    },
   };
 }
 
-const PRIVATE_KEYS = ["email", "phoneNumber", "dni", "passwordHash"];
+const PRIVATE_KEYS = ["email", "phoneNumber", "passwordHash", "account"];
 
 function expectNoPrivateData(value: unknown) {
   const serialized = JSON.stringify(value);

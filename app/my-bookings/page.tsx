@@ -15,7 +15,7 @@ export default async function MyBookingsPage() {
 
   const dataSource = await getDataSource();
   const players = dataSource.getRepository<Player>("Player");
-  const player = await players.findOne({ where: { email: session.user.email } });
+  const player = await players.findOne({ where: { account: { email: session.user.email } } });
 
   const bookingsResult = await getBookings();
   const allBookings = bookingsResult.success ? bookingsResult.data : [];
@@ -23,7 +23,7 @@ export default async function MyBookingsPage() {
   const myBookings = allBookings
     .filter((b) => {
       if (!player) return false;
-      const isOwner = b.player?.id === player.id;
+      const isOwner = b.booker?.id === player.id;
       const isMatchPlayer = (b.match?.matchPlayers ?? []).some((mp) => mp.playerId === player.id);
       return isOwner || isMatchPlayer;
     })
@@ -42,7 +42,7 @@ export default async function MyBookingsPage() {
       ),
       chatId: b.match?.chat?.id ?? null,
       // Turno creado por otro jugador al que este jugador se sumó (no es quien reservó).
-      joinedAsParticipant: player ? b.player?.id !== player.id : false,
+      joinedAsParticipant: player ? b.booker?.id !== player.id : false,
     }));
 
   return (

@@ -16,7 +16,8 @@ import { toPlain, type ActionResult } from "@/src/lib/action-result";
 /**
  * Único dato de un jugador que sale del chat hacia la UI (privacidad y anonimato):
  * nombre y categoría, más el id para distinguir "mis" mensajes. Nunca se devuelve
- * la entidad Player entera, que trae email, teléfono, dni y el hash de la contraseña.
+ * la entidad Player entera, que con su cuenta trae teléfono, email y el hash de
+ * la contraseña.
  */
 export type ChatParticipant = {
   id: number;
@@ -76,7 +77,7 @@ async function resolveParticipant(
   const dataSource = await getDataSource();
   const player = await dataSource
     .getRepository<Player>("Player")
-    .findOne({ where: { email: session.user.email } });
+    .findOne({ where: { account: { email: session.user.email } }, relations: { account: true } });
   if (!player) {
     return { ok: false, error: NOT_PARTICIPANT_MESSAGE };
   }
@@ -163,7 +164,7 @@ export async function sendMessage(chatId: number, content: string): Promise<Acti
     if (!participant.ok) {
       return { success: false, error: participant.error };
     }
-    if (participant.player.isBlocked) {
+    if (participant.player.account.isBlocked) {
       return { success: false, error: BLOCKED_PLAYER_MESSAGE };
     }
 

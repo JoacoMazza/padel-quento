@@ -2,6 +2,7 @@
 
 import "reflect-metadata";
 import { EntityManager } from "typeorm";
+import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
 import { Court } from "@/src/entities/Court";
@@ -26,14 +27,15 @@ export type CreateBookingInput = {
    * bookingState explícito crea además un partido abierto para ese turno.
    */
   groupSize?: number;
-  playerId: number;
+  /** Quien reserva el turno: debe ser un jugador registrado (Player hereda de Booker). */
+  bookerId: number;
   courtId: number;
 };
 
 export type UpdateBookingInput = Partial<
-  Omit<CreateBookingInput, "playerId" | "courtId">
+  Omit<CreateBookingInput, "bookerId" | "courtId">
 > & {
-  playerId?: number;
+  bookerId?: number;
   courtId?: number;
 };
 
@@ -55,6 +57,8 @@ const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
 const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
 const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
+const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
+const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
 const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
@@ -72,11 +76,29 @@ class NotOpenMatchError extends Error {}
 class AlreadyJoinedError extends Error {}
 class MatchFullError extends Error {}
 class BlockedPlayerError extends Error {}
+class BookerNotFoundError extends Error {}
+class NoPlayerAccountError extends Error {}
 class InvalidPriceError extends Error {}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
   }
+}
+
+/**
+ * Busca al jugador que reserva. Player hereda de Booker, así que el id del
+ * booker es el del jugador: si no hay jugador con ese id, se distingue entre un
+ * booker sin cuenta (no puede reservar) y uno inexistente.
+ */
+async function findBookingPlayer(manager: EntityManager, bookerId: number): Promise<Player> {
+  const player = await manager
+    .getRepository<Player>("Player")
+    .findOne({ where: { id: bookerId }, relations: { account: true } });
+  if (player) {
+    return player;
+  }
+  const bookerExists = await manager.getRepository<Booker>("Booker").existsBy({ id: bookerId });
+  throw bookerExists ? new NoPlayerAccountError() : new BookerNotFoundError();
 }
 
 /**
@@ -117,9 +139,9 @@ export async function createBooking(
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
-      const players = manager.getRepository<Player>("Player");
-      const player = await players.findOne({ where: { id: input.playerId } });
-      if (player?.isBlocked) {
+      // Solo reservan los jugadores registrados: un booker sin cuenta no puede hacer nada.
+      const player = await findBookingPlayer(manager, input.bookerId);
+      if (player.account?.isBlocked) {
         throw new BlockedPlayerError();
       }
 
@@ -168,7 +190,8 @@ export async function createBooking(
         durationMinutes,
         bookingState,
         price,
-        player: { id: input.playerId },
+        // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
+        booker: { id: player.id, phoneNumber: player.phoneNumber },
         court: { id: input.courtId },
       });
 
@@ -186,7 +209,7 @@ export async function createBooking(
         await matchPlayers.save(
           matchPlayers.create({
             match: { id: match.id },
-            player: { id: input.playerId },
+            player: { id: player.id },
             playersCount: groupSize,
           }),
         );
@@ -197,8 +220,14 @@ export async function createBooking(
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
+    if (error instanceof BookerNotFoundError) {
+      return { success: false, error: BOOKER_NOT_FOUND_MESSAGE };
+    }
     if (error instanceof BlockedPlayerError) {
       return { success: false, error: BLOCKED_PLAYER_MESSAGE };
+    }
+    if (error instanceof NoPlayerAccountError) {
+      return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
     }
     if (error instanceof DoubleBookingError) {
       return { success: false, error: DOUBLE_BOOKING_MESSAGE };
@@ -233,8 +262,8 @@ export async function joinOpenMatch(
 
     const saved = await dataSource.transaction(async (manager) => {
       const players = manager.getRepository<Player>("Player");
-      const player = await players.findOne({ where: { id: input.playerId } });
-      if (player?.isBlocked) {
+      const player = await players.findOne({ where: { id: input.playerId }, relations: { account: true } });
+      if (player?.account?.isBlocked) {
         throw new BlockedPlayerError();
       }
 
@@ -333,12 +362,18 @@ export async function joinOpenMatch(
   }
 }
 
+const BOOKING_RELATIONS = {
+  booker: true,
+  court: true,
+  match: { matchPlayers: { player: true }, chat: true },
+} as const;
+
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
   try {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.find({
-      relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
+      relations: BOOKING_RELATIONS,
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -355,7 +390,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true, match: { matchPlayers: { player: true }, chat: true } },
+      relations: BOOKING_RELATIONS,
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -375,21 +410,28 @@ export async function updateBooking(
 
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
-      const booking = await bookings.findOne({ where: { id }, relations: { court: true, player: true } });
+      const booking = await bookings.findOne({
+        where: { id },
+        relations: { court: true, booker: true },
+      });
       if (!booking) {
         throw new Error("NOT_FOUND");
       }
 
+      // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
+      // turno previo a la migración puede no tener quien reservó.
       if (
         input.bookingState === BookingState.CANCELLED &&
         booking.bookingState !== BookingState.CANCELLED &&
-        booking.player &&
+        booking.booker &&
         isLateCancellation(booking.fromDateTime)
       ) {
-        lateCancellationPlayerId = booking.player.id;
+        lateCancellationPlayerId = booking.booker.id;
       }
 
-      const { playerId, courtId, ...rest } = input;
+      const { bookerId, courtId, ...rest } = input;
+
+      const booker = bookerId ? await findBookingPlayer(manager, bookerId) : null;
 
       const effectiveCourtId = courtId ?? booking.court?.id;
       const effectiveState = input.bookingState ?? booking.bookingState;
@@ -412,7 +454,7 @@ export async function updateBooking(
 
       bookings.merge(booking, {
         ...rest,
-        ...(playerId ? { player: { id: playerId } } : {}),
+        ...(booker ? { booker: { id: booker.id, phoneNumber: booker.phoneNumber } } : {}),
         ...(courtId ? { court: { id: courtId } } : {}),
       });
 
@@ -429,6 +471,12 @@ export async function updateBooking(
   } catch (error) {
     if (error instanceof DoubleBookingError) {
       return { success: false, error: DOUBLE_BOOKING_MESSAGE };
+    }
+    if (error instanceof BookerNotFoundError) {
+      return { success: false, error: BOOKER_NOT_FOUND_MESSAGE };
+    }
+    if (error instanceof NoPlayerAccountError) {
+      return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La reserva no existe." };

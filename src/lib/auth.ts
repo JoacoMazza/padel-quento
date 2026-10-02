@@ -2,7 +2,8 @@ import "reflect-metadata";
 import bcrypt from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { User } from "@/src/entities/User";
+import { Role } from "@/src/domain/enums";
+import { Account } from "@/src/entities/Account";
 import { getDataSource } from "@/src/lib/db";
 
 export const authOptions: NextAuthOptions = {
@@ -23,31 +24,36 @@ export const authOptions: NextAuthOptions = {
 
         try {
           const dataSource = await getDataSource();
-          const users = dataSource.getRepository<User>("User");
-          const user = await users.findOne({ where: { email } });
+          const accounts = dataSource.getRepository<Account>("Account");
+          const account = await accounts.findOne({
+            where: { email },
+            relations: { admin: true, player: true },
+          });
 
-          if (!user) {
+          if (!account) {
             console.warn(`[Auth] No se encontró usuario con el email: ${email}`);
             return null;
           }
 
-          const matches = await bcrypt.compare(password, user.passwordHash);
+          const matches = await bcrypt.compare(password, account.passwordHash);
           if (!matches) {
             console.warn(`[Auth] Contraseña incorrecta para el email: ${email}`);
             return null;
           }
 
-          if (user.isBlocked) {
+          if (account.isBlocked) {
             console.warn(`[Auth] Intento de login de usuario bloqueado: ${email}`);
             return null;
           }
 
-          console.log(`[Auth] Login exitoso para el usuario: ${user.email}`);
+          // El rol se deduce de a quién pertenece la cuenta: un Admin o un Player.
+          const person = account.admin ?? account.player;
+          console.log(`[Auth] Login exitoso para el usuario: ${account.email}`);
           return {
-            id: String(user.id),
-            email: user.email,
-            name: `${user.names} ${user.lastnames}`,
-            role: user.role,
+            id: String(account.id),
+            email: account.email,
+            name: person ? `${person.names} ${person.lastnames}` : account.email,
+            role: account.admin ? Role.ADMIN : Role.PLAYER,
           };
         } catch (error) {
           console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);
