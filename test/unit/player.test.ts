@@ -15,7 +15,7 @@ const { repos, getDataSource } = vi.hoisted(() => {
     update: vi.fn(async () => ({ affected: 1 })),
     delete: vi.fn(async () => ({ affected: 1 })),
   });
-  const repos = { Account: makeRepo(), Booker: makeRepo(), Player: makeRepo() };
+  const repos = { Account: makeRepo(), Player: makeRepo() };
   const getRepository = vi.fn((entity: keyof typeof repos) => repos[entity]);
   const manager = { getRepository };
   const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
@@ -49,10 +49,12 @@ const input = {
 function storedPlayer() {
   return {
     id: 1,
+    names: "Ana",
+    lastnames: "Gomez",
+    phoneNumber: "2215550101",
     category: PlayerCategory.WITHOUT_CATEGORY,
     scoring: 0,
     account: { id: 10, email: "ana@test.com", passwordHash: "old-hash", photoUrl: null, isBlocked: false },
-    booker: { id: 20, names: "Ana", lastnames: "Gomez", phoneNumber: "2215550101" },
   };
 }
 
@@ -67,7 +69,7 @@ describe("player actions", () => {
   });
 
   describe("createPlayer", () => {
-    it("crea la cuenta, el booker y el jugador con el hash de contraseña y los valores por defecto", async () => {
+    it("crea la cuenta y el jugador (que es un booker) con el hash de contraseña y los valores por defecto", async () => {
       const result = await createPlayer(input);
 
       expect(bcrypt.hash).toHaveBeenCalledWith("secreto123", 12);
@@ -76,22 +78,19 @@ describe("player actions", () => {
         passwordHash: "hashed-password",
         photoUrl: null,
       });
-      expect(repos.Booker.create).toHaveBeenCalledWith({
+      expect(repos.Player.create).toHaveBeenCalledWith({
+        account: expect.objectContaining({ email: "ana@test.com" }),
         names: "Ana",
         lastnames: "Gomez",
         phoneNumber: "2215550101",
-      });
-      expect(repos.Player.create).toHaveBeenCalledWith({
-        account: expect.objectContaining({ email: "ana@test.com" }),
-        booker: expect.objectContaining({ phoneNumber: "2215550101" }),
         category: PlayerCategory.WITHOUT_CATEGORY,
         scoring: 0,
       });
       expect(result).toEqual({
         success: true,
         data: expect.objectContaining({
+          names: "Ana",
           account: expect.objectContaining({ email: "ana@test.com" }),
-          booker: expect.objectContaining({ names: "Ana" }),
         }),
       });
     });
@@ -113,7 +112,7 @@ describe("player actions", () => {
     });
 
     it("devuelve un mensaje de teléfono duplicado ante una violación de unicidad del teléfono", async () => {
-      repos.Booker.save.mockRejectedValueOnce(uniqueViolation("UQ_bookers_phone_number"));
+      repos.Player.save.mockRejectedValueOnce(uniqueViolation("UQ_bookers_phone_number"));
 
       const result = await createPlayer(input);
 
@@ -130,12 +129,12 @@ describe("player actions", () => {
   });
 
   describe("getPlayers", () => {
-    it("devuelve todos los jugadores con su cuenta y su booker", async () => {
+    it("devuelve todos los jugadores con su cuenta", async () => {
       repos.Player.find.mockResolvedValueOnce([{ id: 1 }]);
 
       const result = await getPlayers();
 
-      expect(repos.Player.find).toHaveBeenCalledWith({ relations: { account: true, booker: true } });
+      expect(repos.Player.find).toHaveBeenCalledWith({ relations: { account: true } });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
     });
 
@@ -167,18 +166,18 @@ describe("player actions", () => {
   });
 
   describe("updatePlayer", () => {
-    it("actualiza nombre en el booker y categoría en el jugador sin tocar la contraseña", async () => {
+    it("actualiza nombre y categoría del jugador sin tocar la contraseña", async () => {
       repos.Player.findOne.mockResolvedValueOnce(storedPlayer());
 
       const result = await updatePlayer(1, { names: "Ana María", category: PlayerCategory.FIFTH });
 
       expect(bcrypt.hash).not.toHaveBeenCalled();
-      expect(repos.Booker.save).toHaveBeenCalledWith(expect.objectContaining({ names: "Ana María" }));
+      expect(repos.Player.save).toHaveBeenCalledWith(expect.objectContaining({ names: "Ana María" }));
       expect(result).toEqual({
         success: true,
         data: expect.objectContaining({
           category: PlayerCategory.FIFTH,
-          booker: expect.objectContaining({ names: "Ana María" }),
+          names: "Ana María",
           account: expect.objectContaining({ passwordHash: "old-hash" }),
         }),
       });

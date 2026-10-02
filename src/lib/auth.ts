@@ -27,7 +27,7 @@ export const authOptions: NextAuthOptions = {
           const accounts = dataSource.getRepository<Account>("Account");
           const account = await accounts.findOne({
             where: { email },
-            relations: { admin: true, player: { booker: true } },
+            relations: { admin: true, player: true },
           });
 
           if (!account) {
@@ -46,9 +46,8 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // El rol se deduce de a quién pertenece la cuenta: un Admin o un Player
-          // (cuyos datos personales viven en su Booker).
-          const person = account.admin ?? account.player?.booker;
+          // El rol se deduce de a quién pertenece la cuenta: un Admin o un Player.
+          const person = account.admin ?? account.player;
           console.log(`[Auth] Login exitoso para el usuario: ${account.email}`);
           return {
             id: String(account.id),

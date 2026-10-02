@@ -86,11 +86,11 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const players = dataSource.getRepository<Player>("Player");
     const updated = await players.findOne({
       where: { account: { email: playerEmail } },
-      relations: { account: true, booker: true },
+      relations: { account: true },
     });
 
-    expect(updated?.booker.names).toBe("Esteban Modificado");
-    expect(updated?.booker.lastnames).toBe("Quito Nuevo");
+    expect(updated?.names).toBe("Esteban Modificado");
+    expect(updated?.lastnames).toBe("Quito Nuevo");
     expect(updated?.category).toBe(PlayerCategory.THIRD);
     expect(updated?.account.photoUrl).toBe("https://ejemplo.com/foto.png");
   });

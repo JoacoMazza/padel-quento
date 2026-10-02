@@ -64,8 +64,9 @@ describe("booking actions (integración con Postgres real)", () => {
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
     playerId = player.data.id;
-    bookerId = player.data.booker.id;
-    bookerPhoneNumber = player.data.booker.phoneNumber;
+    // Player hereda de Booker: el jugador es quien reserva, con su mismo id.
+    bookerId = player.data.id;
+    bookerPhoneNumber = player.data.phoneNumber;
   });
 
   afterAll(async () => {

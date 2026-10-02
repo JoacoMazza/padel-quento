@@ -3,7 +3,6 @@
 import "reflect-metadata";
 import bcrypt from "bcrypt";
 import { Account } from "@/src/entities/Account";
-import { Booker } from "@/src/entities/Booker";
 import { Player } from "@/src/entities/Player";
 import { PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
@@ -25,12 +24,11 @@ export type UpdatePlayerInput = Partial<Omit<CreatePlayerInput, "password">> & {
   password?: string;
 };
 
-const PLAYER_RELATIONS = { account: true, booker: true } as const;
+const PLAYER_RELATIONS = { account: true } as const;
 
 /**
- * Crea al jugador junto con su cuenta (credenciales) y su booker (datos con los
- * que reserva turnos) en una misma transacción: si falla cualquiera de los
- * tres, no queda ninguno guardado.
+ * Crea al jugador (un Booker con cuenta) junto con su cuenta en una misma
+ * transacción: si falla cualquiera de los dos, no queda ninguno guardado.
  */
 export async function createPlayer(
   input: CreatePlayerInput,
@@ -41,7 +39,6 @@ export async function createPlayer(
 
     const saved = await dataSource.transaction(async (manager) => {
       const accounts = manager.getRepository<Account>("Account");
-      const bookers = manager.getRepository<Booker>("Booker");
       const players = manager.getRepository<Player>("Player");
 
       const account = await accounts.save(
@@ -51,17 +48,12 @@ export async function createPlayer(
           photoUrl: input.photoUrl ?? null,
         }),
       );
-      const booker = await bookers.save(
-        bookers.create({
-          names: input.names,
-          lastnames: input.lastnames,
-          phoneNumber: input.phoneNumber,
-        }),
-      );
       return players.save(
         players.create({
           account,
-          booker,
+          names: input.names,
+          lastnames: input.lastnames,
+          phoneNumber: input.phoneNumber,
           category: input.category ?? PlayerCategory.WITHOUT_CATEGORY,
           scoring: 0,
         }),
@@ -104,7 +96,7 @@ export async function getPlayerById(
   }
 }
 
-/** Reparte los campos a actualizar entre la cuenta, el booker y el jugador. */
+/** Reparte los campos a actualizar entre la cuenta y el jugador. */
 export async function updatePlayer(
   id: number,
   input: UpdatePlayerInput,
@@ -124,13 +116,12 @@ export async function updatePlayer(
       if (email !== undefined) player.account.email = email;
       if (photoUrl !== undefined) player.account.photoUrl = photoUrl;
       if (password) player.account.passwordHash = await bcrypt.hash(password, 12);
-      if (names !== undefined) player.booker.names = names;
-      if (lastnames !== undefined) player.booker.lastnames = lastnames;
-      if (phoneNumber !== undefined) player.booker.phoneNumber = phoneNumber;
+      if (names !== undefined) player.names = names;
+      if (lastnames !== undefined) player.lastnames = lastnames;
+      if (phoneNumber !== undefined) player.phoneNumber = phoneNumber;
       if (category !== undefined) player.category = category;
 
       player.account = await manager.getRepository<Account>("Account").save(player.account);
-      player.booker = await manager.getRepository<Booker>("Booker").save(player.booker);
       return players.save(player);
     });
 
@@ -148,8 +139,8 @@ export async function updatePlayer(
 }
 
 /**
- * Elimina al jugador borrando su cuenta (players.account_id tiene ON DELETE
- * CASCADE). El booker se conserva: los turnos que reservó lo siguen referenciando.
+ * Elimina al jugador borrando su cuenta (bookers.account_id tiene ON DELETE
+ * CASCADE). Si el jugador tiene turnos, la FK de bookings impide borrarlo.
  */
 export async function deletePlayer(id: number): Promise<ActionResult<null>> {
   try {
@@ -192,10 +183,10 @@ export async function getPlayersAdmin(): Promise<ActionResult<PlayerAdminItem[]>
     // Solo los campos que muestra el panel: nunca el hash de la contraseña.
     const data: PlayerAdminItem[] = found.map((player) => ({
       id: player.id,
-      names: player.booker.names,
-      lastnames: player.booker.lastnames,
+      names: player.names,
+      lastnames: player.lastnames,
       email: player.account.email,
-      phoneNumber: player.booker.phoneNumber,
+      phoneNumber: player.phoneNumber,
       category: player.category,
       scoring: player.scoring,
       isBlocked: player.account.isBlocked,

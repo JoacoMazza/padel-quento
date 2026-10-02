@@ -97,7 +97,7 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
 
     const pending = await bookings.find({
       where: { pointsAwarded: false },
-      relations: { booker: { player: true }, match: { matchPlayers: { player: true } } },
+      relations: { booker: true, match: { matchPlayers: { player: true } } },
     });
 
     const now = Date.now();
@@ -109,8 +109,9 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
 
     let awarded = 0;
     for (const booking of ended) {
-      // Quien reservó sin cuenta en la plataforma no acumula puntos.
-      const bookerPlayerId = booking.booker?.player?.id ?? null;
+      // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
+      // turno previo a la migración puede no tener quien reservó.
+      const bookerPlayerId = booking.booker?.id ?? null;
       if (booking.match) {
         for (const matchPlayer of booking.match.matchPlayers ?? []) {
           if (matchPlayer.attended) {

@@ -39,7 +39,7 @@ describe("chat actions (integración con Postgres real)", () => {
       ...overrides,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    return { email, id: player.data.id, bookerId: player.data.booker.id };
+    return { email, id: player.data.id, bookerId: player.data.id };
   }
 
   beforeAll(async () => {

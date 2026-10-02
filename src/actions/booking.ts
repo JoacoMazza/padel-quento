@@ -27,7 +27,7 @@ export type CreateBookingInput = {
    * bookingState explícito crea además un partido abierto para ese turno.
    */
   groupSize?: number;
-  /** Quien reserva el turno: debe ser el booker de un jugador registrado (Player.booker). */
+  /** Quien reserva el turno: debe ser un jugador registrado (Player hereda de Booker). */
   bookerId: number;
   courtId: number;
 };
@@ -86,6 +86,22 @@ class InvalidJoinGroupSizeError extends Error {
 }
 
 /**
+ * Busca al jugador que reserva. Player hereda de Booker, así que el id del
+ * booker es el del jugador: si no hay jugador con ese id, se distingue entre un
+ * booker sin cuenta (no puede reservar) y uno inexistente.
+ */
+async function findBookingPlayer(manager: EntityManager, bookerId: number): Promise<Player> {
+  const player = await manager
+    .getRepository<Player>("Player")
+    .findOne({ where: { id: bookerId }, relations: { account: true } });
+  if (player) {
+    return player;
+  }
+  const bookerExists = await manager.getRepository<Booker>("Booker").existsBy({ id: bookerId });
+  throw bookerExists ? new NoPlayerAccountError() : new BookerNotFoundError();
+}
+
+/**
  * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
  * bookingState = CANCELLED al buscar solapamientos, sin importar el resto de los estados.
  */
@@ -123,19 +139,9 @@ export async function createBooking(
     const dataSource = await getDataSource();
 
     const saved = await dataSource.transaction(async (manager) => {
-      const bookers = manager.getRepository<Booker>("Booker");
-      const booker = await bookers.findOne({
-        where: { id: input.bookerId },
-        relations: { player: { account: true } },
-      });
-      if (!booker) {
-        throw new BookerNotFoundError();
-      }
       // Solo reservan los jugadores registrados: un booker sin cuenta no puede hacer nada.
-      if (!booker.player) {
-        throw new NoPlayerAccountError();
-      }
-      if (booker.player.account?.isBlocked) {
+      const player = await findBookingPlayer(manager, input.bookerId);
+      if (player.account?.isBlocked) {
         throw new BlockedPlayerError();
       }
 
@@ -185,7 +191,7 @@ export async function createBooking(
         bookingState,
         price,
         // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
-        booker: { id: booker.id, phoneNumber: booker.phoneNumber },
+        booker: { id: player.id, phoneNumber: player.phoneNumber },
         court: { id: input.courtId },
       });
 
@@ -203,7 +209,7 @@ export async function createBooking(
         await matchPlayers.save(
           matchPlayers.create({
             match: { id: match.id },
-            player: { id: booker.player!.id },
+            player: { id: player.id },
             playersCount: groupSize,
           }),
         );
@@ -356,11 +362,10 @@ export async function joinOpenMatch(
   }
 }
 
-// Quien reservó y los jugadores del partido con su booker, que es donde viven sus nombres.
 const BOOKING_RELATIONS = {
   booker: true,
   court: true,
-  match: { matchPlayers: { player: { booker: true } }, chat: true },
+  match: { matchPlayers: { player: true }, chat: true },
 } as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
@@ -407,37 +412,26 @@ export async function updateBooking(
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = await bookings.findOne({
         where: { id },
-        relations: { court: true, booker: { player: true } },
+        relations: { court: true, booker: true },
       });
       if (!booking) {
         throw new Error("NOT_FOUND");
       }
 
-      // Solo se penaliza a quien reservó si es un jugador registrado: quien
-      // reserva sin cuenta no tiene puntos que descontar.
+      // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
+      // turno previo a la migración puede no tener quien reservó.
       if (
         input.bookingState === BookingState.CANCELLED &&
         booking.bookingState !== BookingState.CANCELLED &&
-        booking.booker?.player &&
+        booking.booker &&
         isLateCancellation(booking.fromDateTime)
       ) {
-        lateCancellationPlayerId = booking.booker.player.id;
+        lateCancellationPlayerId = booking.booker.id;
       }
 
       const { bookerId, courtId, ...rest } = input;
 
-      let booker: Booker | null = null;
-      if (bookerId) {
-        booker = await manager
-          .getRepository<Booker>("Booker")
-          .findOne({ where: { id: bookerId }, relations: { player: true } });
-        if (!booker) {
-          throw new BookerNotFoundError();
-        }
-        if (!booker.player) {
-          throw new NoPlayerAccountError();
-        }
-      }
+      const booker = bookerId ? await findBookingPlayer(manager, bookerId) : null;
 
       const effectiveCourtId = courtId ?? booking.court?.id;
       const effectiveState = input.bookingState ?? booking.bookingState;

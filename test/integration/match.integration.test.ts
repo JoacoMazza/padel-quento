@@ -40,7 +40,7 @@ describe("match actions (integración con Postgres real)", () => {
       lastnames: "De Prueba",
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    bookerId = player.data.booker.id;
+    bookerId = player.data.id;
   });
 
   afterAll(async () => {

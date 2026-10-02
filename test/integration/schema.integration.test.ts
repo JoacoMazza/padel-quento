@@ -19,20 +19,36 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
     return rows.map((row) => row.column_name);
   }
 
-  it("las cuentas se dividen en accounts, admins, players y bookers, y ya no existe users", async () => {
+  it("las cuentas se dividen en accounts, admins y bookers (Player hereda de Booker), y ya no existen users ni players", async () => {
     expect(await columnsOf("accounts")).toEqual(
       expect.arrayContaining(["id", "email", "photo_url", "password_hashed", "is_blocked"]),
     );
     expect(await columnsOf("admins")).toEqual(
       expect.arrayContaining(["id", "account_id", "dni", "names", "last_names"]),
     );
-    expect(await columnsOf("players")).toEqual(
-      expect.arrayContaining(["id", "account_id", "booker_id", "category", "scoring"]),
-    );
     expect(await columnsOf("bookers")).toEqual(
-      expect.arrayContaining(["id", "names", "last_names", "phone_number"]),
+      expect.arrayContaining(["id", "type", "names", "last_names", "phone_number", "account_id", "category", "scoring"]),
     );
+    expect(await columnsOf("players")).toEqual([]);
     expect(await columnsOf("users")).toEqual([]);
+  });
+
+  it("penalties, match_players y messages referencian a los jugadores en bookers", async () => {
+    const dataSource = await getDataSource();
+    const rows: { table_name: string; referenced_table: string }[] = await dataSource.query(
+      `SELECT kcu.table_name, ccu.table_name AS referenced_table
+         FROM information_schema.key_column_usage kcu
+         JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = kcu.constraint_name
+         JOIN information_schema.table_constraints tc ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND (kcu.table_name, kcu.column_name) IN (('penalties', 'player_id'), ('match_players', 'player_id'), ('messages', 'sender_id'))
+        ORDER BY kcu.table_name`,
+    );
+    expect(rows).toEqual([
+      { table_name: "match_players", referenced_table: "bookers" },
+      { table_name: "messages", referenced_table: "bookers" },
+      { table_name: "penalties", referenced_table: "bookers" },
+    ]);
   });
 
   it("bookings referencia a quien reservó por booker_phone_number, no por player_id", async () => {

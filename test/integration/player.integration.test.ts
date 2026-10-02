@@ -31,7 +31,7 @@ describe("player actions (integración con Postgres real)", () => {
     await dataSource.destroy();
   });
 
-  it("crea el jugador junto con su cuenta y su booker, con el hash de contraseña y los valores por defecto", async () => {
+  it("crea el jugador (que es un booker) junto con su cuenta, con el hash de contraseña y los valores por defecto", async () => {
     const email = uniqueEmail("crear");
     const phoneNumber = uniquePhoneNumber();
 
@@ -46,11 +46,17 @@ describe("player actions (integración con Postgres real)", () => {
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
     expect(result.data).toMatchObject({
+      names: "Ana",
+      lastnames: "Gomez",
+      phoneNumber,
       category: PlayerCategory.WITHOUT_CATEGORY,
       scoring: 0,
       account: { email, isBlocked: false, photoUrl: null },
-      booker: { names: "Ana", lastnames: "Gomez", phoneNumber },
     });
+
+    const dataSource = await getDataSource();
+    const asBooker = await dataSource.getRepository("Booker").findOne({ where: { id: result.data.id } });
+    expect(asBooker).toMatchObject({ phoneNumber });
     expect(result.data.account.passwordHash).not.toBe("secreto123");
     await expect(bcrypt.compare("secreto123", result.data.account.passwordHash)).resolves.toBe(true);
   });
@@ -76,7 +82,7 @@ describe("player actions (integración con Postgres real)", () => {
     expect(await dataSource.getRepository("Account").count({ where: { email: secondEmail } })).toBe(0);
   });
 
-  it("lista los jugadores creados con su cuenta y su booker", async () => {
+  it("lista los jugadores creados con su cuenta", async () => {
     const input = newPlayerInput("listado");
     await createPlayer(input);
 
@@ -85,7 +91,7 @@ describe("player actions (integración con Postgres real)", () => {
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
     const found = result.data.find((p) => p.account.email === input.email);
-    expect(found?.booker.phoneNumber).toBe(input.phoneNumber);
+    expect(found?.phoneNumber).toBe(input.phoneNumber);
   });
 
   it("obtiene un jugador por id y null si no existe", async () => {
@@ -95,7 +101,7 @@ describe("player actions (integración con Postgres real)", () => {
     const found = await getPlayerById(created.data.id);
     expect(found).toEqual({
       success: true,
-      data: expect.objectContaining({ id: created.data.id, booker: expect.objectContaining({ names: "A" }) }),
+      data: expect.objectContaining({ id: created.data.id, names: "A" }),
     });
 
     const notFound = await getPlayerById(999_999_999);
@@ -114,13 +120,13 @@ describe("player actions (integración con Postgres real)", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    expect(result.data.booker.names).toBe("Ana María");
+    expect(result.data.names).toBe("Ana María");
     expect(result.data.category).toBe(PlayerCategory.FIFTH);
     await expect(bcrypt.compare("otraClave456", result.data.account.passwordHash)).resolves.toBe(true);
 
     const reloaded = await getPlayerById(created.data.id);
     if (!reloaded.success) throw new Error("expected success");
-    expect(reloaded.data?.booker.names).toBe("Ana María");
+    expect(reloaded.data?.names).toBe("Ana María");
   });
 
   it("devuelve error al actualizar un jugador inexistente", async () => {

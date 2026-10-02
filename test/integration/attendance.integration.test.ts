@@ -94,7 +94,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       lastnames: prefix,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    return { id: player.data.id, bookerId: player.data.booker.id, email };
+    return { id: player.data.id, bookerId: player.data.id, email };
   }
 
   describe("setBookingAttendance", () => {

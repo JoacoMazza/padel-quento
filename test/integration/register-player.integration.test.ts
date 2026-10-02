@@ -38,7 +38,7 @@ describe("registerPlayer (integración con Postgres real)", () => {
     await dataSource.destroy();
   });
 
-  it("crea un jugador nuevo con su cuenta, su booker, el hash de contraseña y los valores por defecto", async () => {
+  it("crea un jugador nuevo con su cuenta, el hash de contraseña y los valores por defecto", async () => {
     const email = `nuevo.${Date.now()}@test.com`;
     const phoneNumber = uniquePhoneNumber();
     const result = await registerPlayer(initialState, buildFormData({ email, password: "secreto123", phoneNumber }));
@@ -52,13 +52,13 @@ describe("registerPlayer (integración con Postgres real)", () => {
     const players = dataSource.getRepository<Player>("Player");
     const saved = await players.findOne({
       where: { account: { email } },
-      relations: { account: true, booker: true },
+      relations: { account: true },
     });
 
     expect(saved).not.toBeNull();
     expect(saved?.category).toBe("without_category");
     expect(saved?.scoring).toBe(0);
-    expect(saved?.booker).toMatchObject({ names: "Ana", lastnames: "Gomez", phoneNumber });
+    expect(saved).toMatchObject({ names: "Ana", lastnames: "Gomez", phoneNumber });
     expect(saved?.account.passwordHash).not.toBe("secreto123");
     await expect(bcrypt.compare("secreto123", saved!.account.passwordHash)).resolves.toBe(true);
   });

@@ -8,7 +8,7 @@ const {
   find,
   findOne,
   playerFindOne,
-  bookerFindOne,
+  bookerExistsBy,
   merge,
   deleteFn,
   getOne,
@@ -22,7 +22,7 @@ const {
     const find = vi.fn();
     const findOne = vi.fn();
     const playerFindOne = vi.fn(async () => ({ id: 1, account: { isBlocked: false } }) as unknown);
-    const bookerFindOne = vi.fn(async () => null as unknown);
+    const bookerExistsBy = vi.fn(async () => true);
     const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
     const deleteFn = vi.fn();
     const getOne = vi.fn(async () => null as unknown);
@@ -30,7 +30,7 @@ const {
 
     const repository = { create, save, update, find, findOne, merge, delete: deleteFn };
     const playerRepository = { create, save, update, find, findOne: playerFindOne, merge, delete: deleteFn };
-    const bookerRepository = { findOne: bookerFindOne };
+    const bookerRepository = { existsBy: bookerExistsBy };
 
     const queryBuilder: any = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
@@ -57,7 +57,7 @@ const {
       find,
       findOne,
       playerFindOne,
-      bookerFindOne,
+      bookerExistsBy,
       merge,
       deleteFn,
       getOne,
@@ -91,12 +91,12 @@ const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.
 const fromDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 const PHONE_NUMBER = "2215550101";
 
-/** Booker de un jugador registrado (con cuenta), el caso de las reservas desde la web. */
-function playerBooker(overrides: { isBlocked?: boolean } = {}) {
+/** Jugador registrado que reserva: Player hereda de Booker, así que tiene su teléfono. */
+function bookingPlayer(overrides: { isBlocked?: boolean } = {}) {
   return {
     id: 1,
     phoneNumber: PHONE_NUMBER,
-    player: { id: 1, account: { isBlocked: overrides.isBlocked ?? false } },
+    account: { isBlocked: overrides.isBlocked ?? false },
   };
 }
 
@@ -106,8 +106,8 @@ describe("booking actions", () => {
     create.mockImplementation((data: unknown) => data);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
-    playerFindOne.mockResolvedValue({ id: 1, account: { isBlocked: false } });
-    bookerFindOne.mockResolvedValue(playerBooker());
+    playerFindOne.mockResolvedValue(bookingPlayer());
+    bookerExistsBy.mockResolvedValue(true);
     findOne.mockResolvedValue({ id: 2, price: 10000 });
   });
 
@@ -244,17 +244,18 @@ describe("booking actions", () => {
       expect(save).toHaveBeenCalledTimes(1);
     });
 
-    it("busca a quien reserva junto con su jugador y su cuenta", async () => {
+    it("busca a quien reserva como jugador, junto con su cuenta", async () => {
       await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
 
-      expect(bookerFindOne).toHaveBeenCalledWith({
+      expect(playerFindOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: { player: { account: true } },
+        relations: { account: true },
       });
     });
 
     it("devuelve error y no crea nada si quien reserva no existe", async () => {
-      bookerFindOne.mockResolvedValueOnce(null);
+      playerFindOne.mockResolvedValueOnce(null);
+      bookerExistsBy.mockResolvedValueOnce(false);
 
       const result = await createBooking({ fromDateTime, bookerId: 99, courtId: 2 });
 
@@ -266,7 +267,8 @@ describe("booking actions", () => {
       ["un turno completo", 4],
       ["un partido abierto", 2],
     ])("no permite reservar %s a un booker sin cuenta en la plataforma", async (_label, groupSize) => {
-      bookerFindOne.mockResolvedValueOnce({ id: 3, phoneNumber: "2215550199", player: null });
+      playerFindOne.mockResolvedValueOnce(null);
+      bookerExistsBy.mockResolvedValueOnce(true);
 
       const result = await createBooking({ fromDateTime, groupSize, bookerId: 3, courtId: 2 });
 
@@ -278,7 +280,7 @@ describe("booking actions", () => {
     });
 
     it("rechaza la reserva si el usuario se encuentra bloqueado", async () => {
-      bookerFindOne.mockResolvedValueOnce(playerBooker({ isBlocked: true }));
+      playerFindOne.mockResolvedValueOnce(bookingPlayer({ isBlocked: true }));
 
       const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
 
@@ -569,7 +571,7 @@ describe("booking actions", () => {
         relations: {
           booker: true,
           court: true,
-          match: { matchPlayers: { player: { booker: true } }, chat: true },
+          match: { matchPlayers: { player: true }, chat: true },
         },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
@@ -595,7 +597,7 @@ describe("booking actions", () => {
         relations: {
           booker: true,
           court: true,
-          match: { matchPlayers: { player: { booker: true } }, chat: true },
+          match: { matchPlayers: { player: true }, chat: true },
         },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
@@ -637,7 +639,7 @@ describe("booking actions", () => {
         durationMinutes: 90,
         bookingState: BookingState.RESERVED,
       });
-      bookerFindOne.mockResolvedValueOnce({ id: 3, phoneNumber: "2215550133", player: { id: 30 } });
+      playerFindOne.mockResolvedValueOnce({ id: 3, phoneNumber: "2215550133" });
 
       const result = await updateBooking(1, { bookerId: 3, courtId: 4 });
 
@@ -656,7 +658,8 @@ describe("booking actions", () => {
 
     it("devuelve error y no guarda si el nuevo booker no existe", async () => {
       findOne.mockResolvedValueOnce({ id: 1, fromDateTime, bookingState: BookingState.RESERVED });
-      bookerFindOne.mockResolvedValueOnce(null);
+      playerFindOne.mockResolvedValueOnce(null);
+      bookerExistsBy.mockResolvedValueOnce(false);
 
       const result = await updateBooking(1, { bookerId: 99 });
 
@@ -666,7 +669,8 @@ describe("booking actions", () => {
 
     it("devuelve error y no guarda si se reasigna el turno a un booker sin cuenta en la plataforma", async () => {
       findOne.mockResolvedValueOnce({ id: 1, fromDateTime, bookingState: BookingState.RESERVED });
-      bookerFindOne.mockResolvedValueOnce({ id: 3, phoneNumber: "2215550133", player: null });
+      playerFindOne.mockResolvedValueOnce(null);
+      bookerExistsBy.mockResolvedValueOnce(true);
 
       const result = await updateBooking(1, { bookerId: 3 });
 
@@ -689,7 +693,7 @@ describe("booking actions", () => {
         id: 1,
         fromDateTime: new Date(Date.now() + 2 * 60 * 60_000),
         bookingState: BookingState.RESERVED,
-        booker: { id: 70, player: { id: 7 } },
+        booker: { id: 7 },
       });
 
       const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
@@ -703,7 +707,7 @@ describe("booking actions", () => {
         id: 1,
         fromDateTime: new Date(Date.now() + 4 * 60 * 60_000),
         bookingState: BookingState.RESERVED,
-        booker: { id: 70, player: { id: 7 } },
+        booker: { id: 7 },
       });
 
       const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
@@ -712,12 +716,12 @@ describe("booking actions", () => {
       expect(recordPointsMovement).not.toHaveBeenCalled();
     });
 
-    it("no penaliza la cancelación tardía de un booker sin cuenta en la plataforma", async () => {
+    it("no penaliza la cancelación tardía de un turno sin quien reservó (dato previo a la migración)", async () => {
       findOne.mockResolvedValueOnce({
         id: 1,
         fromDateTime: new Date(Date.now() + 2 * 60 * 60_000),
         bookingState: BookingState.RESERVED,
-        booker: { id: 70, player: null },
+        booker: null,
       });
 
       const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
@@ -731,7 +735,7 @@ describe("booking actions", () => {
         id: 1,
         fromDateTime: new Date(Date.now() + 60 * 60_000),
         bookingState: BookingState.CANCELLED,
-        booker: { id: 70, player: { id: 7 } },
+        booker: { id: 7 },
       });
 
       await updateBooking(1, { bookingState: BookingState.CANCELLED });
@@ -744,7 +748,7 @@ describe("booking actions", () => {
         id: 1,
         fromDateTime: new Date(Date.now() + 60 * 60_000),
         bookingState: BookingState.RESERVED,
-        booker: { id: 70, player: { id: 7 } },
+        booker: { id: 7 },
       });
 
       await updateBooking(1, { bookingState: BookingState.PAID });
@@ -757,7 +761,7 @@ describe("booking actions", () => {
         id: 1,
         fromDateTime: new Date(Date.now() + 60 * 60_000),
         bookingState: BookingState.RESERVED,
-        booker: { id: 70, player: { id: 7 } },
+        booker: { id: 7 },
       });
       save.mockRejectedValueOnce(new Error("boom"));
 

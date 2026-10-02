@@ -23,7 +23,7 @@ export type AdminBookingProp = BookingProp & {
 
 /**
  * Arma un AdminBookingProp a partir de la entidad Booking devuelta por
- * getBookings()/getScheduleBoardData() (con booker y match.matchPlayers.player.booker
+ * getBookings()/getScheduleBoardData() (con booker y match.matchPlayers.player
  * cargados). Se usa tanto en el render inicial (server) como en el refresco en
  * vivo (client), por eso no depende de nada del lado del servidor.
  */
@@ -46,7 +46,7 @@ export function mapBookingToAdminProp(booking: Booking): AdminBookingProp {
     matchPlayers: (booking.match?.matchPlayers ?? []).map((mp) => ({
       id: mp.id,
       playerId: mp.player.id,
-      playerName: `${mp.player.booker.names} ${mp.player.booker.lastnames}`,
+      playerName: `${mp.player.names} ${mp.player.lastnames}`,
       attended: mp.attended,
     })),
   };

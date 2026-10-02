@@ -63,7 +63,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
     // Saldo inicial mayor a la penalización: con saldo 0 no habría nada que
     // descontar (el piso es 0) y no se podría distinguir si se penalizó.
     await recordPointsMovement(player.data.id, INITIAL_POINTS, "bonus", "Puntos iniciales de prueba");
-    return { id: player.data.id, bookerId: player.data.booker.id, email };
+    return { id: player.data.id, bookerId: player.data.id, email };
   }
 
   it("descuenta la penalización al cancelar un turno a menos de 3 horas", async () => {

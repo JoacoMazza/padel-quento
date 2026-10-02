@@ -31,11 +31,14 @@ import { PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 
-// Jugador tal como lo devuelve la base: con su cuenta y su booker, que traen
-// todos sus datos de contacto y privados.
+// Jugador tal como lo devuelve la base: con su teléfono (heredado de Booker) y
+// su cuenta, que traen todos sus datos de contacto y privados.
 function fullPlayer(overrides: { id?: number; names?: string; isBlocked?: boolean } = {}) {
   return {
     id: overrides.id ?? 7,
+    names: overrides.names ?? "Ana",
+    lastnames: "Gómez",
+    phoneNumber: "+54 221 555-0101",
     category: PlayerCategory.FOURTH,
     account: {
       id: 70,
@@ -43,16 +46,10 @@ function fullPlayer(overrides: { id?: number; names?: string; isBlocked?: boolea
       passwordHash: "$2b$10$hash",
       isBlocked: overrides.isBlocked ?? false,
     },
-    booker: {
-      id: 700,
-      names: overrides.names ?? "Ana",
-      lastnames: "Gómez",
-      phoneNumber: "+54 221 555-0101",
-    },
   };
 }
 
-const PRIVATE_KEYS = ["email", "phoneNumber", "passwordHash", "account", "booker"];
+const PRIVATE_KEYS = ["email", "phoneNumber", "passwordHash", "account"];
 
 function expectNoPrivateData(value: unknown) {
   const serialized = JSON.stringify(value);
@@ -105,7 +102,7 @@ describe("chat actions", () => {
       expect(chats.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
         relations: {
-          match: { booking: { court: true }, matchPlayers: { player: { booker: true } } },
+          match: { booking: { court: true }, matchPlayers: { player: true } },
         },
       });
       expect(result).toEqual({

@@ -16,8 +16,8 @@ import { toPlain, type ActionResult } from "@/src/lib/action-result";
 /**
  * Único dato de un jugador que sale del chat hacia la UI (privacidad y anonimato):
  * nombre y categoría, más el id para distinguir "mis" mensajes. Nunca se devuelve
- * la entidad Player entera, que con su booker y su cuenta trae teléfono, email y
- * el hash de la contraseña.
+ * la entidad Player entera, que con su cuenta trae teléfono, email y el hash de
+ * la contraseña.
  */
 export type ChatParticipant = {
   id: number;
@@ -52,12 +52,11 @@ const CHAT_CLOSED_MESSAGE =
 const EMPTY_MESSAGE_MESSAGE = "Escribí un mensaje para enviarlo.";
 const MESSAGE_TOO_LONG_MESSAGE = `El mensaje no puede superar los ${CHAT_MESSAGE_MAX_LENGTH} caracteres.`;
 
-/** Espera el Player con su booker cargado: ahí viven el nombre y el apellido. */
 function toParticipant(player: Player): ChatParticipant {
   return {
     id: player.id,
-    names: player.booker.names,
-    lastnames: player.booker.lastnames,
+    names: player.names,
+    lastnames: player.lastnames,
     category: player.category,
   };
 }
@@ -78,7 +77,7 @@ async function resolveParticipant(
   const dataSource = await getDataSource();
   const player = await dataSource
     .getRepository<Player>("Player")
-    .findOne({ where: { account: { email: session.user.email } }, relations: { account: true, booker: true } });
+    .findOne({ where: { account: { email: session.user.email } }, relations: { account: true } });
   if (!player) {
     return { ok: false, error: NOT_PARTICIPANT_MESSAGE };
   }
@@ -100,7 +99,7 @@ export async function getChatById(id: number): Promise<ActionResult<ChatRoom | n
     const chat = await chats.findOne({
       where: { id },
       relations: {
-        match: { booking: { court: true }, matchPlayers: { player: { booker: true } } },
+        match: { booking: { court: true }, matchPlayers: { player: true } },
       },
     });
     if (!chat) {
@@ -133,7 +132,7 @@ export async function getChatMessages(chatId: number): Promise<ActionResult<Chat
     const dataSource = await getDataSource();
     const found = await dataSource.getRepository<Message>("Message").find({
       where: { chat: { id: chatId } },
-      relations: { sender: { booker: true } },
+      relations: { sender: true },
       order: { sentAt: "DESC", id: "DESC" },
       take: MESSAGES_PAGE_SIZE,
     });

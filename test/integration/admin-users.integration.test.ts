@@ -52,7 +52,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     expect(result.data.length).toBeGreaterThan(0);
     // todos los items tienen isBlocked definido
     result.data.forEach((p) => expect(typeof p.isBlocked).toBe("boolean"));
-    // los datos personales salen del booker y el email de la cuenta
+    // los datos personales salen del jugador (heredados de Booker) y el email de la cuenta
     expect(result.data.find((p) => p.names === "Lista")).toMatchObject({
       lastnames: "Test",
       email: expect.stringContaining("@test.com"),

@@ -55,8 +55,10 @@ describe("admin player actions", () => {
           id: 1,
           category: "4th",
           scoring: 30,
+          names: "Ana",
+          lastnames: "Gomez",
+          phoneNumber: "2215550101",
           account: { id: 10, email: "ana@test.com", isBlocked: false, passwordHash: "hash" },
-          booker: { id: 20, names: "Ana", lastnames: "Gomez", phoneNumber: "2215550101" },
         },
       ]);
 

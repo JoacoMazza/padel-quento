@@ -77,17 +77,17 @@ describe("authorize (CredentialsProvider)", () => {
     expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin" });
     expect(findOne).toHaveBeenCalledWith({
       where: { email: "a@test.com" },
-      relations: { admin: true, player: { booker: true } },
+      relations: { admin: true, player: true },
     });
   });
 
-  it("deduce el rol player y toma el nombre del booker para la cuenta de un jugador", async () => {
+  it("deduce el rol player y toma el nombre del jugador para la cuenta de un jugador", async () => {
     findOne.mockResolvedValueOnce({
       id: 8,
       email: "j@test.com",
       passwordHash: "hash",
       admin: null,
-      player: { id: 2, booker: { names: "Luis", lastnames: "Pérez" } },
+      player: { id: 2, names: "Luis", lastnames: "Pérez" },
     });
     vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
 

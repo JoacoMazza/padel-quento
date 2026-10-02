@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Account } from "@/src/entities/Account";
-import { Booker } from "@/src/entities/Booker";
 import { Player } from "@/src/entities/Player";
 import { Penalty } from "@/src/entities/Penalty";
 import {
@@ -44,7 +43,7 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
 
   const player = await playerRepo.findOne({
     where: { account: { email: userEmail } },
-    relations: { account: true, booker: true },
+    relations: { account: true },
   });
   if (!player) {
     return null;
@@ -69,8 +68,8 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   return {
     id: player.id,
     email: player.account.email,
-    names: player.booker.names,
-    lastnames: player.booker.lastnames,
+    names: player.names,
+    lastnames: player.lastnames,
     category: player.category,
     scoring: netScoring,
     photoUrl: player.account.photoUrl,
@@ -106,17 +105,16 @@ export async function updatePlayerProfile(
 
     const player = await playerRepo.findOne({
       where: { account: { email: session.user.email } },
-      relations: { account: true, booker: true },
+      relations: { account: true },
     });
     if (!player) {
       return { message: "No se encontró el perfil de jugador." };
     }
 
-    // Nombre y apellido viven en el booker, la foto en la cuenta y la categoría en el jugador.
+    // La foto vive en la cuenta; nombre, apellido y categoría en el jugador.
     await dataSource.transaction(async (manager) => {
-      await manager.getRepository<Booker>("Booker").update(player.booker.id, { names, lastnames });
       await manager.getRepository<Account>("Account").update(player.account.id, { photoUrl });
-      await manager.getRepository<Player>("Player").update(player.id, { category });
+      await manager.getRepository<Player>("Player").update(player.id, { names, lastnames, category });
     });
     console.log(`[Profile] Perfil actualizado exitosamente para: ${session.user.email}`);
 

@@ -4,7 +4,6 @@ import { Court } from "@/src/entities/Court";
 import { Schedule } from "@/src/entities/Schedule";
 import { Account } from "@/src/entities/Account";
 import { Admin } from "@/src/entities/Admin";
-import { Booker } from "@/src/entities/Booker";
 import { Player } from "@/src/entities/Player";
 import { CourtState, DayOfWeek } from "@/src/domain/enums";
 
@@ -66,7 +65,6 @@ async function main() {
   const bcrypt = await import("bcrypt");
   const accounts = dataSource.getRepository(Account);
   const admins = dataSource.getRepository(Admin);
-  const bookers = dataSource.getRepository(Booker);
   const players = dataSource.getRepository(Player);
 
   const adminEmail = "admin@quento.com";
@@ -83,10 +81,9 @@ async function main() {
   if (!existingPlayer) {
     const passwordHash = await bcrypt.hash("jugador123", 12);
     const account = await accounts.save(accounts.create({ email: playerEmail, passwordHash }));
-    const booker = await bookers.save(
-      bookers.create({ names: "Juan", lastnames: "Perez", phoneNumber: "2215550000" }),
+    await players.save(
+      players.create({ account, names: "Juan", lastnames: "Perez", phoneNumber: "2215550000" }),
     );
-    await players.save(players.create({ account, booker }));
     console.log("Usuario Jugador creado: jugador@quento.com / jugador123");
   }
 
