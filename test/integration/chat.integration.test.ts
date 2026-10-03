@@ -5,11 +5,11 @@ vi.mock("next-auth/next", () => ({
 }));
 
 import { getServerSession } from "next-auth/next";
-import { PlayerCategory } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
+import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
@@ -157,6 +157,46 @@ describe("chat actions (integración con Postgres real)", () => {
     // La conversación se conserva y sigue siendo legible para los participantes.
     actAs(beto.email);
     const history = await getChatMessages(closingChatId);
+    if (!history.success) throw new Error("expected success");
+    expect(history.data.map((message) => message.content)).toEqual(["Nos vemos en la cancha"]);
+  });
+
+  it("al cancelar el turno la sala queda en solo lectura y conserva el historial", async () => {
+    const court = await createCourt({
+      number: uniqueCourtNumber(),
+      price: 10000,
+    });
+    if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
+    const ana = await newPlayer("Ana");
+    const beto = await newPlayer("Beto");
+
+    const fromDateTime = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+    fromDateTime.setHours(9, 0, 0, 0);
+    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
+    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
+    const found = await getBookingById(booking.data.id);
+    if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
+    const cancelledChatId = found.data.match.chat.id;
+
+    actAs(ana.email);
+    expect((await sendMessage(cancelledChatId, "Nos vemos en la cancha")).success).toBe(true);
+
+    const cancelled = await updateBooking(booking.data.id, { bookingState: BookingState.CANCELLED });
+    expect(cancelled.success).toBe(true);
+
+    const closed = await getChatById(cancelledChatId);
+    expect(closed).toMatchObject({ success: true, data: { isClosed: true, closedReason: "cancelled" } });
+
+    const rejected = await sendMessage(cancelledChatId, "¿Se suspendió?");
+    expect(rejected).toEqual({
+      success: false,
+      error: "El chat se cerró porque el turno fue cancelado. Podés leer la conversación, pero no enviar mensajes nuevos.",
+    });
+
+    actAs(beto.email);
+    const history = await getChatMessages(cancelledChatId);
     if (!history.success) throw new Error("expected success");
     expect(history.data.map((message) => message.content)).toEqual(["Nos vemos en la cancha"]);
   });
