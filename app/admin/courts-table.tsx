@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Ban, Eye, Pencil } from "lucide-react";
+import { CourtState } from "@/src/domain/enums";
 import { STATE_LABELS, STATE_BADGE_STYLES, type CourtItem } from "@/app/admin/court-status";
 import { CourtModal } from "@/app/admin/court-modal";
 
 type ModalState =
-  | { mode: "view" | "edit" | "delete"; court: CourtItem }
+  | { mode: "view" | "edit" | "outOfService"; court: CourtItem }
   | null;
 
 export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) {
@@ -19,11 +20,6 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
 
   function handleSaved(updated: CourtItem) {
     setCourts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    closeModal();
-  }
-
-  function handleDeleted(id: number) {
-    setCourts((prev) => prev.filter((c) => c.id !== id));
     closeModal();
   }
 
@@ -83,12 +79,13 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       </button>
                       <button
                         type="button"
-                        aria-label={`Eliminar cancha ${court.number}`}
-                        title="Eliminar"
-                        onClick={() => setModal({ mode: "delete", court })}
-                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
+                        aria-label={`Poner fuera de servicio la cancha ${court.number}`}
+                        title="Poner fuera de servicio"
+                        disabled={court.state === CourtState.OUT_OF_SERVICE}
+                        onClick={() => setModal({ mode: "outOfService", court })}
+                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-foreground/60"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Ban className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -103,8 +100,8 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
       {modal?.mode === "edit" ? (
         <CourtModal mode="edit" court={modal.court} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
-      {modal?.mode === "delete" ? (
-        <CourtModal mode="delete" court={modal.court} onClose={closeModal} onDeleted={handleDeleted} />
+      {modal?.mode === "outOfService" ? (
+        <CourtModal mode="outOfService" court={modal.court} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
     </>
   );

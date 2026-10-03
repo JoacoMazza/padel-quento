@@ -16,12 +16,13 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
+import * as courtActions from "@/src/actions/court";
 import {
   createCourt,
   getCourts,
   getCourtById,
   updateCourt,
-  deleteCourt,
+  setCourtOutOfService,
 } from "@/src/actions/court";
 
 function duplicateError() {
@@ -164,30 +165,40 @@ describe("court actions", () => {
     });
   });
 
-  describe("deleteCourt", () => {
-    it("elimina la cancha", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 1 });
+  describe("setCourtOutOfService", () => {
+    it("no expone una acción para eliminar canchas", () => {
+      expect(courtActions).not.toHaveProperty("deleteCourt");
+    });
 
-      const result = await deleteCourt(1);
+    it("pone la cancha en estado OUT_OF_SERVICE sin eliminarla", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 });
 
-      expect(deleteFn).toHaveBeenCalledWith(1);
-      expect(result).toEqual({ success: true, data: null });
+      const result = await setCourtOutOfService(1);
+
+      expect(findOne).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 1, state: CourtState.OUT_OF_SERVICE }));
+      expect(deleteFn).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        data: { id: 1, number: 3, state: CourtState.OUT_OF_SERVICE, price: 10000 },
+      });
     });
 
     it("devuelve error si la cancha no existe", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 0 });
+      findOne.mockResolvedValueOnce(null);
 
-      const result = await deleteCourt(999);
+      const result = await setCourtOutOfService(999);
 
       expect(result).toEqual({ success: false, error: "La cancha no existe." });
+      expect(save).not.toHaveBeenCalled();
     });
 
     it("devuelve un error genérico ante cualquier otra falla", async () => {
-      deleteFn.mockRejectedValueOnce(new Error("boom"));
+      findOne.mockRejectedValueOnce(new Error("boom"));
 
-      const result = await deleteCourt(1);
+      const result = await setCourtOutOfService(1);
 
-      expect(result).toEqual({ success: false, error: "No se pudo eliminar la cancha." });
+      expect(result).toEqual({ success: false, error: "No se pudo poner la cancha fuera de servicio." });
     });
   });
 });
