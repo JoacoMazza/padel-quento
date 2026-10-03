@@ -115,7 +115,7 @@ export default async function ChatPage({
             chatId={chat.id}
             currentPlayerId={player.id}
             initialMessages={initialMessages}
-            isClosed={chat.isClosed}
+            closedReason={chat.closedReason}
           />
         </div>
       </main>

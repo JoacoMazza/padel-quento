@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { CourtState } from "@/src/domain/enums";
-import { updateCourt, deleteCourt } from "@/src/actions/court";
+import { updateCourt, setCourtOutOfService } from "@/src/actions/court";
 import { STATE_LABELS, STATE_BADGE_STYLES, type CourtItem } from "@/app/admin/court-status";
 
 type CourtModalProps =
   | { mode: "view"; court: CourtItem; onClose: () => void }
   | { mode: "edit"; court: CourtItem; onClose: () => void; onSaved: (court: CourtItem) => void }
-  | { mode: "delete"; court: CourtItem; onClose: () => void; onDeleted: (id: number) => void };
+  | { mode: "outOfService" | "enable"; court: CourtItem; onClose: () => void; onSaved: (court: CourtItem) => void };
 
 function ModalShell({
   title,
@@ -80,7 +80,7 @@ export function CourtModal(props: CourtModalProps) {
     return <EditForm court={court} onClose={onClose} onSaved={props.onSaved} />;
   }
 
-  return <DeleteConfirm court={court} onClose={onClose} onDeleted={props.onDeleted} />;
+  return <StateChangeConfirm mode={mode} court={court} onClose={onClose} onSaved={props.onSaved} />;
 }
 
 function EditForm({
@@ -187,37 +187,53 @@ function EditForm({
   );
 }
 
-function DeleteConfirm({
+const STATE_CHANGE_COPY = {
+  outOfService: {
+    title: "Poner fuera de servicio la cancha",
+    question: "¿Estás seguro de que querés poner fuera de servicio la",
+  },
+  enable: {
+    title: "Habilitar la cancha",
+    question: "¿Estás seguro de que querés volver a habilitar la",
+  },
+};
+
+function StateChangeConfirm({
+  mode,
   court,
   onClose,
-  onDeleted,
+  onSaved,
 }: {
+  mode: "outOfService" | "enable";
   court: CourtItem;
   onClose: () => void;
-  onDeleted: (id: number) => void;
+  onSaved: (court: CourtItem) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const copy = STATE_CHANGE_COPY[mode];
 
-  async function handleDelete() {
+  async function handleConfirm() {
     setError(null);
-    setIsDeleting(true);
+    setIsSaving(true);
 
-    const result = await deleteCourt(court.id);
+    const result =
+      mode === "outOfService"
+        ? await setCourtOutOfService(court.id)
+        : await updateCourt(court.id, { state: CourtState.AVAILABLE });
 
-    setIsDeleting(false);
+    setIsSaving(false);
     if (!result.success) {
       setError(result.error);
       return;
     }
-    onDeleted(court.id);
+    onSaved({ id: result.data.id, number: result.data.number, state: result.data.state, price: result.data.price });
   }
 
   return (
-    <ModalShell title={`Eliminar cancha ${court.number}`} onClose={onClose}>
+    <ModalShell title={`${copy.title} ${court.number}`} onClose={onClose}>
       <p className="text-sm text-foreground/70">
-        ¿Estás seguro de que querés eliminar la <span className="font-semibold text-foreground">Cancha {court.number}</span>?
-        Esta acción no se puede deshacer.
+        {copy.question} <span className="font-semibold text-foreground">Cancha {court.number}</span>?
       </p>
 
       {error ? <p className="mt-3 text-sm font-medium text-danger">{error}</p> : null}
@@ -232,11 +248,15 @@ function DeleteConfirm({
         </button>
         <button
           type="button"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="cursor-pointer rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white shadow hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleConfirm}
+          disabled={isSaving}
+          className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold shadow disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === "outOfService"
+              ? "bg-danger text-white hover:bg-danger/90"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          }`}
         >
-          {isDeleting ? "Eliminando..." : "Eliminar"}
+          {isSaving ? "Guardando..." : "Confirmar"}
         </button>
       </div>
     </ModalShell>

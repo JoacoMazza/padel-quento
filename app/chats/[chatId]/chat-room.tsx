@@ -5,9 +5,15 @@ import { Lock, MessageCircle, Send } from "lucide-react";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { getChatMessages, sendMessage, type ChatMessage } from "@/src/actions/chat";
+import type { ChatClosureReason } from "@/src/domain/chat-closure";
 
 /** Cada cuántos milisegundos se buscan mensajes nuevos de los otros jugadores. */
 const POLL_INTERVAL_MS = 5000;
+
+const CLOSED_REASON_LABELS: Record<ChatClosureReason, string> = {
+  finished: "el turno ya finalizó",
+  cancelled: "el turno fue cancelado",
+};
 
 function formatTime(date: Date) {
   return new Date(date).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
@@ -17,13 +23,14 @@ export function ChatRoom({
   chatId,
   currentPlayerId,
   initialMessages,
-  isClosed,
+  closedReason,
 }: {
   chatId: number;
   currentPlayerId: number;
   initialMessages: ChatMessage[];
-  isClosed: boolean;
+  closedReason: ChatClosureReason | null;
 }) {
+  const isClosed = closedReason !== null;
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -112,10 +119,10 @@ export function ChatRoom({
         </div>
       )}
 
-      {isClosed ? (
+      {closedReason ? (
         <div className="flex items-center gap-2 border-t border-line bg-line/20 px-4 py-3 text-xs text-foreground/60">
           <Lock className="h-4 w-4 shrink-0" />
-          <p>Este chat está cerrado porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.</p>
+          <p>Este chat está cerrado porque {CLOSED_REASON_LABELS[closedReason]}. Podés leer la conversación, pero no enviar mensajes nuevos.</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="border-t border-line p-3">
