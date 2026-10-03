@@ -58,10 +58,32 @@ describe("CourtsTable", () => {
     expect(await screen.findByText("No se pudo poner la cancha fuera de servicio.")).toBeTruthy();
   });
 
-  it("deshabilita la acción si la cancha ya está fuera de servicio", () => {
+  it("ofrece habilitar la cancha en lugar de ponerla fuera de servicio si ya lo está", () => {
     render(<CourtsTable courts={[{ ...court, state: CourtState.OUT_OF_SERVICE }]} />);
 
-    const button = screen.getByRole("button", { name: "Poner fuera de servicio la cancha 3" }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Poner fuera de servicio la cancha 3" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Habilitar la cancha 3" })).toBeTruthy();
+  });
+
+  it("habilita una cancha fuera de servicio tras confirmar y la muestra disponible", async () => {
+    updateCourt.mockResolvedValueOnce({ success: true, data: court });
+    render(<CourtsTable courts={[{ ...court, state: CourtState.OUT_OF_SERVICE }]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Habilitar la cancha 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    await waitFor(() => expect(updateCourt).toHaveBeenCalledWith(1, { state: CourtState.AVAILABLE }));
+    await waitFor(() => expect(screen.getByText("Disponible")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Poner fuera de servicio la cancha 3" })).toBeTruthy();
+  });
+
+  it("muestra el error si no se pudo habilitar la cancha", async () => {
+    updateCourt.mockResolvedValueOnce({ success: false, error: "No se pudo actualizar la cancha." });
+    render(<CourtsTable courts={[{ ...court, state: CourtState.OUT_OF_SERVICE }]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Habilitar la cancha 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+
+    expect(await screen.findByText("No se pudo actualizar la cancha.")).toBeTruthy();
   });
 });
