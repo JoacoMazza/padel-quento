@@ -8,6 +8,8 @@ import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
+import { getOutOfServices } from "@/src/actions/outOfService";
+import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
 import type { ActionResult } from "@/src/lib/action-result";
 
@@ -60,9 +62,24 @@ function SectionStatus({ state }: { state: SectionData<unknown> }) {
 }
 
 async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
-  const result = await getCourts();
-  if (!result.success) return result;
-  return { success: true, data: result.data.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })) };
+  const [courtsResult, outOfServicesResult] = await Promise.all([getCourts(), getOutOfServices()]);
+  if (!courtsResult.success) return courtsResult;
+  if (!outOfServicesResult.success) return outOfServicesResult;
+
+  const now = new Date();
+  return {
+    success: true,
+    data: courtsResult.data.map((c) => {
+      const active = outOfServicesResult.data.find((o) => o.court?.id === c.id && isOutOfServiceActive(o, now));
+      return {
+        id: c.id,
+        number: c.number,
+        state: c.state,
+        price: c.price,
+        activeOutOfService: active ? { id: active.id, reason: active.reason, toDateTime: active.toDateTime } : null,
+      };
+    }),
+  };
 }
 
 function CourtsSection() {

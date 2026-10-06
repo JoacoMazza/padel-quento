@@ -1,15 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { OutOfServiceReason } from "@/src/domain/enums";
+import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
+import { createPlayer } from "@/src/actions/player";
+import { createBooking, getBookingById } from "@/src/actions/booking";
 import {
   createOutOfService,
   getOutOfServices,
   getOutOfServiceById,
   updateOutOfService,
   deleteOutOfService,
+  endOutOfService,
 } from "@/src/actions/outOfService";
-import { uniqueCourtNumber } from "./helpers";
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
 const toDateTime = new Date("2026-01-01T12:00:00Z");
@@ -121,5 +124,74 @@ describe("outOfService actions (integración con Postgres real)", () => {
 
     const secondAttempt = await deleteOutOfService(created.data.id);
     expect(secondAttempt).toEqual({ success: false, error: "El bloqueo de cancha no existe." });
+  });
+
+  it("al crear el bloqueo cancela solo los turnos de esa cancha que se superponen", async () => {
+    const otherCourt = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    if (!otherCourt.success) throw new Error("no se pudo crear la cancha de prueba");
+    const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
+      email: `bloqueo.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
+      password: "secreto123",
+      names: "Jugador",
+      lastnames: "Bloqueo",
+    });
+    if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
+
+    const day = new Date(Date.now() + 50 * 24 * 60 * 60 * 1000);
+    const at = (hours: number, minutes = 0) => {
+      const date = new Date(day);
+      date.setHours(hours, minutes, 0, 0);
+      return date;
+    };
+    async function book(hours: number, minutes: number, onCourtId: number) {
+      const booking = await createBooking({ fromDateTime: at(hours, minutes), bookerId: player.data!.id, courtId: onCourtId });
+      if (!booking.success) throw new Error(`no se pudo crear el turno de prueba: ${booking.error}`);
+      return booking.data.id;
+    }
+
+    // Bloqueo de 10:00 a 13:00 en la cancha del archivo.
+    const overlapping = await book(9, 0, courtId); // 09:00-10:30, se superpone al inicio
+    const inside = await book(11, 0, courtId); // 11:00-12:30, dentro del bloqueo
+    const after = await book(13, 0, courtId); // 13:00-14:30, empieza justo al terminar
+    const otherCourtSameTime = await book(11, 0, otherCourt.data.id);
+
+    const created = await createOutOfService({
+      fromDateTime: at(10),
+      toDateTime: at(13),
+      reason: OutOfServiceReason.MAINTENANCE,
+      courtId,
+    });
+    expect(created.success).toBe(true);
+
+    async function stateOf(bookingId: number) {
+      const found = await getBookingById(bookingId);
+      if (!found.success || !found.data) throw new Error("no se encontró el turno");
+      return found.data.bookingState;
+    }
+    expect(await stateOf(overlapping)).toBe(BookingState.CANCELLED);
+    expect(await stateOf(inside)).toBe(BookingState.CANCELLED);
+    expect(await stateOf(after)).not.toBe(BookingState.CANCELLED);
+    expect(await stateOf(otherCourtSameTime)).not.toBe(BookingState.CANCELLED);
+  });
+
+  it("finaliza un bloqueo activo y conserva el registro", async () => {
+    const created = await createOutOfService({
+      fromDateTime: new Date(Date.now() - 60 * 60 * 1000),
+      toDateTime: new Date(Date.now() + 60 * 60 * 1000),
+      reason: OutOfServiceReason.CLEANING,
+      courtId,
+    });
+    if (!created.success) throw new Error("expected success");
+
+    const ended = await endOutOfService(created.data.id);
+    expect(ended.success).toBe(true);
+
+    const found = await getOutOfServiceById(created.data.id);
+    if (!found.success || !found.data) throw new Error("expected the block to still exist");
+    expect(found.data.toDateTime.getTime()).toBeLessThanOrEqual(Date.now());
+
+    const again = await endOutOfService(created.data.id);
+    expect(again).toEqual({ success: false, error: "El bloqueo de cancha no está activo." });
   });
 });

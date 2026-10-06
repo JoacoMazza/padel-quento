@@ -1,20 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-const { getScheduleBoardData, getCourts, getPlayersAdmin } = vi.hoisted(() => ({
+const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin } = vi.hoisted(() => ({
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
+  getOutOfServices: vi.fn(),
   getPlayersAdmin: vi.fn(),
 }));
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
-vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), setCourtOutOfService: vi.fn() }));
+vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn() }));
+vi.mock("@/src/actions/outOfService", () => ({
+  getOutOfServices,
+  createOutOfService: vi.fn(),
+  endOutOfService: vi.fn(),
+}));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 
-import { CourtState, PlayerCategory } from "@/src/domain/enums";
+import { CourtState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
 
 const EMPTY_BOARD = { success: true, data: { courts: [], schedules: [], bookings: [], outOfServices: [] } };
@@ -39,6 +45,7 @@ describe("AdminPanel", () => {
       success: true,
       data: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
     });
+    getOutOfServices.mockResolvedValue({ success: true, data: [] });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -67,6 +74,7 @@ describe("AdminPanel", () => {
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(1);
     expect(getCourts).not.toHaveBeenCalled();
+    expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
   });
 
@@ -80,6 +88,52 @@ describe("AdminPanel", () => {
     expect(getCourts).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Cancha 3")).toBeTruthy();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+  });
+
+  it("muestra fuera de servicio la cancha con un bloqueo activo, pero no por uno programado o vencido", async () => {
+    vi.setSystemTime(new Date("2026-10-01T10:00:00"));
+    getCourts.mockResolvedValueOnce({
+      success: true,
+      data: [
+        { id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 },
+        { id: 2, number: 4, state: CourtState.AVAILABLE, price: 10000 },
+      ],
+    });
+    getOutOfServices.mockResolvedValueOnce({
+      success: true,
+      data: [
+        {
+          id: 20,
+          fromDateTime: new Date("2026-10-01T09:00:00"),
+          toDateTime: new Date("2026-10-01T12:00:00"),
+          reason: OutOfServiceReason.MAINTENANCE,
+          court: { id: 1 },
+        },
+        {
+          id: 21,
+          fromDateTime: new Date("2026-10-02T09:00:00"),
+          toDateTime: new Date("2026-10-02T12:00:00"),
+          reason: OutOfServiceReason.CLEANING,
+          court: { id: 2 },
+        },
+        {
+          id: 22,
+          fromDateTime: new Date("2026-09-30T09:00:00"),
+          toDateTime: new Date("2026-09-30T12:00:00"),
+          reason: OutOfServiceReason.OTHER,
+          court: { id: 2 },
+        },
+      ],
+    });
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Estado de Canchas");
+    await flush();
+
+    const row = (courtLabel: string) => within(screen.getByText(courtLabel).closest("tr")!);
+    expect(row("Cancha 3").getByText("Fuera de Servicio (Mantenimiento)")).toBeTruthy();
+    expect(row("Cancha 4").getByText("Disponible")).toBeTruthy();
   });
 
   it("pide los usuarios recién al abrir su sección y los muestra", async () => {

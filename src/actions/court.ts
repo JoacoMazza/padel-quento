@@ -97,23 +97,3 @@ export async function updateCourt(
     return { success: false, error: "No se pudo actualizar la cancha." };
   }
 }
-
-// Courts are never deleted (it would cascade to bookings, schedules, etc.); they are taken out of service instead.
-export async function setCourtOutOfService(id: number): Promise<ActionResult<Court>> {
-  try {
-    const dataSource = await getDataSource();
-    const courts = dataSource.getRepository<Court>("Court");
-
-    const court = await courts.findOne({ where: { id } });
-    if (!court) {
-      return { success: false, error: "La cancha no existe." };
-    }
-
-    court.state = CourtState.OUT_OF_SERVICE;
-    const saved = await courts.save(court);
-    return { success: true, data: toPlain(saved) };
-  } catch (error) {
-    console.error("setCourtOutOfService", error);
-    return { success: false, error: "No se pudo poner la cancha fuera de servicio." };
-  }
-}

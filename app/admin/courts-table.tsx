@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Ban, CircleCheck, Eye, Pencil } from "lucide-react";
-import { CourtState } from "@/src/domain/enums";
-import { STATE_LABELS, STATE_BADGE_STYLES, type CourtItem } from "@/app/admin/court-status";
+import { courtStatus, type CourtItem } from "@/app/admin/court-status";
 import { CourtModal } from "@/app/admin/court-modal";
 
 type ModalState =
@@ -41,7 +40,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
           </thead>
           <tbody className="divide-y divide-line">
             {courts.map((court) => {
-              const style = STATE_BADGE_STYLES[court.state];
+              const { label: stateLabel, style } = courtStatus(court);
 
               return (
                 <tr key={court.id}>
@@ -54,7 +53,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}
                     >
                       <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-                      {STATE_LABELS[court.state]}
+                      {stateLabel}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5">
@@ -77,7 +76,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      {court.state === CourtState.OUT_OF_SERVICE ? (
+                      {court.activeOutOfService ? (
                         <button
                           type="button"
                           aria-label={`Habilitar la cancha ${court.number}`}

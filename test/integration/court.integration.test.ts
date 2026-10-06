@@ -6,7 +6,6 @@ import {
   getCourts,
   getCourtById,
   updateCourt,
-  setCourtOutOfService,
 } from "@/src/actions/court";
 import { uniqueCourtNumber } from "./helpers";
 
@@ -79,29 +78,6 @@ describe("court actions (integración con Postgres real)", () => {
 
   it("devuelve error al actualizar una cancha inexistente", async () => {
     const result = await updateCourt(999_999_999, { state: CourtState.AVAILABLE });
-
-    expect(result).toEqual({ success: false, error: "La cancha no existe." });
-  });
-
-  it("pone una cancha fuera de servicio y la conserva en la base de datos", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
-    if (!created.success) throw new Error("expected success");
-
-    const result = await setCourtOutOfService(created.data.id);
-    expect(result).toEqual({
-      success: true,
-      data: expect.objectContaining({ id: created.data.id, state: CourtState.OUT_OF_SERVICE }),
-    });
-
-    const found = await getCourtById(created.data.id);
-    expect(found).toEqual({
-      success: true,
-      data: expect.objectContaining({ state: CourtState.OUT_OF_SERVICE }),
-    });
-  });
-
-  it("devuelve error al poner fuera de servicio una cancha inexistente", async () => {
-    const result = await setCourtOutOfService(999_999_999);
 
     expect(result).toEqual({ success: false, error: "La cancha no existe." });
   });

@@ -22,7 +22,6 @@ import {
   getCourts,
   getCourtById,
   updateCourt,
-  setCourtOutOfService,
 } from "@/src/actions/court";
 
 function duplicateError() {
@@ -165,40 +164,9 @@ describe("court actions", () => {
     });
   });
 
-  describe("setCourtOutOfService", () => {
+  describe("baja de canchas", () => {
     it("no expone una acción para eliminar canchas", () => {
       expect(courtActions).not.toHaveProperty("deleteCourt");
-    });
-
-    it("pone la cancha en estado OUT_OF_SERVICE sin eliminarla", async () => {
-      findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 });
-
-      const result = await setCourtOutOfService(1);
-
-      expect(findOne).toHaveBeenCalledWith({ where: { id: 1 } });
-      expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 1, state: CourtState.OUT_OF_SERVICE }));
-      expect(deleteFn).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        success: true,
-        data: { id: 1, number: 3, state: CourtState.OUT_OF_SERVICE, price: 10000 },
-      });
-    });
-
-    it("devuelve error si la cancha no existe", async () => {
-      findOne.mockResolvedValueOnce(null);
-
-      const result = await setCourtOutOfService(999);
-
-      expect(result).toEqual({ success: false, error: "La cancha no existe." });
-      expect(save).not.toHaveBeenCalled();
-    });
-
-    it("devuelve un error genérico ante cualquier otra falla", async () => {
-      findOne.mockRejectedValueOnce(new Error("boom"));
-
-      const result = await setCourtOutOfService(1);
-
-      expect(result).toEqual({ success: false, error: "No se pudo poner la cancha fuera de servicio." });
     });
   });
 });
