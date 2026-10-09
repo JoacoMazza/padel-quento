@@ -59,16 +59,25 @@ type BoardData = {
   outOfServices: OutOfServiceProp[];
 };
 
-export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
-  const [data, setData] = useState<BoardData>(initialData);
+const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfServices: [] };
+
+/**
+ * Pide sus datos al montarse y los refresca en vivo solo mientras está visible
+ * (isActive): oculta en el panel conserva lo último obtenido sin seguir consultando.
+ */
+export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
+  const [data, setData] = useState<BoardData>(EMPTY_BOARD);
   const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingProp | null>(null);
   const isFetchingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!isActive) return;
+
     async function refresh() {
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
@@ -106,10 +115,14 @@ export function ScheduleBoard({ initialData }: { initialData: BoardData }) {
       }
     }
 
-    refresh();
+    // Al volver a la sección se reanuda el refresco periódico sin pedir de nuevo en el acto.
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      refresh();
+    }
     const intervalId = setInterval(refresh, REFRESH_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isActive]);
 
   const selectedDate = useMemo(() => parseISODate(dateInput), [dateInput]);
   const dayOfWeek = useMemo(() => dayOfWeekFromDate(selectedDate), [selectedDate]);

@@ -6,7 +6,6 @@ import {
   getCourts,
   getCourtById,
   updateCourt,
-  deleteCourt,
 } from "@/src/actions/court";
 import { uniqueCourtNumber } from "./helpers";
 
@@ -81,16 +80,5 @@ describe("court actions (integración con Postgres real)", () => {
     const result = await updateCourt(999_999_999, { state: CourtState.AVAILABLE });
 
     expect(result).toEqual({ success: false, error: "La cancha no existe." });
-  });
-
-  it("elimina una cancha existente y falla al eliminarla de nuevo", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
-    if (!created.success) throw new Error("expected success");
-
-    const result = await deleteCourt(created.data.id);
-    expect(result).toEqual({ success: true, data: null });
-
-    const secondAttempt = await deleteCourt(created.data.id);
-    expect(secondAttempt).toEqual({ success: false, error: "La cancha no existe." });
   });
 });

@@ -97,20 +97,3 @@ export async function updateCourt(
     return { success: false, error: "No se pudo actualizar la cancha." };
   }
 }
-
-export async function deleteCourt(id: number): Promise<ActionResult<null>> {
-  try {
-    const dataSource = await getDataSource();
-    const courts = dataSource.getRepository<Court>("Court");
-
-    const result = await courts.delete(id);
-    if (!result.affected) {
-      return { success: false, error: "La cancha no existe." };
-    }
-
-    return { success: true, data: null };
-  } catch (error) {
-    console.error("deleteCourt", error);
-    return { success: false, error: "No se pudo eliminar la cancha." };
-  }
-}

@@ -1,4 +1,4 @@
-import { CourtState } from "@/src/domain/enums";
+import { CourtState, OutOfServiceReason } from "@/src/domain/enums";
 
 export const STATE_LABELS: Record<CourtState, string> = {
   [CourtState.AVAILABLE]: "Disponible",
@@ -26,4 +26,37 @@ export const STATE_BADGE_STYLES: Record<CourtState, { badge: string; dot: string
   },
 };
 
-export type CourtItem = { id: number; number: number; state: CourtState; price: number };
+export const OUT_OF_SERVICE_REASON_LABELS: Record<OutOfServiceReason, string> = {
+  [OutOfServiceReason.MAINTENANCE]: "Mantenimiento",
+  [OutOfServiceReason.FREE_DAY]: "Día libre",
+  [OutOfServiceReason.CLEANING]: "Limpieza",
+  [OutOfServiceReason.OTHER]: "Otro",
+};
+
+/**
+ * Estados que se eligen al editar una cancha. Fuera de servicio y mantenimiento
+ * no se setean a mano: surgen de un bloqueo (OutOfService) activo.
+ */
+export const EDITABLE_COURT_STATES = [CourtState.AVAILABLE, CourtState.CLOSED_DOWN];
+
+/** Bloqueo vigente de la cancha (ver isOutOfServiceActive), si lo tiene. */
+export type ActiveOutOfService = { id: number; reason: OutOfServiceReason; toDateTime: Date };
+
+export type CourtItem = {
+  id: number;
+  number: number;
+  state: CourtState;
+  price: number;
+  activeOutOfService: ActiveOutOfService | null;
+};
+
+/** Etiqueta y estilo del estado a mostrar: un bloqueo activo manda sobre el estado guardado. */
+export function courtStatus(court: CourtItem): { label: string; style: { badge: string; dot: string } } {
+  if (court.activeOutOfService) {
+    return {
+      label: `${STATE_LABELS[CourtState.OUT_OF_SERVICE]} (${OUT_OF_SERVICE_REASON_LABELS[court.activeOutOfService.reason]})`,
+      style: STATE_BADGE_STYLES[CourtState.OUT_OF_SERVICE],
+    };
+  }
+  return { label: STATE_LABELS[court.state], style: STATE_BADGE_STYLES[court.state] };
+}

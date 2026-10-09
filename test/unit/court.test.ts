@@ -16,12 +16,12 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
+import * as courtActions from "@/src/actions/court";
 import {
   createCourt,
   getCourts,
   getCourtById,
   updateCourt,
-  deleteCourt,
 } from "@/src/actions/court";
 
 function duplicateError() {
@@ -164,30 +164,9 @@ describe("court actions", () => {
     });
   });
 
-  describe("deleteCourt", () => {
-    it("elimina la cancha", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 1 });
-
-      const result = await deleteCourt(1);
-
-      expect(deleteFn).toHaveBeenCalledWith(1);
-      expect(result).toEqual({ success: true, data: null });
-    });
-
-    it("devuelve error si la cancha no existe", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 0 });
-
-      const result = await deleteCourt(999);
-
-      expect(result).toEqual({ success: false, error: "La cancha no existe." });
-    });
-
-    it("devuelve un error genérico ante cualquier otra falla", async () => {
-      deleteFn.mockRejectedValueOnce(new Error("boom"));
-
-      const result = await deleteCourt(1);
-
-      expect(result).toEqual({ success: false, error: "No se pudo eliminar la cancha." });
+  describe("baja de canchas", () => {
+    it("no expone una acción para eliminar canchas", () => {
+      expect(courtActions).not.toHaveProperty("deleteCourt");
     });
   });
 });

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
-import { STATE_LABELS, STATE_BADGE_STYLES, type CourtItem } from "@/app/admin/court-status";
+import { Ban, CircleCheck, Eye, Pencil } from "lucide-react";
+import { courtStatus, type CourtItem } from "@/app/admin/court-status";
 import { CourtModal } from "@/app/admin/court-modal";
 
 type ModalState =
-  | { mode: "view" | "edit" | "delete"; court: CourtItem }
+  | { mode: "view" | "edit" | "outOfService" | "enable"; court: CourtItem }
   | null;
 
 export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) {
@@ -19,11 +19,6 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
 
   function handleSaved(updated: CourtItem) {
     setCourts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    closeModal();
-  }
-
-  function handleDeleted(id: number) {
-    setCourts((prev) => prev.filter((c) => c.id !== id));
     closeModal();
   }
 
@@ -45,7 +40,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
           </thead>
           <tbody className="divide-y divide-line">
             {courts.map((court) => {
-              const style = STATE_BADGE_STYLES[court.state];
+              const { label: stateLabel, style } = courtStatus(court);
 
               return (
                 <tr key={court.id}>
@@ -58,7 +53,7 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}
                     >
                       <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-                      {STATE_LABELS[court.state]}
+                      {stateLabel}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5">
@@ -81,15 +76,27 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`Eliminar cancha ${court.number}`}
-                        title="Eliminar"
-                        onClick={() => setModal({ mode: "delete", court })}
-                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {court.activeOutOfService ? (
+                        <button
+                          type="button"
+                          aria-label={`Habilitar la cancha ${court.number}`}
+                          title="Habilitar"
+                          onClick={() => setModal({ mode: "enable", court })}
+                          className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-emerald-500/10 hover:text-emerald-600"
+                        >
+                          <CircleCheck className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Poner fuera de servicio la cancha ${court.number}`}
+                          title="Poner fuera de servicio"
+                          onClick={() => setModal({ mode: "outOfService", court })}
+                          className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -103,8 +110,8 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
       {modal?.mode === "edit" ? (
         <CourtModal mode="edit" court={modal.court} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
-      {modal?.mode === "delete" ? (
-        <CourtModal mode="delete" court={modal.court} onClose={closeModal} onDeleted={handleDeleted} />
+      {modal?.mode === "outOfService" || modal?.mode === "enable" ? (
+        <CourtModal mode={modal.mode} court={modal.court} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
     </>
   );

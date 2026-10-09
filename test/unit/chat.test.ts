@@ -27,7 +27,7 @@ const { chats, players, matchPlayers, messages, getDataSource } = vi.hoisted(() 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
 import { getServerSession } from "next-auth/next";
-import { PlayerCategory } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 
@@ -69,8 +69,8 @@ const BOOKING_START = new Date("2026-10-01T18:00:00");
 const BEFORE_BOOKING_END = new Date("2026-10-01T19:29:59");
 const AT_BOOKING_END = new Date("2026-10-01T19:30:00");
 
-function chatWithBooking() {
-  return { id: 1, match: { id: 2, booking: { fromDateTime: BOOKING_START, durationMinutes: 90 } } };
+function chatWithBooking(bookingState: BookingState = BookingState.RESERVED) {
+  return { id: 1, match: { id: 2, booking: { fromDateTime: BOOKING_START, durationMinutes: 90, bookingState } } };
 }
 
 describe("chat actions", () => {
@@ -92,7 +92,7 @@ describe("chat actions", () => {
         id: 1,
         match: {
           id: 2,
-          booking: { fromDateTime, durationMinutes: 90, court: { number: 3 } },
+          booking: { fromDateTime, durationMinutes: 90, bookingState: BookingState.RESERVED, court: { number: 3 } },
           matchPlayers: [{ player: fullPlayer() }],
         },
       });
@@ -112,6 +112,7 @@ describe("chat actions", () => {
           booking: { fromDateTime, courtNumber: 3 },
           participants: [{ id: 7, names: "Ana", lastnames: "Gómez", category: PlayerCategory.FOURTH }],
           isClosed: false,
+          closedReason: null,
         },
       });
       expectNoPrivateData(result);
@@ -126,7 +127,18 @@ describe("chat actions", () => {
 
       const result = await getChatById(1);
 
-      expect(result).toMatchObject({ success: true, data: { id: 1, isClosed: true } });
+      expect(result).toMatchObject({ success: true, data: { id: 1, isClosed: true, closedReason: "finished" } });
+    });
+
+    it("marca la sala como cerrada si el turno fue cancelado, aunque no haya llegado su horario", async () => {
+      chats.findOne.mockResolvedValueOnce({
+        ...chatWithBooking(BookingState.CANCELLED),
+        match: { ...chatWithBooking(BookingState.CANCELLED).match, matchPlayers: [{ player: fullPlayer() }] },
+      });
+
+      const result = await getChatById(1);
+
+      expect(result).toMatchObject({ success: true, data: { id: 1, isClosed: true, closedReason: "cancelled" } });
     });
 
     it("devuelve data null cuando no existe", async () => {
@@ -301,6 +313,21 @@ describe("chat actions", () => {
       expect(result).toEqual({
         success: false,
         error: "El chat se cerró porque el turno ya finalizó. Podés leer la conversación, pero no enviar mensajes nuevos.",
+      });
+      expect(messages.save).not.toHaveBeenCalled();
+    });
+
+    it("rechaza mensajes si el turno fue cancelado (chat en solo lectura)", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking(BookingState.CANCELLED));
+
+      const result = await sendMessage(1, "Hola");
+
+      expect(result).toEqual({
+        success: false,
+        error: "El chat se cerró porque el turno fue cancelado. Podés leer la conversación, pero no enviar mensajes nuevos.",
       });
       expect(messages.save).not.toHaveBeenCalled();
     });
