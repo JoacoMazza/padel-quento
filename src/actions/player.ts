@@ -4,7 +4,10 @@ import "reflect-metadata";
 import bcrypt from "bcrypt";
 import { Account } from "@/src/entities/Account";
 import { Player } from "@/src/entities/Player";
-import { PlayerCategory } from "@/src/domain/enums";
+import { Booking } from "@/src/entities/Booking";
+import { MatchPlayer } from "@/src/entities/MatchPlayer";
+import { Penalty } from "@/src/entities/Penalty";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
@@ -195,6 +198,105 @@ export async function getPlayersAdmin(): Promise<ActionResult<PlayerAdminItem[]>
   } catch (error) {
     console.error("getPlayersAdmin", error);
     return { success: false, error: "No se pudieron obtener los jugadores." };
+  }
+}
+
+export type PlayerRecordBooking = {
+  id: number;
+  fromDateTime: string;
+  durationMinutes: number;
+  courtNumber: number | null;
+  bookingState: BookingState;
+  isOpenMatch: boolean;
+  attended: boolean;
+};
+
+export type PlayerRecordAdmin = PlayerAdminItem & {
+  noShows: number;
+  bookings: PlayerRecordBooking[];
+  movements: Array<{ id: number; amount: number; description: string; createdAt: string }>;
+};
+
+function toRecordBooking(booking: Booking, isOpenMatch: boolean, attended: boolean): PlayerRecordBooking {
+  return {
+    id: booking.id,
+    fromDateTime: new Date(booking.fromDateTime).toISOString(),
+    durationMinutes: booking.durationMinutes,
+    courtNumber: booking.court?.number ?? null,
+    bookingState: booking.bookingState,
+    isOpenMatch,
+    attended,
+  };
+}
+
+/**
+ * Ficha del jugador para el panel de administración: los turnos que reservó y
+ * los partidos abiertos en los que participa (con su asistencia), la cantidad
+ * de inasistencias y su historial de puntos. Solo accesible por administradores.
+ */
+export async function getPlayerRecordAdmin(id: number): Promise<ActionResult<PlayerRecordAdmin>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+
+    const player = await dataSource
+      .getRepository<Player>("Player")
+      .findOne({ where: { id }, relations: PLAYER_RELATIONS });
+    if (!player) {
+      return { success: false, error: "El jugador no existe." };
+    }
+
+    const ownBookings = await dataSource.getRepository<Booking>("Booking").find({
+      where: { booker: { id } },
+      relations: { court: true, match: true },
+    });
+    const participations = await dataSource.getRepository<MatchPlayer>("MatchPlayer").find({
+      where: { player: { id } },
+      relations: { match: { booking: { court: true } } },
+    });
+    const penalties = await dataSource.getRepository<Penalty>("Penalty").find({
+      where: { player: { id } },
+      order: { createdAt: "DESC" },
+    });
+
+    // En un partido abierto la asistencia es la del jugador dentro del partido
+    // (MatchPlayer.attended), incluso si fue quien lo creó.
+    const recordBookings = new Map<number, PlayerRecordBooking>();
+    for (const participation of participations) {
+      const booking = participation.match.booking;
+      recordBookings.set(booking.id, toRecordBooking(booking, true, participation.attended));
+    }
+    for (const booking of ownBookings) {
+      if (!recordBookings.has(booking.id)) {
+        recordBookings.set(booking.id, toRecordBooking(booking, Boolean(booking.match), booking.attended));
+      }
+    }
+    const bookings = [...recordBookings.values()].sort((a, b) => b.fromDateTime.localeCompare(a.fromDateTime));
+
+    return {
+      success: true,
+      data: {
+        id: player.id,
+        names: player.names,
+        lastnames: player.lastnames,
+        email: player.account.email,
+        phoneNumber: player.phoneNumber,
+        category: player.category,
+        scoring: player.scoring,
+        isBlocked: player.account.isBlocked,
+        noShows: bookings.filter((b) => !b.attended && b.bookingState !== BookingState.CANCELLED).length,
+        bookings,
+        movements: penalties.map((p) => ({
+          id: p.id,
+          amount: Number(p.penalizedScoring),
+          description: p.reason,
+          createdAt: new Date(p.createdAt).toISOString(),
+        })),
+      },
+    };
+  } catch (error) {
+    console.error("getPlayerRecordAdmin", error);
+    return { success: false, error: "No se pudo obtener la ficha del jugador." };
   }
 }
 

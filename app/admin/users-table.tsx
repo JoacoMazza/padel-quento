@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Search, ShieldOff, ShieldCheck } from "lucide-react";
+import { Search, ShieldOff, ShieldCheck, IdCard } from "lucide-react";
 import { blockPlayer, unblockPlayer, type PlayerAdminItem } from "@/src/actions/player";
+import { PlayerRecordModal } from "@/app/admin/player-record-modal";
 
 const CATEGORY_LABELS: Record<string, string> = {
   "1st": "1ª",
@@ -21,6 +22,8 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
   const [actionError, setActionError] = useState<{ id: number; msg: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<number | null>(null);
+  const [recordPlayerId, setRecordPlayerId] = useState<number | null>(null);
+  const recordPlayer = players.find((p) => p.id === recordPlayerId) ?? null;
 
   const filtered = players.filter((p) => {
     const term = search.toLowerCase();
@@ -130,35 +133,47 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
                     {/* Acciones */}
                     <td className="whitespace-nowrap px-5 py-3.5 text-right">
                       <div className="flex flex-col items-end gap-1">
-                        <button
-                          type="button"
-                          disabled={isThisPending}
-                          aria-label={
-                            player.isBlocked
-                              ? `Desbloquear a ${player.names}`
-                              : `Bloquear a ${player.names}`
-                          }
-                          title={player.isBlocked ? "Desbloquear" : "Bloquear"}
-                          onClick={() => handleToggleBlock(player)}
-                          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                            player.isBlocked
-                              ? "bg-success/10 text-success hover:bg-success/20"
-                              : "bg-danger/10 text-danger hover:bg-danger/20"
-                          }`}
-                        >
-                          {isThisPending ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          ) : player.isBlocked ? (
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                          ) : (
-                            <ShieldOff className="h-3.5 w-3.5" />
-                          )}
-                          {isThisPending
-                            ? "Procesando…"
-                            : player.isBlocked
-                              ? "Desbloquear"
-                              : "Bloquear"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={`Ver ficha de ${player.names}`}
+                            title="Ver ficha"
+                            onClick={() => setRecordPlayerId(player.id)}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                          >
+                            <IdCard className="h-3.5 w-3.5" />
+                            Ver ficha
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isThisPending}
+                            aria-label={
+                              player.isBlocked
+                                ? `Desbloquear a ${player.names}`
+                                : `Bloquear a ${player.names}`
+                            }
+                            title={player.isBlocked ? "Desbloquear" : "Bloquear"}
+                            onClick={() => handleToggleBlock(player)}
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                              player.isBlocked
+                                ? "bg-success/10 text-success hover:bg-success/20"
+                                : "bg-danger/10 text-danger hover:bg-danger/20"
+                            }`}
+                          >
+                            {isThisPending ? (
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : player.isBlocked ? (
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            ) : (
+                              <ShieldOff className="h-3.5 w-3.5" />
+                            )}
+                            {isThisPending
+                              ? "Procesando…"
+                              : player.isBlocked
+                                ? "Desbloquear"
+                                : "Bloquear"}
+                          </button>
+                        </div>
 
                         {thisError ? (
                           <p className="text-[11px] font-medium text-danger">{thisError}</p>
@@ -172,6 +187,16 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
           </tbody>
         </table>
       </div>
+
+      {recordPlayer ? (
+        <PlayerRecordModal
+          player={recordPlayer}
+          isTogglePending={isPending && pendingId === recordPlayer.id}
+          toggleError={actionError?.id === recordPlayer.id ? actionError.msg : null}
+          onToggleBlock={() => handleToggleBlock(recordPlayer)}
+          onClose={() => setRecordPlayerId(null)}
+        />
+      ) : null}
 
       {/* Contador */}
       <p className="text-xs text-foreground/40">

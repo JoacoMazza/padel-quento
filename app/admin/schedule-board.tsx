@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, RefreshCw } from "lucide-react";
 import { BookingState, CourtState } from "@/src/domain/enums";
 import { getScheduleBoardData } from "@/src/actions/scheduleBoard";
@@ -18,22 +18,7 @@ import {
 import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/types";
 import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
 import { AttendanceModal } from "@/app/admin/attendance-modal";
-
-const DEFAULT_REFRESH_INTERVAL_MS = 15_000;
-const MIN_REFRESH_INTERVAL_MS = 5_000;
-
-/**
- * Configurable por env var para poder subir el intervalo en producción sin
- * tocar código: un refresco cada 15s en desarrollo no pesa, pero en un plan
- * gratuito puede acercarse rápido al límite de requests.
- */
-function getRefreshIntervalMs(): number {
-  const raw = Number(process.env.NEXT_PUBLIC_SCHEDULE_BOARD_REFRESH_MS);
-  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_REFRESH_INTERVAL_MS;
-  return Math.max(raw, MIN_REFRESH_INTERVAL_MS);
-}
-
-const REFRESH_INTERVAL_MS = getRefreshIntervalMs();
+import { getNextSlotChange } from "@/app/admin/schedule-refresh";
 
 type CellState = "available" | "reserved" | "pending" | "blocked" | "closed";
 
@@ -62,8 +47,9 @@ type BoardData = {
 const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfServices: [] };
 
 /**
- * Pide sus datos al montarse y los refresca en vivo solo mientras está visible
- * (isActive): oculta en el panel conserva lo último obtenido sin seguir consultando.
+ * Pide sus datos al montarse y, mientras está visible (isActive), los refresca
+ * solo cuando cambia de turno (ver getNextSlotChange) o cuando el admin hace
+ * click en Actualizar: oculta en el panel conserva lo último obtenido sin seguir consultando.
  */
 export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
   const [data, setData] = useState<BoardData>(EMPTY_BOARD);
@@ -74,55 +60,62 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingProp | null>(null);
   const isFetchingRef = useRef(false);
   const hasLoadedRef = useRef(false);
+  const lastAttemptRef = useRef<Date | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    lastAttemptRef.current = new Date();
+    setIsRefreshing(true);
+    try {
+      const result = await getScheduleBoardData();
+      if (result.success) {
+        setData({
+          courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
+          schedules: result.data.schedules.map((s) => ({
+            id: s.id,
+            dayOfWeek: s.dayOfWeek,
+            openingTime: String(s.openingTime),
+            closingTime: String(s.closingTime),
+            courtId: s.court?.id,
+          })),
+          bookings: result.data.bookings.map(mapBookingToAdminProp),
+          outOfServices: result.data.outOfServices.map((o) => ({
+            id: o.id,
+            fromDateTime: new Date(o.fromDateTime),
+            toDateTime: new Date(o.toDateTime),
+            courtId: o.court?.id,
+          })),
+        });
+        setLastUpdated(new Date());
+        setRefreshError(null);
+      } else {
+        setRefreshError(result.error);
+      }
+    } catch {
+      setRefreshError("No se pudo actualizar la turnera.");
+    } finally {
+      isFetchingRef.current = false;
+      setIsRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+    refresh();
+  }, [isActive, refresh]);
 
-    async function refresh() {
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
-      setIsRefreshing(true);
-      try {
-        const result = await getScheduleBoardData();
-        if (result.success) {
-          setData({
-            courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
-            schedules: result.data.schedules.map((s) => ({
-              id: s.id,
-              dayOfWeek: s.dayOfWeek,
-              openingTime: String(s.openingTime),
-              closingTime: String(s.closingTime),
-              courtId: s.court?.id,
-            })),
-            bookings: result.data.bookings.map(mapBookingToAdminProp),
-            outOfServices: result.data.outOfServices.map((o) => ({
-              id: o.id,
-              fromDateTime: new Date(o.fromDateTime),
-              toDateTime: new Date(o.toDateTime),
-              courtId: o.court?.id,
-            })),
-          });
-          setLastUpdated(new Date());
-          setRefreshError(null);
-        } else {
-          setRefreshError(result.error);
-        }
-      } catch {
-        setRefreshError("No se pudo actualizar la turnera.");
-      } finally {
-        isFetchingRef.current = false;
-        setIsRefreshing(false);
-      }
-    }
-
-    // Al volver a la sección se reanuda el refresco periódico sin pedir de nuevo en el acto.
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      refresh();
-    }
-    const intervalId = setInterval(refresh, REFRESH_INTERVAL_MS);
-    return () => clearInterval(intervalId);
-  }, [isActive]);
+  // Se reprograma tras cada intento de refresco (isRefreshing vuelve a false) y
+  // al volver a la sección. El próximo cambio se cuenta desde el último intento:
+  // si ya pasó mientras la sección estaba oculta, se actualiza en el acto.
+  useEffect(() => {
+    if (!isActive || isRefreshing) return;
+    const nextChange = getNextSlotChange(lastAttemptRef.current ?? new Date(), data.schedules);
+    if (!nextChange) return;
+    const timeoutId = setTimeout(refresh, Math.max(nextChange.getTime() - Date.now(), 0));
+    return () => clearTimeout(timeoutId);
+  }, [isActive, isRefreshing, data.schedules, refresh]);
 
   const selectedDate = useMemo(() => parseISODate(dateInput), [dateInput]);
   const dayOfWeek = useMemo(() => dayOfWeekFromDate(selectedDate), [selectedDate]);
@@ -240,7 +233,17 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
           En vivo{lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-AR")}` : null}
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          <button
+            type="button"
+            aria-label="Actualizar turnera"
+            title="Actualizar"
+            disabled={isRefreshing}
+            onClick={refresh}
+            className="ml-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-foreground/70 transition-colors hover:bg-line/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            Actualizar
+          </button>
         </div>
       </div>
 
