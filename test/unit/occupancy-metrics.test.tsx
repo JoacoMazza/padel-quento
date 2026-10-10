@@ -66,21 +66,27 @@ describe("OccupancyMetrics", () => {
     );
   });
 
-  it("muestra los indicadores de ocupación general, horas reservadas, turnos y picos", async () => {
+  it("muestra los indicadores de ocupación general, horas reservadas, turnos y lo más solicitado", async () => {
     await renderLastWeek();
 
     expect((await screen.findByTestId("kpi-occupancy")).textContent).toBe("62,50%");
     expect(screen.getByTestId("kpi-hours").textContent).toBe("3h 45m de 6h");
     expect(screen.getByTestId("kpi-bookings").textContent).toBe("3");
-    expect(screen.getByTestId("kpi-peak-slot").textContent).toBe("8 a 9:30 · 100,00%");
-    expect(screen.getByTestId("kpi-peak-day").textContent).toBe("Lunes · 62,50%");
+    // El horario más solicitado se muestra por la hora en que empieza el turno.
+    expect(screen.getByText("Horario más solicitado")).toBeTruthy();
+    expect(screen.getByTestId("kpi-top-slot").textContent).toBe("08:00 · 100,00%");
+    expect(screen.getByText("Día más solicitado")).toBeTruthy();
+    expect(screen.getByTestId("kpi-top-day").textContent).toBe("Lunes · 62,50%");
+    expect(screen.queryByText(/pico/i)).toBeNull();
   });
 
   it("grafica el porcentaje de uso por cancha", async () => {
     await renderLastWeek();
 
     const chart = await screen.findByRole("region", { name: "Ocupación por cancha" });
-    expect(within(chart).getByRole("img", { name: "Cancha 1: 50,00%" })).toBeTruthy();
+    const bar = within(chart).getByRole("img", { name: "Cancha 1: 50,00%" });
+    // El color de ocupación es un token del tema (--color-occupied), no un color suelto.
+    expect(bar.className).toContain("bg-occupied");
     expect(within(chart).getByRole("img", { name: "Cancha 2: 100,00%" })).toBeTruthy();
   });
 
@@ -98,10 +104,10 @@ describe("OccupancyMetrics", () => {
     expect(within(bySlot).getByText("11")).toBeTruthy();
   });
 
-  it("muestra el mapa de horarios pico por día y turno", async () => {
+  it("muestra el mapa de los turnos más solicitados por día y turno", async () => {
     await renderLastWeek();
 
-    const heatmap = await screen.findByRole("region", { name: "Horarios pico" });
+    const heatmap = await screen.findByRole("region", { name: "Turnos más solicitados" });
     expect(within(heatmap).getByRole("img", { name: "Lunes 11 a 12:30: 50,00%" })).toBeTruthy();
   });
 
@@ -115,6 +121,34 @@ describe("OccupancyMetrics", () => {
       expect(getOccupancyReportData).toHaveBeenLastCalledWith({
         from: new Date(2026, 9, 6),
         to: new Date(2026, 9, 12, 23, 59, 59, 999),
+      }),
+    );
+  });
+
+  it("permite ver la ocupación de hoy", async () => {
+    render(<OccupancyMetrics />);
+    await screen.findByTestId("kpi-occupancy");
+
+    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
+
+    await waitFor(() =>
+      expect(getOccupancyReportData).toHaveBeenLastCalledWith({
+        from: new Date(2026, 9, 12),
+        to: new Date(2026, 9, 12, 23, 59, 59, 999),
+      }),
+    );
+  });
+
+  it("permite ver la ocupación de ayer", async () => {
+    render(<OccupancyMetrics />);
+    await screen.findByTestId("kpi-occupancy");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ayer" }));
+
+    await waitFor(() =>
+      expect(getOccupancyReportData).toHaveBeenLastCalledWith({
+        from: new Date(2026, 9, 11),
+        to: new Date(2026, 9, 11, 23, 59, 59, 999),
       }),
     );
   });

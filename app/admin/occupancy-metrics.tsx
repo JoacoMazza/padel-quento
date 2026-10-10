@@ -4,14 +4,16 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getOccupancyReportData, type OccupancyReportData } from "@/src/actions/metrics";
 import { DayOfWeek } from "@/src/domain/enums";
 import { WEEK_DAYS, computeOccupancyMetrics, type OccupancyStat } from "@/src/domain/occupancy";
-import { SLOT_DURATION_MINUTES } from "@/app/bookings/slot-utils";
+import { SLOT_DURATION_MINUTES, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import { formatDuration, formatPercent, formatSlotTime } from "@/app/admin/metrics-format";
 
 const PRESETS = [
-  { id: "last7", label: "Últimos 7 días", days: 7, upcoming: false },
-  { id: "last30", label: "Últimos 30 días", days: 30, upcoming: false },
-  { id: "last90", label: "Últimos 90 días", days: 90, upcoming: false },
-  { id: "next30", label: "Próximos 30 días", days: 30, upcoming: true },
+  { id: "today", label: "Hoy", fromOffset: 0, toOffset: 0 },
+  { id: "yesterday", label: "Ayer", fromOffset: -1, toOffset: -1 },
+  { id: "last7", label: "Últimos 7 días", fromOffset: -6, toOffset: 0 },
+  { id: "last30", label: "Últimos 30 días", fromOffset: -29, toOffset: 0 },
+  { id: "last90", label: "Últimos 90 días", fromOffset: -89, toOffset: 0 },
+  { id: "next30", label: "Próximos 30 días", fromOffset: 0, toOffset: 29 },
 ] as const;
 
 type PresetId = (typeof PRESETS)[number]["id"];
@@ -26,18 +28,24 @@ const DAY_LABELS: Record<DayOfWeek, string> = {
   [DayOfWeek.SUNDAY]: "Domingo",
 };
 
-// Mismo azul que "Reservado" en la turnera: más intenso cuanto más ocupado.
-const OCCUPIED_RGB = "59, 130, 246";
+/** Color de ocupación (token --occupied del tema), más intenso cuanto más ocupado. */
+function occupiedShade(occupancy: number): string {
+  return `color-mix(in srgb, var(--occupied) ${Math.round((0.08 + occupancy * 0.92) * 100)}%, transparent)`;
+}
 
-/** Rango del período elegido: de 00:00 del primer día a 23:59:59.999 del último. */
+/**
+ * Rango del período elegido, con los días contados desde hoy: de 00:00 del
+ * primer día a 23:59:59.999 del último.
+ */
 function presetRange(id: PresetId, now: Date): { from: Date; to: Date } {
   const preset = PRESETS.find((p) => p.id === id)!;
   const y = now.getFullYear();
   const m = now.getMonth();
   const d = now.getDate();
-  return preset.upcoming
-    ? { from: new Date(y, m, d), to: new Date(y, m, d + preset.days - 1, 23, 59, 59, 999) }
-    : { from: new Date(y, m, d - preset.days + 1), to: new Date(y, m, d, 23, 59, 59, 999) };
+  return {
+    from: new Date(y, m, d + preset.fromOffset),
+    to: new Date(y, m, d + preset.toOffset, 23, 59, 59, 999),
+  };
 }
 
 /** Turno de inicio a fin, por ejemplo "9 a 10:30". */
@@ -49,8 +57,8 @@ function statDetail(stat: OccupancyStat): string {
   return `${formatDuration(stat.bookedMinutes)} reservadas de ${formatDuration(stat.availableMinutes)} disponibles`;
 }
 
-/** El de mayor ocupación entre los que tienen horario; ante un empate, el primero. */
-function peakOf<T extends OccupancyStat>(items: T[]): T | null {
+/** El más solicitado (mayor ocupación) entre los que tienen horario; ante un empate, el primero. */
+function mostRequested<T extends OccupancyStat>(items: T[]): T | null {
   return items
     .filter((item) => item.availableMinutes > 0)
     .reduce<T | null>((best, item) => (best === null || item.occupancy > best.occupancy ? item : best), null);
@@ -96,7 +104,7 @@ function ColumnChart({ items }: { items: ColumnItem[] }) {
                 role="img"
                 aria-label={hasSchedule ? `${name}: ${formatPercent(stat.occupancy)}` : `${name}: sin horarios`}
                 title={hasSchedule ? `${name}: ${statDetail(stat)}` : `${name}: sin horarios`}
-                className="w-full max-w-10 rounded-t bg-blue-500"
+                className="w-full max-w-10 rounded-t bg-occupied"
                 style={{ height: `${stat.occupancy * 100}%` }}
               />
             </div>
@@ -111,7 +119,7 @@ function ColumnChart({ items }: { items: ColumnItem[] }) {
 /**
  * Métricas de ocupación del complejo para el período elegido: porcentaje de uso
  * general, por cancha, por día de la semana, por turno y el cruce día × turno
- * para detectar los horarios pico (ver computeOccupancyMetrics).
+ * para detectar los turnos más solicitados (ver computeOccupancyMetrics).
  */
 export function OccupancyMetrics() {
   const [presetId, setPresetId] = useState<PresetId>("last30");
@@ -144,8 +152,8 @@ export function OccupancyMetrics() {
     [state],
   );
 
-  const peakSlot = metrics ? peakOf(metrics.bySlot) : null;
-  const peakDay = metrics ? peakOf(metrics.byDayOfWeek) : null;
+  const topSlot = metrics ? mostRequested(metrics.bySlot) : null;
+  const topDay = metrics ? mostRequested(metrics.byDayOfWeek) : null;
   const heatmapSlots = metrics ? metrics.bySlot.map((s) => s.startMinutes) : [];
   const heatmapDays = metrics ? WEEK_DAYS.filter((day) => metrics.byDayAndSlot.some((c) => c.dayOfWeek === day)) : [];
 
@@ -192,14 +200,14 @@ export function OccupancyMetrics() {
             />
             <KpiTile label="Turnos" testId="kpi-bookings" value={String(metrics.total.bookingsCount)} />
             <KpiTile
-              label="Turno pico"
-              testId="kpi-peak-slot"
-              value={peakSlot ? `${slotLabel(peakSlot.startMinutes)} · ${formatPercent(peakSlot.occupancy)}` : "—"}
+              label="Horario más solicitado"
+              testId="kpi-top-slot"
+              value={topSlot ? `${minutesToTimeLabel(topSlot.startMinutes)} · ${formatPercent(topSlot.occupancy)}` : "—"}
             />
             <KpiTile
-              label="Día pico"
-              testId="kpi-peak-day"
-              value={peakDay ? `${DAY_LABELS[peakDay.dayOfWeek]} · ${formatPercent(peakDay.occupancy)}` : "—"}
+              label="Día más solicitado"
+              testId="kpi-top-day"
+              value={topDay ? `${DAY_LABELS[topDay.dayOfWeek]} · ${formatPercent(topDay.occupancy)}` : "—"}
             />
           </div>
 
@@ -216,7 +224,7 @@ export function OccupancyMetrics() {
                         role="img"
                         aria-label={`Cancha ${court.courtNumber}: ${formatPercent(court.occupancy)}`}
                         title={`Cancha ${court.courtNumber}: ${statDetail(court)}`}
-                        className="h-full rounded-r bg-blue-500"
+                        className="h-full rounded-r bg-occupied"
                         style={{ width: `${court.occupancy * 100}%` }}
                       />
                     </div>
@@ -257,7 +265,7 @@ export function OccupancyMetrics() {
             </ChartCard>
           </div>
 
-          <ChartCard id="metrics-heatmap" title="Horarios pico">
+          <ChartCard id="metrics-heatmap" title="Turnos más solicitados">
             {heatmapDays.length === 0 ? (
               <p className="text-sm text-foreground/60">No hay horarios configurados.</p>
             ) : (
@@ -296,7 +304,7 @@ export function OccupancyMetrics() {
                               className={`h-8 min-w-14 rounded px-1 text-center font-semibold ${
                                 cell.occupancy > 0.55 ? "text-white" : "text-foreground/70"
                               }`}
-                              style={{ backgroundColor: `rgba(${OCCUPIED_RGB}, ${0.08 + cell.occupancy * 0.92})` }}
+                              style={{ backgroundColor: occupiedShade(cell.occupancy) }}
                             >
                               {formatPercent(cell.occupancy)}
                             </td>
@@ -310,7 +318,7 @@ export function OccupancyMetrics() {
                   0%
                   <span
                     className="h-2.5 w-32 rounded"
-                    style={{ background: `linear-gradient(to right, rgba(${OCCUPIED_RGB}, 0.08), rgb(${OCCUPIED_RGB}))` }}
+                    style={{ background: `linear-gradient(to right, ${occupiedShade(0)}, ${occupiedShade(1)})` }}
                   />
                   100%
                 </div>
