@@ -70,7 +70,7 @@ describe("OccupancyMetrics", () => {
     await renderLastWeek();
 
     expect((await screen.findByTestId("kpi-occupancy")).textContent).toBe("62,50%");
-    expect(screen.getByTestId("kpi-hours").textContent).toBe("3h 45m de 6h");
+    expect(screen.getByTestId("kpi-hours").textContent).toBe("3h 45m");
     expect(screen.getByTestId("kpi-bookings").textContent).toBe("3");
     // El horario más solicitado se muestra por la hora en que empieza el turno.
     expect(screen.getByText("Horario más solicitado")).toBeTruthy();

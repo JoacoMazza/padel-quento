@@ -196,7 +196,7 @@ export function OccupancyMetrics() {
             <KpiTile
               label="Horas reservadas"
               testId="kpi-hours"
-              value={`${formatDuration(metrics.total.bookedMinutes)} de ${formatDuration(metrics.total.availableMinutes)}`}
+              value={formatDuration(metrics.total.bookedMinutes)}
             />
             <KpiTile label="Turnos" testId="kpi-bookings" value={String(metrics.total.bookingsCount)} />
             <KpiTile
