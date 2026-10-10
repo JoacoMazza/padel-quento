@@ -58,7 +58,7 @@ function timeToMinutes(value: string): number {
   return hours * 60 + minutes;
 }
 
-/** Probabilidad de que un turno esté reservado: pico a la tarde-noche y los fines de semana. */
+/** Probabilidad de que un turno esté reservado: más demanda a la tarde-noche y los fines de semana. */
 function slotDemand(startMinutes: number, isWeekend: boolean): number {
   const hour = startMinutes / 60;
   const base = hour < 12 ? 0.2 : hour < 17 ? 0.3 : hour < 21 ? 0.75 : 0.5;

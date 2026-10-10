@@ -81,7 +81,7 @@ describe("computeOccupancyMetrics", () => {
     ]);
   });
 
-  it("cruza día de la semana y turno para detectar los horarios pico", () => {
+  it("cruza día de la semana y turno para detectar los turnos más solicitados", () => {
     const metrics = computeOccupancyMetrics(baseInput());
 
     expect(metrics.byDayAndSlot).toEqual([
