@@ -133,6 +133,14 @@ Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 
 
 También crea, si no existen, una cuenta de administrador (`admin@quento.com` / `admin123`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
+Para tener datos con los que revisar las métricas de ocupación del panel admin, hay un seed aparte de turnos (requiere haber corrido antes `pnpm db:seed`):
+
+```bash
+pnpm db:seed:bookings
+```
+
+Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+
 > Si tu base de desarrollo es anterior a la división de `users` en `accounts`/`admins`/`bookers`, `synchronize` no migra los datos (crea las tablas nuevas vacías y deja `users` huérfana). Lo más simple es recrearla (`docker compose down -v && docker compose up -d`), levantar la app una vez (`pnpm dev`) para que `synchronize` cree las tablas y recién ahí correr el seed: el seed usa la `DataSource` de CLI, que no sincroniza el esquema, así que sobre una base vacía falla con `no existe la relación «courts»`. Las bases gestionadas con migraciones conservan sus datos: `SplitUsersIntoAccounts` los copia de `users` a las tablas nuevas.
 
 ## Comandos importantes
@@ -155,6 +163,7 @@ pnpm migration:run                                      # aplica las migraciones
 pnpm migration:revert                                   # revierte la última migración aplicada
 pnpm migration:show                                     # lista migraciones aplicadas/pendientes
 pnpm db:seed                                             # crea 8 canchas con horario 09-23hs todos los días (idempotente)
+pnpm db:seed:bookings                                    # crea turnos de ejemplo alrededor de la fecha actual, para las métricas
 ```
 
 Ver [Migraciones](#4-migraciones) y [Datos de ejemplo (seed)](#5-datos-de-ejemplo-seed) para más detalle.

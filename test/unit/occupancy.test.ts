@@ -5,6 +5,7 @@ import { computeOccupancyMetrics, type OccupancyInput } from "@/src/domain/occup
 // 2026-10-12 es lunes.
 const monday = (hours: number, minutes = 0) => new Date(2026, 9, 12, hours, minutes);
 
+// Turnos de 90 minutos desde la apertura más temprana del día (8:00): 8:00, 9:30 y 11:00.
 function baseInput(overrides: Partial<OccupancyInput> = {}): OccupancyInput {
   return {
     from: new Date(2026, 9, 12),
@@ -14,16 +15,16 @@ function baseInput(overrides: Partial<OccupancyInput> = {}): OccupancyInput {
       { id: 20, number: 2 },
     ],
     schedules: [
-      { courtId: 10, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "12:00:00" },
-      { courtId: 20, dayOfWeek: DayOfWeek.MONDAY, openingTime: "10:00:00", closingTime: "12:00:00" },
+      { courtId: 10, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "12:30:00" },
+      { courtId: 20, dayOfWeek: DayOfWeek.MONDAY, openingTime: "09:30:00", closingTime: "12:30:00" },
     ],
     bookings: [
       { courtId: 10, fromDateTime: monday(8, 0), durationMinutes: 90 },
-      { courtId: 10, fromDateTime: monday(10, 30), durationMinutes: 90 },
-      { courtId: 20, fromDateTime: monday(10, 0), durationMinutes: 60 },
+      { courtId: 10, fromDateTime: monday(11, 0), durationMinutes: 45 },
+      { courtId: 20, fromDateTime: monday(9, 30), durationMinutes: 90 },
     ],
-    // La cancha 2 está bloqueada de 11 a 12: esa hora no cuenta como disponible.
-    outOfServices: [{ courtId: 20, fromDateTime: monday(11, 0), toDateTime: monday(12, 0) }],
+    // La cancha 2 está bloqueada en el turno de las 11:00: no cuenta como disponible.
+    outOfServices: [{ courtId: 20, fromDateTime: monday(11, 0), toDateTime: monday(12, 30) }],
     ...overrides,
   };
 }
@@ -32,15 +33,15 @@ describe("computeOccupancyMetrics", () => {
   it("calcula la ocupación total como minutos reservados sobre minutos disponibles", () => {
     const metrics = computeOccupancyMetrics(baseInput());
 
-    expect(metrics.total).toEqual({ bookedMinutes: 240, availableMinutes: 300, occupancy: 0.8, bookingsCount: 3 });
+    expect(metrics.total).toEqual({ bookedMinutes: 225, availableMinutes: 360, occupancy: 0.625, bookingsCount: 3 });
   });
 
   it("discrimina la ocupación por cancha, descontando los bloqueos de lo disponible", () => {
     const metrics = computeOccupancyMetrics(baseInput());
 
     expect(metrics.byCourt).toEqual([
-      { courtId: 10, courtNumber: 1, bookedMinutes: 180, availableMinutes: 240, occupancy: 0.75 },
-      { courtId: 20, courtNumber: 2, bookedMinutes: 60, availableMinutes: 60, occupancy: 1 },
+      { courtId: 10, courtNumber: 1, bookedMinutes: 135, availableMinutes: 270, occupancy: 0.5 },
+      { courtId: 20, courtNumber: 2, bookedMinutes: 90, availableMinutes: 90, occupancy: 1 },
     ]);
   });
 
@@ -58,9 +59,9 @@ describe("computeOccupancyMetrics", () => {
     ]);
     expect(metrics.byDayOfWeek[0]).toEqual({
       dayOfWeek: DayOfWeek.MONDAY,
-      bookedMinutes: 240,
-      availableMinutes: 300,
-      occupancy: 0.8,
+      bookedMinutes: 225,
+      availableMinutes: 360,
+      occupancy: 0.625,
     });
     expect(metrics.byDayOfWeek[1]).toEqual({
       dayOfWeek: DayOfWeek.TUESDAY,
@@ -70,41 +71,57 @@ describe("computeOccupancyMetrics", () => {
     });
   });
 
-  it("discrimina la ocupación por franja horaria de una hora, solo en las franjas con horario", () => {
+  it("discrimina la ocupación por turno de 90 minutos, desde la apertura más temprana del día", () => {
     const metrics = computeOccupancyMetrics(baseInput());
 
-    expect(metrics.byHour).toEqual([
-      { hour: 8, bookedMinutes: 60, availableMinutes: 60, occupancy: 1 },
-      { hour: 9, bookedMinutes: 30, availableMinutes: 60, occupancy: 0.5 },
-      { hour: 10, bookedMinutes: 90, availableMinutes: 120, occupancy: 0.75 },
-      { hour: 11, bookedMinutes: 60, availableMinutes: 60, occupancy: 1 },
+    expect(metrics.bySlot).toEqual([
+      { startMinutes: 8 * 60, bookedMinutes: 90, availableMinutes: 90, occupancy: 1 },
+      { startMinutes: 9 * 60 + 30, bookedMinutes: 90, availableMinutes: 180, occupancy: 0.5 },
+      { startMinutes: 11 * 60, bookedMinutes: 45, availableMinutes: 90, occupancy: 0.5 },
     ]);
   });
 
-  it("cruza día de la semana y franja horaria para detectar los horarios pico", () => {
+  it("cruza día de la semana y turno para detectar los horarios pico", () => {
     const metrics = computeOccupancyMetrics(baseInput());
 
-    expect(metrics.byDayAndHour).toEqual([
-      { dayOfWeek: DayOfWeek.MONDAY, hour: 8, bookedMinutes: 60, availableMinutes: 60, occupancy: 1 },
-      { dayOfWeek: DayOfWeek.MONDAY, hour: 9, bookedMinutes: 30, availableMinutes: 60, occupancy: 0.5 },
-      { dayOfWeek: DayOfWeek.MONDAY, hour: 10, bookedMinutes: 90, availableMinutes: 120, occupancy: 0.75 },
-      { dayOfWeek: DayOfWeek.MONDAY, hour: 11, bookedMinutes: 60, availableMinutes: 60, occupancy: 1 },
+    expect(metrics.byDayAndSlot).toEqual([
+      { dayOfWeek: DayOfWeek.MONDAY, startMinutes: 8 * 60, bookedMinutes: 90, availableMinutes: 90, occupancy: 1 },
+      {
+        dayOfWeek: DayOfWeek.MONDAY,
+        startMinutes: 9 * 60 + 30,
+        bookedMinutes: 90,
+        availableMinutes: 180,
+        occupancy: 0.5,
+      },
+      { dayOfWeek: DayOfWeek.MONDAY, startMinutes: 11 * 60, bookedMinutes: 45, availableMinutes: 90, occupancy: 0.5 },
     ]);
+  });
+
+  it("no cuenta como disponible el tiempo al final del día que no completa un turno", () => {
+    const metrics = computeOccupancyMetrics(
+      baseInput({
+        schedules: [{ courtId: 10, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "10:00:00" }],
+      }),
+    );
+
+    // Solo entra el turno de 8:00 a 9:30; de 9:30 a 10:00 no hay turno posible.
+    expect(metrics.byCourt[0]).toMatchObject({ availableMinutes: 90 });
+    expect(metrics.bySlot.map((s) => s.startMinutes)).toEqual([8 * 60]);
   });
 
   it("suma la disponibilidad de cada día del rango", () => {
     const metrics = computeOccupancyMetrics(baseInput({ to: new Date(2026, 9, 19), outOfServices: [] }));
 
     // Dos lunes en el rango: el doble de minutos disponibles, mismas reservas.
-    expect(metrics.byCourt[0]).toMatchObject({ bookedMinutes: 180, availableMinutes: 480, occupancy: 0.375 });
+    expect(metrics.byCourt[0]).toMatchObject({ bookedMinutes: 135, availableMinutes: 540, occupancy: 0.25 });
   });
 
   it("solo cuenta la parte de la reserva que cae dentro del horario de la cancha", () => {
     const metrics = computeOccupancyMetrics(
-      baseInput({ bookings: [{ courtId: 10, fromDateTime: monday(11, 30), durationMinutes: 90 }], outOfServices: [] }),
+      baseInput({ bookings: [{ courtId: 10, fromDateTime: monday(12, 0), durationMinutes: 90 }], outOfServices: [] }),
     );
 
-    expect(metrics.byCourt[0]).toMatchObject({ bookedMinutes: 30, availableMinutes: 240 });
+    expect(metrics.byCourt[0]).toMatchObject({ bookedMinutes: 30, availableMinutes: 270 });
   });
 
   it("ignora las reservas fuera del rango de fechas", () => {
@@ -115,11 +132,11 @@ describe("computeOccupancyMetrics", () => {
     expect(metrics.total).toMatchObject({ bookedMinutes: 0, bookingsCount: 0 });
   });
 
-  it("sin horarios configurados la ocupación es 0 y no hay franjas", () => {
+  it("sin horarios configurados la ocupación es 0 y no hay turnos", () => {
     const metrics = computeOccupancyMetrics(baseInput({ schedules: [] }));
 
     expect(metrics.total).toMatchObject({ availableMinutes: 0, occupancy: 0 });
-    expect(metrics.byHour).toEqual([]);
-    expect(metrics.byDayAndHour).toEqual([]);
+    expect(metrics.bySlot).toEqual([]);
+    expect(metrics.byDayAndSlot).toEqual([]);
   });
 });

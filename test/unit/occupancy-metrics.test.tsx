@@ -19,16 +19,17 @@ const REPORT = {
       { id: 10, number: 1 },
       { id: 20, number: 2 },
     ],
+    // Turnos de 8:00, 9:30 y 11:00 (ver occupancy.test.ts).
     schedules: [
-      { courtId: 10, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "12:00:00" },
-      { courtId: 20, dayOfWeek: DayOfWeek.MONDAY, openingTime: "10:00:00", closingTime: "12:00:00" },
+      { courtId: 10, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "12:30:00" },
+      { courtId: 20, dayOfWeek: DayOfWeek.MONDAY, openingTime: "09:30:00", closingTime: "12:30:00" },
     ],
     bookings: [
       { courtId: 10, fromDateTime: monday(8, 0), durationMinutes: 90 },
-      { courtId: 10, fromDateTime: monday(10, 30), durationMinutes: 90 },
-      { courtId: 20, fromDateTime: monday(10, 0), durationMinutes: 60 },
+      { courtId: 10, fromDateTime: monday(11, 0), durationMinutes: 45 },
+      { courtId: 20, fromDateTime: monday(9, 30), durationMinutes: 90 },
     ],
-    outOfServices: [{ courtId: 20, fromDateTime: monday(11, 0), toDateTime: monday(12, 0) }],
+    outOfServices: [{ courtId: 20, fromDateTime: monday(11, 0), toDateTime: monday(12, 30) }],
   },
 };
 
@@ -68,37 +69,40 @@ describe("OccupancyMetrics", () => {
   it("muestra los indicadores de ocupación general, horas reservadas, turnos y picos", async () => {
     await renderLastWeek();
 
-    expect((await screen.findByTestId("kpi-occupancy")).textContent).toBe("80%");
-    expect(screen.getByTestId("kpi-hours").textContent).toBe("4 h de 5 h");
+    expect((await screen.findByTestId("kpi-occupancy")).textContent).toBe("62,50%");
+    expect(screen.getByTestId("kpi-hours").textContent).toBe("3h 45m de 6h");
     expect(screen.getByTestId("kpi-bookings").textContent).toBe("3");
-    expect(screen.getByTestId("kpi-peak-hour").textContent).toBe("08:00 – 09:00 · 100%");
-    expect(screen.getByTestId("kpi-peak-day").textContent).toBe("Lunes · 80%");
+    expect(screen.getByTestId("kpi-peak-slot").textContent).toBe("8 a 9:30 · 100,00%");
+    expect(screen.getByTestId("kpi-peak-day").textContent).toBe("Lunes · 62,50%");
   });
 
   it("grafica el porcentaje de uso por cancha", async () => {
     await renderLastWeek();
 
     const chart = await screen.findByRole("region", { name: "Ocupación por cancha" });
-    expect(within(chart).getByRole("img", { name: "Cancha 1: 75%" })).toBeTruthy();
-    expect(within(chart).getByRole("img", { name: "Cancha 2: 100%" })).toBeTruthy();
+    expect(within(chart).getByRole("img", { name: "Cancha 1: 50,00%" })).toBeTruthy();
+    expect(within(chart).getByRole("img", { name: "Cancha 2: 100,00%" })).toBeTruthy();
   });
 
-  it("grafica el porcentaje de uso por día de la semana y por franja horaria", async () => {
+  it("grafica el porcentaje de uso por día de la semana y por turno", async () => {
     await renderLastWeek();
 
     const byDay = await screen.findByRole("region", { name: "Ocupación por día de la semana" });
-    expect(within(byDay).getByRole("img", { name: "Lunes: 80%" })).toBeTruthy();
+    expect(within(byDay).getByRole("img", { name: "Lunes: 62,50%" })).toBeTruthy();
     expect(within(byDay).getByRole("img", { name: "Martes: sin horarios" })).toBeTruthy();
 
-    const byHour = screen.getByRole("region", { name: "Ocupación por franja horaria" });
-    expect(within(byHour).getByRole("img", { name: "09:00 – 10:00: 50%" })).toBeTruthy();
+    // Las columnas siguen la grilla de turnos de 90 minutos: 8, 9:30, 11.
+    const bySlot = screen.getByRole("region", { name: "Ocupación por turno" });
+    expect(within(bySlot).getByRole("img", { name: "9:30 a 11: 50,00%" })).toBeTruthy();
+    expect(within(bySlot).getByText("9:30")).toBeTruthy();
+    expect(within(bySlot).getByText("11")).toBeTruthy();
   });
 
-  it("muestra el mapa de horarios pico por día y franja", async () => {
+  it("muestra el mapa de horarios pico por día y turno", async () => {
     await renderLastWeek();
 
     const heatmap = await screen.findByRole("region", { name: "Horarios pico" });
-    expect(within(heatmap).getByRole("img", { name: "Lunes 10:00 – 11:00: 75%" })).toBeTruthy();
+    expect(within(heatmap).getByRole("img", { name: "Lunes 11 a 12:30: 50,00%" })).toBeTruthy();
   });
 
   it("al elegir otro período vuelve a pedir los datos para ese rango", async () => {

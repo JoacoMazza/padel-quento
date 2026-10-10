@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getOccupancyReportData, type OccupancyReportData } from "@/src/actions/metrics";
 import { DayOfWeek } from "@/src/domain/enums";
 import { WEEK_DAYS, computeOccupancyMetrics, type OccupancyStat } from "@/src/domain/occupancy";
+import { SLOT_DURATION_MINUTES } from "@/app/bookings/slot-utils";
+import { formatDuration, formatPercent, formatSlotTime } from "@/app/admin/metrics-format";
 
 const PRESETS = [
   { id: "last7", label: "Últimos 7 días", days: 7, upcoming: false },
@@ -38,21 +40,13 @@ function presetRange(id: PresetId, now: Date): { from: Date; to: Date } {
     : { from: new Date(y, m, d - preset.days + 1), to: new Date(y, m, d, 23, 59, 59, 999) };
 }
 
-function formatPercent(occupancy: number): string {
-  return `${Math.round(occupancy * 100)}%`;
-}
-
-function formatHours(minutes: number): string {
-  return (minutes / 60).toLocaleString("es-AR", { maximumFractionDigits: 1 });
-}
-
-function hourLabel(hour: number): string {
-  const pad = (h: number) => `${String(h).padStart(2, "0")}:00`;
-  return `${pad(hour)} – ${pad(hour + 1)}`;
+/** Turno de inicio a fin, por ejemplo "9 a 10:30". */
+function slotLabel(startMinutes: number): string {
+  return `${formatSlotTime(startMinutes)} a ${formatSlotTime(startMinutes + SLOT_DURATION_MINUTES)}`;
 }
 
 function statDetail(stat: OccupancyStat): string {
-  return `${formatHours(stat.bookedMinutes)} h reservadas de ${formatHours(stat.availableMinutes)} h disponibles`;
+  return `${formatDuration(stat.bookedMinutes)} reservadas de ${formatDuration(stat.availableMinutes)} disponibles`;
 }
 
 /** El de mayor ocupación entre los que tienen horario; ante un empate, el primero. */
@@ -116,8 +110,8 @@ function ColumnChart({ items }: { items: ColumnItem[] }) {
 
 /**
  * Métricas de ocupación del complejo para el período elegido: porcentaje de uso
- * general, por cancha, por día de la semana, por franja horaria y el cruce día ×
- * franja para detectar los horarios pico (ver computeOccupancyMetrics).
+ * general, por cancha, por día de la semana, por turno y el cruce día × turno
+ * para detectar los horarios pico (ver computeOccupancyMetrics).
  */
 export function OccupancyMetrics() {
   const [presetId, setPresetId] = useState<PresetId>("last30");
@@ -150,10 +144,10 @@ export function OccupancyMetrics() {
     [state],
   );
 
-  const peakHour = metrics ? peakOf(metrics.byHour) : null;
+  const peakSlot = metrics ? peakOf(metrics.bySlot) : null;
   const peakDay = metrics ? peakOf(metrics.byDayOfWeek) : null;
-  const heatmapHours = metrics ? metrics.byHour.map((h) => h.hour) : [];
-  const heatmapDays = metrics ? WEEK_DAYS.filter((day) => metrics.byDayAndHour.some((c) => c.dayOfWeek === day)) : [];
+  const heatmapSlots = metrics ? metrics.bySlot.map((s) => s.startMinutes) : [];
+  const heatmapDays = metrics ? WEEK_DAYS.filter((day) => metrics.byDayAndSlot.some((c) => c.dayOfWeek === day)) : [];
 
   return (
     <div className="space-y-5">
@@ -194,13 +188,13 @@ export function OccupancyMetrics() {
             <KpiTile
               label="Horas reservadas"
               testId="kpi-hours"
-              value={`${formatHours(metrics.total.bookedMinutes)} h de ${formatHours(metrics.total.availableMinutes)} h`}
+              value={`${formatDuration(metrics.total.bookedMinutes)} de ${formatDuration(metrics.total.availableMinutes)}`}
             />
             <KpiTile label="Turnos" testId="kpi-bookings" value={String(metrics.total.bookingsCount)} />
             <KpiTile
-              label="Franja pico"
-              testId="kpi-peak-hour"
-              value={peakHour ? `${hourLabel(peakHour.hour)} · ${formatPercent(peakHour.occupancy)}` : "—"}
+              label="Turno pico"
+              testId="kpi-peak-slot"
+              value={peakSlot ? `${slotLabel(peakSlot.startMinutes)} · ${formatPercent(peakSlot.occupancy)}` : "—"}
             />
             <KpiTile
               label="Día pico"
@@ -226,7 +220,7 @@ export function OccupancyMetrics() {
                         style={{ width: `${court.occupancy * 100}%` }}
                       />
                     </div>
-                    <span className="w-12 shrink-0 text-right font-semibold text-foreground">
+                    <span className="w-16 shrink-0 text-right font-semibold text-foreground">
                       {formatPercent(court.occupancy)}
                     </span>
                   </li>
@@ -247,16 +241,16 @@ export function OccupancyMetrics() {
               />
             </ChartCard>
 
-            <ChartCard id="metrics-by-hour" title="Ocupación por franja horaria">
-              {metrics.byHour.length === 0 ? (
+            <ChartCard id="metrics-by-slot" title="Ocupación por turno">
+              {metrics.bySlot.length === 0 ? (
                 <p className="text-sm text-foreground/60">No hay horarios configurados.</p>
               ) : (
                 <ColumnChart
-                  items={metrics.byHour.map((hour) => ({
-                    key: String(hour.hour),
-                    label: String(hour.hour).padStart(2, "0"),
-                    name: hourLabel(hour.hour),
-                    stat: hour,
+                  items={metrics.bySlot.map((slot) => ({
+                    key: String(slot.startMinutes),
+                    label: formatSlotTime(slot.startMinutes),
+                    name: slotLabel(slot.startMinutes),
+                    stat: slot,
                   }))}
                 />
               )}
@@ -272,9 +266,9 @@ export function OccupancyMetrics() {
                   <thead>
                     <tr>
                       <th className="w-24" />
-                      {heatmapHours.map((hour) => (
-                        <th key={hour} className="px-1 pb-1 text-center font-medium text-foreground/60">
-                          {String(hour).padStart(2, "0")}
+                      {heatmapSlots.map((slot) => (
+                        <th key={slot} className="px-1 pb-1 text-center font-medium text-foreground/60">
+                          {formatSlotTime(slot)}
                         </th>
                       ))}
                     </tr>
@@ -283,23 +277,23 @@ export function OccupancyMetrics() {
                     {heatmapDays.map((day) => (
                       <tr key={day}>
                         <th className="pr-2 text-left font-medium text-foreground/70">{DAY_LABELS[day]}</th>
-                        {heatmapHours.map((hour) => {
-                          const cell = metrics.byDayAndHour.find((c) => c.dayOfWeek === day && c.hour === hour);
+                        {heatmapSlots.map((slot) => {
+                          const cell = metrics.byDayAndSlot.find((c) => c.dayOfWeek === day && c.startMinutes === slot);
                           if (!cell || cell.availableMinutes === 0) {
                             return (
-                              <td key={hour} className="h-8 min-w-9 rounded bg-line/30 text-center text-foreground/30">
+                              <td key={slot} className="h-8 min-w-14 rounded bg-line/30 text-center text-foreground/30">
                                 —
                               </td>
                             );
                           }
-                          const name = `${DAY_LABELS[day]} ${hourLabel(hour)}`;
+                          const name = `${DAY_LABELS[day]} ${slotLabel(slot)}`;
                           return (
                             <td
-                              key={hour}
+                              key={slot}
                               role="img"
                               aria-label={`${name}: ${formatPercent(cell.occupancy)}`}
                               title={`${name}: ${statDetail(cell)}`}
-                              className={`h-8 min-w-9 rounded text-center font-semibold ${
+                              className={`h-8 min-w-14 rounded px-1 text-center font-semibold ${
                                 cell.occupancy > 0.55 ? "text-white" : "text-foreground/70"
                               }`}
                               style={{ backgroundColor: `rgba(${OCCUPIED_RGB}, ${0.08 + cell.occupancy * 0.92})` }}
