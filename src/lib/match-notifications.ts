@@ -8,6 +8,7 @@ import {
   courtUnavailableNotice,
   matchCancelledByCreatorNotice,
   matchClosedNotice,
+  matchCompleteNotice,
   matchExpiredNotice,
   playerJoinedNotice,
   playerLeftLateNotice,
@@ -66,7 +67,10 @@ async function findBooking(bookingId: number) {
   return dataSource.getRepository<Booking>("Booking").findOne({ where: { id: bookingId }, relations: BOOKING_RELATIONS });
 }
 
-/** Avisa a los demás jugadores del partido que alguien se sumó. */
+/**
+ * Avisa a los demás jugadores del partido que alguien se sumó. Si con esa suma
+ * el partido se completó, se avisa a todos, incluido quien se sumó (HU-17).
+ */
 export async function notifyPlayerJoined(bookingId: number, playerId: number): Promise<void> {
   try {
     const booking = await findBooking(bookingId);
@@ -74,6 +78,12 @@ export async function notifyPlayerJoined(bookingId: number, playerId: number): P
     if (!booking?.match || !joined) return;
 
     const spots = freeSpots(booking.match);
+    if (spots === 0) {
+      await send(allPlayers(booking.match), (recipient) =>
+        matchCompleteNotice(recipient.names, fullName(joined), noticeBookingOf(booking)),
+      );
+      return;
+    }
     await send(otherPlayers(booking.match, playerId), (recipient) =>
       playerJoinedNotice(recipient.names, fullName(joined), noticeBookingOf(booking), spots),
     );

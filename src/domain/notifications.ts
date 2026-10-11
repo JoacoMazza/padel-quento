@@ -1,3 +1,5 @@
+import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+
 /** Persona a la que se le avisa: cada canal usa el dato de contacto que le corresponde. */
 export type NotificationRecipient = {
   names: string;
@@ -143,3 +145,16 @@ export function matchClosedNotice(recipientName: string, booking: NoticeBooking)
   };
 }
 
+/** Con quien se acaba de sumar el partido llegó al cupo (HU-17): se avisa a todos sus jugadores. */
+export function matchCompleteNotice(
+  recipientName: string,
+  playerName: string,
+  booking: NoticeBooking,
+): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `¡El partido del ${day} está completo!`,
+    text: `Hola ${recipientName}, ¡el partido del ${day} a las ${time} en la cancha ${court} está completo! ${playerName} se sumó y ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores.`,
+    whatsappTemplate: { name: "quento_partido_completo", parameters: [recipientName, day, time, court, playerName] },
+  };
+}

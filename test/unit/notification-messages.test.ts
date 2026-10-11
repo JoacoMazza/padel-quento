@@ -3,6 +3,7 @@ import {
   courtUnavailableNotice,
   matchCancelledByCreatorNotice,
   matchClosedNotice,
+  matchCompleteNotice,
   matchExpiredNotice,
   playerJoinedNotice,
   playerLeftLateNotice,
@@ -114,6 +115,21 @@ describe("matchClosedNotice", () => {
     expect(notice.whatsappTemplate).toEqual({
       name: "quento_partido_cerrado",
       parameters: ["Bruno", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("matchCompleteNotice", () => {
+  it("avisa que el partido se completó con quien se sumó último", () => {
+    const notice = matchCompleteNotice("Ana", "Carla Gómez", booking);
+
+    expect(notice.subject).toBe("¡El partido del sábado 17 de octubre está completo!");
+    expect(notice.text).toBe(
+      "Hola Ana, ¡el partido del sábado 17 de octubre a las 19:30 en la cancha 3 está completo! Carla Gómez se sumó y ya son 4 jugadores.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_partido_completo",
+      parameters: ["Ana", "sábado 17 de octubre", "19:30", "3", "Carla Gómez"],
     });
   });
 });

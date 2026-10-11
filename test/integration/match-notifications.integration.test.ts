@@ -4,6 +4,7 @@ import {
   courtUnavailableNotice,
   matchCancelledByCreatorNotice,
   matchClosedNotice,
+  matchCompleteNotice,
   matchExpiredNotice,
   playerJoinedNotice,
   playerLeftLateNotice,
@@ -96,7 +97,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
   describe("cuando un jugador se suma a un partido abierto", () => {
     it("avisa a los demás jugadores del partido quién se sumó y cuántos lugares quedan", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const { bookingId } = await createOpenMatch(fromDateTime, 2);
+      const { bookingId } = await createOpenMatch(fromDateTime, 1);
       await joinOpenMatch({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
@@ -108,7 +109,25 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       expect(recipients).toEqual(expect.arrayContaining([recipientOf(ana), recipientOf(bruno)]));
       expect(recipients).toHaveLength(2);
       expect(buildMessage(recipientOf(ana))).toEqual(
-        playerJoinedNotice("Ana", "Carla Gómez", { fromDateTime, courtNumber }, 0),
+        playerJoinedNotice("Ana", "Carla Gómez", { fromDateTime, courtNumber }, 1),
+      );
+    });
+
+    it("cuando el partido se completa avisa a todos sus jugadores, incluido quien se sumó (HU-17)", async () => {
+      const fromDateTime = uniqueFromDateTime();
+      const { bookingId } = await createOpenMatch(fromDateTime, 2);
+      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      notify.mockClear();
+
+      const joined = await joinOpenMatch({ bookingId, playerId: carla.id });
+
+      expect(joined.success).toBe(true);
+      expect(notify).toHaveBeenCalledTimes(1);
+      const [recipients, buildMessage] = notifyCalls()[0];
+      expect(recipients).toEqual(expect.arrayContaining([recipientOf(ana), recipientOf(bruno), recipientOf(carla)]));
+      expect(recipients).toHaveLength(3);
+      expect(buildMessage(recipientOf(carla))).toEqual(
+        matchCompleteNotice("Carla", "Carla Gómez", { fromDateTime, courtNumber }),
       );
     });
 

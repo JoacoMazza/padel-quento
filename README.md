@@ -93,10 +93,11 @@ Se avisa a los jugadores (ver [src/lib/match-notifications.ts](src/lib/match-not
 
 - se cancela su turno porque la cancha queda fuera de servicio (bloqueo) o se da de baja (en ese caso se cancelan sus turnos futuros);
 - alguien se suma o se baja de un partido abierto del que forman parte (si se baja a menos de 3 horas, sin ofrecer su lugar);
+- el partido se completa: en ese caso se avisa a todos, incluido quien se sumó último (HU-17);
 - quien armó el partido lo cancela (HU-19) o lo cierra para no sumar más jugadores;
 - el partido se cancela solo por no completar el cupo a tiempo.
 
-No se le avisa a quien provocó el cambio. Cada canal se activa solo si están cargadas sus variables; sin ninguna, en desarrollo los avisos se muestran por consola y en tests no se envía nada. Un aviso que falla nunca hace fallar la operación que lo originó.
+Salvo cuando el partido se completa, no se le avisa a quien provocó el cambio. Cada canal se activa solo si están cargadas sus variables; sin ninguna, en desarrollo los avisos se muestran por consola y en tests no se envía nada. Un aviso que falla nunca hace fallar la operación que lo originó.
 
 WhatsApp no permite mandar texto libre en mensajes que inicia el club, así que usa estas plantillas, que hay que crear (categoría *Utility*, idioma `es_AR`) y tener aprobadas en el WhatsApp Manager de Meta:
 
@@ -108,6 +109,7 @@ WhatsApp no permite mandar texto libre en mensajes que inicia el club, así que 
 | `quento_jugador_se_bajo_tarde` | Hola {{1}}, {{2}} se bajó a último momento del partido del {{3}} a las {{4}} en la cancha {{5}}. |
 | `quento_partido_cancelado` | Hola {{1}}, {{2}} canceló el partido del {{3}} a las {{4}} en la cancha {{5}}. No se aplicó ninguna penalización para vos. |
 | `quento_partido_sin_cupo` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} se canceló porque no se completó el cupo de jugadores. No se aplicó ninguna penalización. |
+| `quento_partido_completo` | Hola {{1}}, ¡el partido del {{2}} a las {{3}} en la cancha {{4}} está completo! {{5}} se sumó y ya son 4 jugadores. |
 | `quento_partido_cerrado` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} ya no busca más jugadores. Se juega con los que están anotados. |
 
 Para los tests de integración, copiar también:
