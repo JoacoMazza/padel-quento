@@ -17,6 +17,8 @@
   --ink: #111827;
   --ink-soft: #1f2937;
   --panel: #1b1d22;
+  /* Ocupación en las métricas del panel admin: mismo azul que "Reservado" en la turnera. */
+  --occupied: #3b82f6;
 }
 
 @theme inline {
@@ -36,6 +38,9 @@
   --color-ink-soft: var(--ink-soft);
   --color-panel: var(--panel);
   --font-sans: var(--font-jakarta);
+  --color-occupied: var(--occupied);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
