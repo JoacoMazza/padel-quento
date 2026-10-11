@@ -14,7 +14,7 @@ import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POIN
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { notifyPlayerJoined } from "@/src/lib/match-notifications";
+import { notifyMatchCancelledByCreator, notifyPlayerJoined } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 export type CreateBookingInput = {
@@ -410,6 +410,7 @@ export async function updateBooking(
     const dataSource = await getDataSource();
 
     let lateCancellationPlayerId: number | null = null;
+    let cancelled = false;
 
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
@@ -420,6 +421,9 @@ export async function updateBooking(
       if (!booking) {
         throw new Error("NOT_FOUND");
       }
+
+      cancelled =
+        input.bookingState === BookingState.CANCELLED && booking.bookingState !== BookingState.CANCELLED;
 
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
       // turno previo a la migración puede no tener quien reservó.
@@ -468,6 +472,11 @@ export async function updateBooking(
     // solo se penaliza si la cancelación efectivamente se guardó (RN-03).
     if (lateCancellationPlayerId !== null) {
       await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
+    }
+
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    if (cancelled) {
+      await notifyMatchCancelledByCreator(id);
     }
 
     return { success: true, data: toPlain(saved) };

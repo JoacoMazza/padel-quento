@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   courtUnavailableNotice,
+  matchCancelledByCreatorNotice,
+  matchClosedNotice,
+  matchExpiredNotice,
   playerJoinedNotice,
+  playerLeftLateNotice,
   playerLeftNotice,
   toWhatsAppNumber,
 } from "@/src/domain/notifications";
@@ -50,6 +54,66 @@ describe("playerLeftNotice", () => {
     expect(notice.whatsappTemplate).toEqual({
       name: "quento_jugador_se_bajo",
       parameters: ["Ana", "Bruno Díaz", "sábado 17 de octubre", "19:30", "3", "2"],
+    });
+  });
+});
+
+describe("playerLeftLateNotice", () => {
+  it("avisa que alguien se bajó a último momento, sin ofrecer su lugar", () => {
+    const notice = playerLeftLateNotice("Ana", "Bruno Díaz", booking);
+
+    expect(notice.subject).toBe("Bruno Díaz se bajó de tu partido del sábado 17 de octubre");
+    expect(notice.text).toBe(
+      "Hola Ana, Bruno Díaz se bajó a último momento del partido del sábado 17 de octubre a las 19:30 en la cancha 3.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_jugador_se_bajo_tarde",
+      parameters: ["Ana", "Bruno Díaz", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("matchCancelledByCreatorNotice", () => {
+  it("avisa que quien armó el partido lo canceló y que no hay penalización para el destinatario", () => {
+    const notice = matchCancelledByCreatorNotice("Bruno", "Ana Pérez", booking);
+
+    expect(notice.subject).toBe("Se canceló el partido del sábado 17 de octubre");
+    expect(notice.text).toBe(
+      "Hola Bruno, Ana Pérez canceló el partido del sábado 17 de octubre a las 19:30 en la cancha 3. No se aplicó ninguna penalización para vos.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_partido_cancelado",
+      parameters: ["Bruno", "Ana Pérez", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("matchExpiredNotice", () => {
+  it("avisa que el partido se canceló por no completar el cupo, sin penalización", () => {
+    const notice = matchExpiredNotice("Bruno", booking);
+
+    expect(notice.subject).toBe("Se canceló el partido del sábado 17 de octubre");
+    expect(notice.text).toBe(
+      "Hola Bruno, el partido del sábado 17 de octubre a las 19:30 en la cancha 3 se canceló porque no se completó el cupo de jugadores. No se aplicó ninguna penalización.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_partido_sin_cupo",
+      parameters: ["Bruno", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("matchClosedNotice", () => {
+  it("avisa que el partido ya no busca más jugadores", () => {
+    const notice = matchClosedNotice("Bruno", booking);
+
+    expect(notice.subject).toBe("El partido del sábado 17 de octubre ya no busca jugadores");
+    expect(notice.text).toBe(
+      "Hola Bruno, el partido del sábado 17 de octubre a las 19:30 en la cancha 3 ya no busca más jugadores. Se juega con los que están anotados.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_partido_cerrado",
+      parameters: ["Bruno", "sábado 17 de octubre", "19:30", "3"],
     });
   });
 });

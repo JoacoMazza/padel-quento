@@ -85,3 +85,61 @@ export function playerLeftNotice(
     },
   };
 }
+
+/**
+ * Alguien se bajó con menos de 3 horas para el turno: el partido no vuelve a
+ * buscar jugadores (ver leaveMatch), así que no se ofrecen lugares libres.
+ */
+export function playerLeftLateNotice(
+  recipientName: string,
+  playerName: string,
+  booking: NoticeBooking,
+): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `${playerName} se bajó de tu partido del ${day}`,
+    text: `Hola ${recipientName}, ${playerName} se bajó a último momento del partido del ${day} a las ${time} en la cancha ${court}.`,
+    whatsappTemplate: {
+      name: "quento_jugador_se_bajo_tarde",
+      parameters: [recipientName, playerName, day, time, court],
+    },
+  };
+}
+
+/** Quien armó el partido canceló el turno (HU-19); la penalización, si corresponde, es solo para él. */
+export function matchCancelledByCreatorNotice(
+  recipientName: string,
+  creatorName: string,
+  booking: NoticeBooking,
+): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Se canceló el partido del ${day}`,
+    text: `Hola ${recipientName}, ${creatorName} canceló el partido del ${day} a las ${time} en la cancha ${court}. No se aplicó ninguna penalización para vos.`,
+    whatsappTemplate: {
+      name: "quento_partido_cancelado",
+      parameters: [recipientName, creatorName, day, time, court],
+    },
+  };
+}
+
+/** El partido se canceló solo por no completar el cupo a tiempo (ver cancelExpiredMatches). */
+export function matchExpiredNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Se canceló el partido del ${day}`,
+    text: `Hola ${recipientName}, el partido del ${day} a las ${time} en la cancha ${court} se canceló porque no se completó el cupo de jugadores. No se aplicó ninguna penalización.`,
+    whatsappTemplate: { name: "quento_partido_sin_cupo", parameters: [recipientName, day, time, court] },
+  };
+}
+
+/** Quien armó el partido lo cerró: se juega con los anotados y no se suman más jugadores. */
+export function matchClosedNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `El partido del ${day} ya no busca jugadores`,
+    text: `Hola ${recipientName}, el partido del ${day} a las ${time} en la cancha ${court} ya no busca más jugadores. Se juega con los que están anotados.`,
+    whatsappTemplate: { name: "quento_partido_cerrado", parameters: [recipientName, day, time, court] },
+  };
+}
+

@@ -74,8 +74,11 @@ const { recordPointsMovement } = vi.hoisted(() => ({
 
 vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
 
-const { notifyPlayerJoined } = vi.hoisted(() => ({ notifyPlayerJoined: vi.fn(async () => {}) }));
-vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined }));
+const { notifyPlayerJoined, notifyMatchCancelledByCreator } = vi.hoisted(() => ({
+  notifyPlayerJoined: vi.fn(async () => {}),
+  notifyMatchCancelledByCreator: vi.fn(async () => {}),
+}));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined, notifyMatchCancelledByCreator }));
 
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
@@ -626,6 +629,22 @@ describe("booking actions", () => {
         success: true,
         data: { id: 1, bookingState: BookingState.CANCELLED },
       });
+    });
+
+    it("al cancelar un turno avisa a los demás jugadores si era un partido abierto", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, bookingState: BookingState.RESERVED });
+
+      await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(notifyMatchCancelledByCreator).toHaveBeenCalledWith(1);
+    });
+
+    it("no avisa nada si el turno ya estaba cancelado", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, bookingState: BookingState.CANCELLED });
+
+      await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(notifyMatchCancelledByCreator).not.toHaveBeenCalled();
     });
 
     it("no valida solapamiento al cancelar", async () => {

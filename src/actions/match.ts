@@ -9,7 +9,7 @@ import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POIN
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { notifyPlayerLeft } from "@/src/lib/match-notifications";
+import { notifyMatchClosed, notifyMatchesExpired, notifyPlayerLeft } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 const NOT_OPEN_MESSAGE = "Este partido ya no está buscando jugadores.";
@@ -67,6 +67,8 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
       match.needPlayers = false;
       return match;
     });
+
+    await notifyMatchClosed(matchId);
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
@@ -128,7 +130,7 @@ export async function leaveMatch(matchId: number, playerId: number): Promise<Act
       await recordPointsMovement(playerId, PENALTY_POINTS, "penalty", LATE_LEAVE_REASON);
     }
 
-    await notifyPlayerLeft(matchId, playerId);
+    await notifyPlayerLeft(matchId, playerId, late);
 
     return { success: true, data: null };
   } catch (error) {
@@ -188,6 +190,8 @@ export async function cancelExpiredMatches(): Promise<ActionResult<number>> {
         toCancel.map((match) => match.id),
         { needPlayers: false },
       );
+
+      await notifyMatchesExpired(toCancel.map((match) => match.booking.id));
     }
 
     return { success: true, data: toCancel.length };

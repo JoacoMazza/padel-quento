@@ -26,8 +26,12 @@ const { recordPointsMovement } = vi.hoisted(() => ({
 
 vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
 
-const { notifyPlayerLeft } = vi.hoisted(() => ({ notifyPlayerLeft: vi.fn(async () => {}) }));
-vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerLeft }));
+const { notifyPlayerLeft, notifyMatchClosed, notifyMatchesExpired } = vi.hoisted(() => ({
+  notifyPlayerLeft: vi.fn(async () => {}),
+  notifyMatchClosed: vi.fn(async () => {}),
+  notifyMatchesExpired: vi.fn(async () => {}),
+}));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerLeft, notifyMatchClosed, notifyMatchesExpired }));
 
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import { closeMatch, cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
@@ -69,6 +73,7 @@ describe("match actions", () => {
         success: true,
         data: { id: 1, needPlayers: false, matchPlayers: [{ playersCount: 2 }] },
       });
+      expect(notifyMatchClosed).toHaveBeenCalledWith(1);
     });
 
     it("devuelve error si el partido no existe", async () => {
@@ -123,7 +128,7 @@ describe("match actions", () => {
       expect(deleteFn).toHaveBeenCalledWith(20);
       expect(update).toHaveBeenCalledWith(1, { needPlayers: true });
       expect(recordPointsMovement).not.toHaveBeenCalled();
-      expect(notifyPlayerLeft).toHaveBeenCalledWith(1, 5);
+      expect(notifyPlayerLeft).toHaveBeenCalledWith(1, 5, false);
     });
 
     it("penaliza al jugador que se da de baja con menos de 3 horas y no reabre la búsqueda", async () => {
@@ -135,6 +140,7 @@ describe("match actions", () => {
       expect(deleteFn).toHaveBeenCalledWith(20);
       expect(update).not.toHaveBeenCalled();
       expect(recordPointsMovement).toHaveBeenCalledWith(5, PENALTY_POINTS, "penalty", expect.any(String));
+      expect(notifyPlayerLeft).toHaveBeenCalledWith(1, 5, true);
     });
 
     it("devuelve error si el jugador no forma parte del partido", async () => {
@@ -206,6 +212,7 @@ describe("match actions", () => {
       expect(update).toHaveBeenCalledWith([1], { needPlayers: false });
       expect(update).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ success: true, data: 1 });
+      expect(notifyMatchesExpired).toHaveBeenCalledWith([10]);
     });
 
     it("no penaliza al creador cuando el partido se cancela solo por falta de jugadores", async () => {
