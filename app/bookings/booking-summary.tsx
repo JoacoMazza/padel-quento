@@ -1,11 +1,18 @@
-import { Banknote, Calendar, Clock, LayoutGrid, MapPin, Users } from "lucide-react";
-import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { ArrowRight, CalendarCheck, UserPlus, Users } from "lucide-react";
+import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   SLOT_DURATION_MINUTES,
   formatLongDate,
   formatPrice,
   minutesToTimeLabel,
 } from "@/app/bookings/slot-utils";
+import {
+  GroupSizePicker,
+  SummaryCourt,
+  SummaryFeedback,
+  SummaryField,
+  SummaryHeader,
+} from "@/app/bookings/summary-parts";
 import type { SelectedSlot } from "@/app/bookings/types";
 
 export function BookingSummary({
@@ -30,117 +37,119 @@ export function BookingSummary({
   onConfirm: () => void;
 }) {
   const openMatchGroupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS - 1 }, (_, i) => i + 1);
-  return (
-    <aside className="h-fit rounded-2xl border border-line bg-card p-6 shadow-sm">
-      <h2 className="text-lg font-extrabold text-foreground">Tu reserva</h2>
 
-      {feedback ? (
-        <p
-          role="alert"
-          className={`mt-3 rounded-lg px-3 py-2 text-sm font-medium ${
-            feedback.type === "error"
-              ? "border border-danger/30 bg-danger-light text-danger"
-              : "border border-primary/30 bg-primary-light text-primary"
-          }`}
-        >
-          {feedback.message}
-        </p>
-      ) : null}
+  return (
+    <aside className="card-dark h-fit p-6 lg:sticky lg:top-24">
+      <SummaryHeader
+        title="Resumen de tu turno"
+        status={
+          selectedSlot ? (
+            <>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Disponible
+            </>
+          ) : null
+        }
+      />
+
+      <SummaryFeedback feedback={feedback} />
 
       {selectedSlot ? (
-        <div className="mt-4 flex flex-col gap-4">
-          <SummaryRow icon={<Calendar className="h-5 w-5" />} label="Fecha" value={formatLongDate(selectedDate)} />
-          <SummaryRow
-            icon={<LayoutGrid className="h-5 w-5" />}
-            label="Cancha"
-            value={`Cancha ${selectedSlot.courtNumber}`}
-          />
-          <SummaryRow
-            icon={<MapPin className="h-5 w-5" />}
-            label="Ubicación"
-            value="Cam. Centenario 8907, Villa Elisa"
-          />
-          <SummaryRow
-            icon={<Clock className="h-5 w-5" />}
-            label="Horario"
-            value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} – ${minutesToTimeLabel(selectedSlot.end.getHours() * 60 + selectedSlot.end.getMinutes())}`}
-          />
-          <SummaryRow icon={<Clock className="h-5 w-5" />} label="Duración" value={`${SLOT_DURATION_MINUTES} min`} />
-          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(selectedSlot.price)} />
+        <>
+          <SummaryCourt courtNumber={selectedSlot.courtNumber} />
 
-          <label
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-              isOpenMatch ? "border-amber-300 bg-amber-50" : "border-line hover:border-amber-300"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={isOpenMatch}
-              onChange={(event) => onIsOpenMatchChange(event.target.checked)}
-              className="mt-0.5 h-4 w-4 cursor-pointer accent-amber-500"
+          <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
+            <SummaryField label="Día" value={formatLongDate(selectedDate)} />
+            <SummaryField
+              label="Horario"
+              value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} · ${SLOT_DURATION_MINUTES} min`}
             />
-            <span className="flex flex-col gap-0.5">
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                <Users className="h-4 w-4 text-amber-600" />
-                ¿Es un partido abierto?
-              </span>
-              <span className="text-xs text-foreground/60">
-                Reservás el horario y dejás lugares libres para que otros jugadores de la comunidad se
-                sumen hasta completar los {OPEN_MATCH_MAX_PLAYERS}.
-              </span>
-            </span>
-          </label>
+          </div>
 
-          {isOpenMatch ? (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-              <p className="text-xs font-medium text-foreground/70">
-                ¿Cuántos jugadores confirmados hay (contándote a vos)?
-              </p>
-              <div className="mt-1.5 grid grid-cols-3 gap-2">
-                {openMatchGroupSizeOptions.map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => onOpenMatchGroupSizeChange(size)}
-                    className={`h-9 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                      openMatchGroupSize === size
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "border border-amber-300 bg-white text-foreground hover:border-amber-500"
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
+          <fieldset className="space-y-2 border-b border-white/10 py-5">
+            <legend className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">
+              ¿Cómo vienen?
+            </legend>
+            <ModeOption
+              checked={!isOpenMatch}
+              onChange={() => onIsOpenMatchChange(false)}
+              icon={<Users className="h-4 w-4" />}
+              title="Cancha completa"
+              description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores`}
+            />
+            <ModeOption
+              checked={isOpenMatch}
+              onChange={() => onIsOpenMatchChange(true)}
+              icon={<UserPlus className="h-4 w-4" />}
+              title="Buscar jugadores"
+              description="Abrí el partido para que se sume la comunidad"
+            />
+            {isOpenMatch ? (
+              <div className="pt-2">
+                <GroupSizePicker
+                  question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
+                  options={openMatchGroupSizeOptions}
+                  value={openMatchGroupSize}
+                  onChange={onOpenMatchGroupSizeChange}
+                />
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </fieldset>
 
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={onConfirm}
-            className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
-          >
+          <div className="flex items-end justify-between pt-5">
+            <span className="text-sm text-white/60">Total cancha</span>
+            <span className="text-4xl font-extrabold tracking-tight">{formatPrice(selectedSlot.price)}</span>
+          </div>
+          <p className="mt-3 text-xs text-white/45">
+            Cancelación sin cargo hasta {LATE_CANCELLATION_HOURS} h antes. El pago se abona en la recepción del club.
+          </p>
+
+          <button type="button" disabled={isPending} onClick={onConfirm} className="btn btn-primary btn-lg mt-5 w-full">
             {isPending ? "Confirmando…" : "Reservar turno"}
+            {!isPending ? <ArrowRight className="h-5 w-5" /> : null}
           </button>
-        </div>
+        </>
       ) : (
-        <p className="mt-4 text-sm leading-relaxed text-foreground/60">
-          Elegí un turno disponible para ver el resumen de tu reserva.
-        </p>
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-white/50">
+            <CalendarCheck className="h-6 w-6" />
+          </span>
+          <p className="max-w-60 text-sm leading-relaxed text-white/60">
+            Elegí un turno disponible en la grilla para ver el resumen de tu reserva.
+          </p>
+        </div>
       )}
     </aside>
   );
 }
 
-function SummaryRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ModeOption({
+  checked,
+  onChange,
+  icon,
+  title,
+  description,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 text-foreground/40">{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-xs text-foreground/50">{label}</span>
-        <span className="text-sm font-semibold text-foreground">{value}</span>
-      </div>
-    </div>
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 transition-colors ${
+        checked ? "bg-primary/15 ring-primary" : "bg-white/5 ring-white/10 hover:ring-white/25"
+      }`}
+    >
+      <input type="radio" name="booking-mode" checked={checked} onChange={onChange} className="mt-1 accent-primary" />
+      <span className="flex flex-col gap-0.5">
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          {icon}
+          {title}
+        </span>
+        <span className="text-xs text-white/55">{description}</span>
+      </span>
+    </label>
   );
 }

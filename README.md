@@ -38,7 +38,10 @@ app/                  Rutas y páginas (App Router de Next.js)
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
-  components/         Componentes de UI compartidos (header, menú de usuario, logo)
+  open-matches/       Partidos abiertos: listado y detalle para sumarse ([bookingId])
+  components/         Componentes de UI compartidos (header, footer, shell de página, menú de usuario, logo)
+    ui/               Piezas visuales reutilizables (encabezado de página, avatar, tag de cancha, KPIs)
+  globals.css         Tokens de color y clases de componentes (`card`, `btn-*`, `chip`, `badge-*`, `field`, ...)
 src/
   entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, ...)
   domain/             Enums y tipos de dominio

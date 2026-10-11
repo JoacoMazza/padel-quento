@@ -24,9 +24,11 @@ export type PlayerProfileData = {
   email: string;
   names: string;
   lastnames: string;
+  phoneNumber: string;
   category: string;
   scoring: number;
   photoUrl: string | null;
+  isBlocked: boolean;
   movements: Array<{
     id: number;
     amount: number;
@@ -70,9 +72,11 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
     email: player.account.email,
     names: player.names,
     lastnames: player.lastnames,
+    phoneNumber: player.phoneNumber,
     category: player.category,
     scoring: netScoring,
     photoUrl: player.account.photoUrl,
+    isBlocked: player.account.isBlocked,
     movements: penalties.map((p) => ({
       id: p.id,
       amount: Number(p.penalizedScoring),

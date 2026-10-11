@@ -65,6 +65,16 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(profile?.movements).toEqual([]);
   });
 
+  it("incluye el teléfono del jugador y si su cuenta está bloqueada", async () => {
+    const dataSource = await getDataSource();
+    const player = await dataSource.getRepository<Player>("Player").findOneOrFail({ where: { id: playerId } });
+
+    const profile = await getProfileData(playerEmail);
+
+    expect(profile?.phoneNumber).toBe(player.phoneNumber);
+    expect(profile?.isBlocked).toBe(false);
+  });
+
   it("modifica el nombre y categoría del jugador y los persiste inmediatamente", async () => {
     vi.mocked(getServerSession).mockResolvedValueOnce({
       user: { email: playerEmail, name: "Esteban Quito" },

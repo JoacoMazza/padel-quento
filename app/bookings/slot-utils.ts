@@ -1,5 +1,5 @@
-import { DayOfWeek } from "@/src/domain/enums";
-import type { CourtProp, ScheduleProp } from "@/app/bookings/types";
+import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
+import type { BookingProp, CourtProp, OutOfServiceProp, ScheduleProp, Slot } from "@/app/bookings/types";
 
 export const SLOT_DURATION_MINUTES = 90;
 
@@ -82,6 +82,86 @@ export function getInitialBoardDate(
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   return tomorrow;
+}
+
+/**
+ * Turnos de una cancha para un día según su horario. No contempla la selección
+ * del usuario: el tablero la aplica después sobre el resultado.
+ */
+export function buildCourtSlots({
+  court,
+  schedules,
+  bookings,
+  outOfServices,
+  date,
+  now,
+  playerId,
+}: {
+  court: CourtProp;
+  schedules: ScheduleProp[];
+  bookings: BookingProp[];
+  outOfServices: OutOfServiceProp[];
+  date: Date;
+  now: Date;
+  playerId: number | null;
+}): Slot[] {
+  const schedule = schedules.find((s) => s.courtId === court.id && s.dayOfWeek === dayOfWeekFromDate(date));
+  if (!schedule) return [];
+
+  const openMinutes = timeStringToMinutes(schedule.openingTime);
+  const closeMinutes = timeStringToMinutes(schedule.closingTime);
+  const isCourtOutOfService = court.state !== CourtState.AVAILABLE;
+  const slots: Slot[] = [];
+
+  for (
+    let minutesOfDay = openMinutes;
+    minutesOfDay + SLOT_DURATION_MINUTES <= closeMinutes;
+    minutesOfDay += SLOT_DURATION_MINUTES
+  ) {
+    const start = buildSlotDate(date, minutesOfDay);
+    const end = new Date(start.getTime() + SLOT_DURATION_MINUTES * 60_000);
+    const isPast = start < now;
+
+    const isBlockedByOutOfService = outOfServices.some(
+      (o) => o.courtId === court.id && rangesOverlap(start, end, new Date(o.fromDateTime), new Date(o.toDateTime)),
+    );
+
+    const overlappingBooking = bookings.find((b) => {
+      if (b.courtId !== court.id || b.bookingState === BookingState.CANCELLED) return false;
+      const bookingStart = new Date(b.fromDateTime);
+      const bookingEnd = new Date(bookingStart.getTime() + b.durationMinutes * 60_000);
+      return rangesOverlap(start, end, bookingStart, bookingEnd);
+    });
+
+    const isUnavailable = isCourtOutOfService || isPast || isBlockedByOutOfService;
+
+    // Un partido abierto no cuenta como ocupado: todavía busca jugadores.
+    if (overlappingBooking?.needPlayers && !isUnavailable) {
+      slots.push({
+        minutesOfDay,
+        start,
+        end,
+        status: "open",
+        bookingId: overlappingBooking.id,
+        confirmedPlayers: overlappingBooking.confirmedPlayers,
+        alreadyJoined: playerId != null && (overlappingBooking.matchPlayerIds ?? []).includes(playerId),
+      });
+      continue;
+    }
+
+    slots.push({ minutesOfDay, start, end, status: isUnavailable || overlappingBooking ? "occupied" : "available" });
+  }
+
+  return slots;
+}
+
+/** Turnos libres y partidos abiertos de un día, sumando todas las canchas. */
+export function summarizeSlots(slotsByCourt: Slot[][]): { free: number; open: number } {
+  const all = slotsByCourt.flat();
+  return {
+    free: all.filter((s) => s.status === "available").length,
+    open: all.filter((s) => s.status === "open").length,
+  };
 }
 
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {

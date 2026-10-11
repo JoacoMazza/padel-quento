@@ -1,19 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { PlayerCategory } from "@/src/domain/enums";
+import { Save } from "lucide-react";
 import { updatePlayerProfile, type ProfileState } from "@/src/actions/profile";
-
-const CATEGORY_LABELS: Record<PlayerCategory, string> = {
-  [PlayerCategory.FIRST]: "1ª Categoría",
-  [PlayerCategory.SECOND]: "2ª Categoría",
-  [PlayerCategory.THIRD]: "3ª Categoría",
-  [PlayerCategory.FOURTH]: "4ª Categoría",
-  [PlayerCategory.FIFTH]: "5ª Categoría",
-  [PlayerCategory.SIXTH]: "6ª Categoría",
-  [PlayerCategory.SEVENTH]: "7ª Categoría",
-  [PlayerCategory.WITHOUT_CATEGORY]: "Sin Categoría",
-};
+import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 
 interface ProfileFormProps {
   initialData: {
@@ -37,50 +27,44 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
   const initials = `${names[0] ?? ""}${lastnames[0] ?? ""}`.toUpperCase() || "J";
 
   return (
-    <form action={formAction} className="space-y-6">
-      {state?.success && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-medium text-emerald-400">
-          {state.message}
-        </div>
-      )}
+    <form action={formAction} className="space-y-5">
+      {state?.success && <div className="alert-success">{state.message}</div>}
 
-      {state?.message && !state.success && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-medium text-red-400">
-          {state.message}
-        </div>
-      )}
+      {state?.message && !state.success && <div className="alert-error">{state.message}</div>}
 
       {/* Avatar Preview */}
-      <div className="flex items-center gap-5">
-        <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/40 bg-card shadow-inner">
+      <div className="flex items-center gap-4 rounded-xl bg-background p-4">
+        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink">
           {photoUrl.trim() ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoUrl}
               alt="Avatar de perfil"
-              className="h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
               onError={(e) => {
                 // If image fails to load, clear image to show fallback initials
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           ) : null}
-          <span className="text-xl font-bold text-primary">{initials}</span>
+          <span className="text-lg font-bold text-white">{initials}</span>
         </div>
         <div>
-          <h3 className="text-base font-semibold text-foreground">
+          <p className="text-sm font-semibold text-foreground">
             {names || "Nombre"} {lastnames || "Apellido"}
-          </h3>
+          </p>
           <p className="text-xs text-foreground/60">
-            Categoría actual: <span className="font-medium text-primary">{CATEGORY_LABELS[category as PlayerCategory] || category}</span>
+            Categoría actual:{" "}
+            <span className="font-medium text-primary">
+              {PLAYER_CATEGORY_LABELS[category as keyof typeof PLAYER_CATEGORY_LABELS] || category}
+            </span>
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {/* Nombres */}
         <div>
-          <label htmlFor="names" className="block text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-2">
+          <label htmlFor="names" className="field-label">
             Nombre
           </label>
           <input
@@ -90,17 +74,14 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             required
             value={names}
             onChange={(e) => setNames(e.target.value)}
-            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="field"
             placeholder="Tu nombre"
           />
-          {state?.errors?.names && (
-            <p className="mt-1 text-xs text-red-400">{state.errors.names}</p>
-          )}
+          {state?.errors?.names && <p className="mt-1 text-xs text-danger">{state.errors.names}</p>}
         </div>
 
-        {/* Apellidos */}
         <div>
-          <label htmlFor="lastnames" className="block text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-2">
+          <label htmlFor="lastnames" className="field-label">
             Apellido
           </label>
           <input
@@ -110,67 +91,57 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             required
             value={lastnames}
             onChange={(e) => setLastnames(e.target.value)}
-            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="field"
             placeholder="Tu apellido"
           />
-          {state?.errors?.lastnames && (
-            <p className="mt-1 text-xs text-red-400">{state.errors.lastnames}</p>
-          )}
+          {state?.errors?.lastnames && <p className="mt-1 text-xs text-danger">{state.errors.lastnames}</p>}
         </div>
       </div>
 
-      {/* Categoría */}
-      <div>
-        <label htmlFor="category" className="block text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-2">
-          Categoría
-        </label>
-        <select
-          id="category"
-          name="category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {Object.entries(CATEGORY_LABELS).map(([catKey, label]) => (
-            <option key={catKey} value={catKey}>
-              {label}
-            </option>
-          ))}
-        </select>
-        {state?.errors?.category && (
-          <p className="mt-1 text-xs text-red-400">{state.errors.category}</p>
-        )}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="category" className="field-label">
+            Categoría
+          </label>
+          <select
+            id="category"
+            name="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="field cursor-pointer"
+          >
+            {Object.entries(PLAYER_CATEGORY_LABELS).map(([catKey, label]) => (
+              <option key={catKey} value={catKey}>
+                {label}
+              </option>
+            ))}
+          </select>
+          {state?.errors?.category && <p className="mt-1 text-xs text-danger">{state.errors.category}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="photoUrl" className="field-label">
+            URL de foto de perfil
+          </label>
+          <input
+            id="photoUrl"
+            name="photoUrl"
+            type="text"
+            value={photoUrl}
+            onChange={(e) => setPhotoUrl(e.target.value)}
+            className="field"
+            placeholder="https://ejemplo.com/mi-foto.jpg"
+          />
+          {state?.errors?.photoUrl && <p className="mt-1 text-xs text-danger">{state.errors.photoUrl}</p>}
+        </div>
       </div>
 
-      {/* Foto de perfil */}
-      <div>
-        <label htmlFor="photoUrl" className="block text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-2">
-          URL de Foto de Perfil
-        </label>
-        <input
-          id="photoUrl"
-          name="photoUrl"
-          type="text"
-          value={photoUrl}
-          onChange={(e) => setPhotoUrl(e.target.value)}
-          className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          placeholder="https://ejemplo.com/mi-foto.jpg"
-        />
-        {state?.errors?.photoUrl && (
-          <p className="mt-1 text-xs text-red-400">{state.errors.photoUrl}</p>
-        )}
-      </div>
-
-      <div className="flex justify-end pt-2">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {isPending ? "Guardando..." : "Guardar Cambios"}
+      <div className="flex justify-end pt-1">
+        <button type="submit" disabled={isPending} className="btn btn-dark">
+          <Save className="h-4 w-4" />
+          {isPending ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
     </form>
   );
 }
-

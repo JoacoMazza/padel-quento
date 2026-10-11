@@ -29,15 +29,15 @@ function ModalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-lg">
+    <div className="modal-backdrop">
+      <div className="modal-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">{title}</h2>
           <button
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="icon-btn border-transparent"
           >
             <X className="h-5 w-5" />
           </button>
@@ -132,7 +132,7 @@ function EditForm({
     <ModalShell title={`Editar cancha ${court.number}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="edit-number" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70">
+          <label htmlFor="edit-number" className="field-label">
             Número
           </label>
           <input
@@ -142,12 +142,12 @@ function EditForm({
             required
             value={number}
             onChange={(e) => setNumber(Number(e.target.value))}
-            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="field"
           />
         </div>
 
         <div>
-          <label htmlFor="edit-price" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70">
+          <label htmlFor="edit-price" className="field-label">
             Precio ($)
           </label>
           <input
@@ -157,19 +157,19 @@ function EditForm({
             required
             value={price}
             onChange={(e) => setPrice(Number(e.target.value))}
-            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="field"
           />
         </div>
 
         <div>
-          <label htmlFor="edit-state" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70">
+          <label htmlFor="edit-state" className="field-label">
             Estado
           </label>
           <select
             id="edit-state"
             value={state}
             onChange={(e) => setState(e.target.value as CourtState)}
-            className="w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="field"
           >
             {EDITABLE_COURT_STATES.map((s) => (
               <option key={s} value={s}>
@@ -185,14 +185,14 @@ function EditForm({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
+            className="btn btn-outline"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary"
           >
             {isSaving ? "Guardando..." : "Guardar cambios"}
           </button>
@@ -203,8 +203,8 @@ function EditForm({
 }
 
 const FIELD_CLASS =
-  "w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
-const LABEL_CLASS = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70";
+  "field";
+const LABEL_CLASS = "field-label";
 
 /**
  * Crea un bloqueo (OutOfService) de la cancha: desde este momento o programado
@@ -338,14 +338,14 @@ function OutOfServiceForm({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
+            className="btn btn-outline"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="cursor-pointer rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white shadow hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn bg-danger text-white hover:bg-danger/90"
           >
             {isSaving ? "Guardando..." : "Guardar bloqueo"}
           </button>
@@ -397,7 +397,7 @@ function EnableConfirm({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
+          className="btn btn-outline"
         >
           Cancelar
         </button>
@@ -405,7 +405,7 @@ function EnableConfirm({
           type="button"
           onClick={handleConfirm}
           disabled={isSaving}
-          className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-primary"
         >
           {isSaving ? "Guardando..." : "Confirmar"}
         </button>

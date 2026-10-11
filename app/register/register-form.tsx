@@ -17,7 +17,7 @@ export function RegisterForm() {
       {state.message ? (
         <p
           role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light px-3.5 py-2.5 text-sm font-medium text-danger"
+          className="alert-error"
         >
           {state.message}
         </p>
@@ -72,7 +72,7 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
+        className="btn btn-primary mt-2 w-full"
       >
         {pending ? "Creando cuenta…" : "Registrarme"}
       </button>
@@ -110,7 +110,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-foreground">
+      <label htmlFor={id} className="field-label mb-0">
         {label}
       </label>
       <input
@@ -122,7 +122,7 @@ function Field({
         minLength={minLength}
         maxLength={maxLength}
         required
-        className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+        className="field h-11 bg-card"
       />
       {error ? (
         <p className="text-xs font-medium text-danger" role="alert">
