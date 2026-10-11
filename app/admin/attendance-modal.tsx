@@ -5,6 +5,7 @@ import { CalendarX, Repeat, X, UserCheck, UserX } from "lucide-react";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
 import { releaseFixedBookingDate } from "@/src/actions/fixedBooking";
 import type { AdminBookingProp } from "@/app/admin/types";
+import { Avatar, getInitials } from "@/app/components/ui/avatar";
 
 /**
  * Turno abierto en la turnera global para marcar asistencia (ver
@@ -80,15 +81,15 @@ export function AttendanceModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-lg">
+    <div className="modal-backdrop">
+      <div className="modal-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Asistencia del turno</h2>
           <button
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="icon-btn border-transparent"
           >
             <X className="h-5 w-5" />
           </button>
@@ -110,7 +111,7 @@ export function AttendanceModal({
           {isOpenMatch ? (
             booking.matchPlayers.map((matchPlayer) => (
               <li key={matchPlayer.id} className="flex items-center justify-between py-3">
-                <span className="text-sm font-medium text-foreground">{matchPlayer.playerName}</span>
+                <PlayerName name={matchPlayer.playerName} />
                 <button
                   type="button"
                   disabled={pendingId === matchPlayer.id}
@@ -132,7 +133,7 @@ export function AttendanceModal({
             ))
           ) : (
             <li className="flex items-center justify-between py-3">
-              <span className="text-sm font-medium text-foreground">{booking.bookerName}</span>
+              <PlayerName name={booking.bookerName} />
               <button
                 type="button"
                 disabled={pendingId === booking.id}
@@ -190,5 +191,14 @@ export function AttendanceModal({
         {error ? <p className="mt-3 text-sm font-medium text-danger">{error}</p> : null}
       </div>
     </div>
+  );
+}
+
+function PlayerName({ name }: { name: string }) {
+  return (
+    <span className="flex items-center gap-3">
+      <Avatar initials={getInitials(name)} size="sm" />
+      <span className="text-sm font-semibold text-foreground">{name}</span>
+    </span>
   );
 }

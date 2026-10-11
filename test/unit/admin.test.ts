@@ -38,7 +38,7 @@ function storedAdmin() {
     names: "Admin",
     lastnames: "Uno",
     dni: null,
-    account: { id: 10, email: "admin@test.com", passwordHash: "old-hash", photoUrl: null, isBlocked: false },
+    account: { id: 10, email: "admin@test.com", passwordHash: "old-hash", isBlocked: false },
   };
 }
 
@@ -60,7 +60,6 @@ describe("admin actions", () => {
       expect(repos.Account.create).toHaveBeenCalledWith({
         email: "admin@test.com",
         passwordHash: "hashed-password",
-        photoUrl: null,
       });
       expect(repos.Admin.create).toHaveBeenCalledWith({
         account: expect.objectContaining({ email: "admin@test.com" }),

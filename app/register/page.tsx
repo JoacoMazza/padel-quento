@@ -1,5 +1,8 @@
 import { RegisterForm } from "@/app/register/register-form";
 import { AuthShell } from "@/app/components/auth-shell";
+import { pageMetadata } from "@/app/site-metadata";
+
+export const metadata = pageMetadata("Creá tu cuenta", "/register");
 
 export default function RegisterPage() {
   return (

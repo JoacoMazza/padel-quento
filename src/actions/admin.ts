@@ -14,7 +14,6 @@ export type CreateAdminInput = {
   names: string;
   lastnames: string;
   dni?: number | null;
-  photoUrl?: string | null;
 };
 
 export type UpdateAdminInput = Partial<Omit<CreateAdminInput, "password">> & {
@@ -37,7 +36,6 @@ export async function createAdmin(
         accounts.create({
           email: input.email,
           passwordHash,
-          photoUrl: input.photoUrl ?? null,
         }),
       );
       return admins.save(
@@ -101,10 +99,9 @@ export async function updateAdmin(
         return null;
       }
 
-      const { email, password, photoUrl, names, lastnames, dni } = input;
+      const { email, password, names, lastnames, dni } = input;
 
       if (email !== undefined) admin.account.email = email;
-      if (photoUrl !== undefined) admin.account.photoUrl = photoUrl;
       if (password) admin.account.passwordHash = await bcrypt.hash(password, 12);
       if (names !== undefined) admin.names = names;
       if (lastnames !== undefined) admin.lastnames = lastnames;

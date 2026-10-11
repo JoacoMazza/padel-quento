@@ -2,23 +2,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin, getFixedBookingsAdmin } = vi.hoisted(() => ({
-  getScheduleBoardData: vi.fn(),
-  getCourts: vi.fn(),
-  getOutOfServices: vi.fn(),
-  getPlayersAdmin: vi.fn(),
-  getFixedBookingsAdmin: vi.fn(),
-}));
+const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin, getOccupancyReportData, getFixedBookingsAdmin } = vi.hoisted(
+  () => ({
+    getScheduleBoardData: vi.fn(),
+    getCourts: vi.fn(),
+    getOutOfServices: vi.fn(),
+    getPlayersAdmin: vi.fn(),
+    getOccupancyReportData: vi.fn(),
+    getFixedBookingsAdmin: vi.fn(),
+  }),
+);
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
-vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn() }));
+vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateAllCourtsPrice: vi.fn() }));
 vi.mock("@/src/actions/outOfService", () => ({
   getOutOfServices,
   createOutOfService: vi.fn(),
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
+vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
@@ -58,6 +62,10 @@ describe("AdminPanel", () => {
     });
     getOutOfServices.mockResolvedValue({ success: true, data: [] });
     getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [] });
+    getOccupancyReportData.mockResolvedValue({
+      success: true,
+      data: { courts: [], schedules: [], bookings: [], outOfServices: [] },
+    });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -89,6 +97,7 @@ describe("AdminPanel", () => {
     expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
     expect(getFixedBookingsAdmin).not.toHaveBeenCalled();
+    expect(getOccupancyReportData).not.toHaveBeenCalled();
   });
 
   it("al abrir Turnos Fijos pide los turnos fijos, las canchas y los jugadores para el alta", async () => {
@@ -105,11 +114,32 @@ describe("AdminPanel", () => {
     expect(screen.getByRole("button", { name: "Nuevo turno fijo" })).toBeTruthy();
   });
 
+  it("pide las métricas de ocupación recién al abrir su sección", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Métricas del Complejo");
+    await flush();
+
+    expect(getOccupancyReportData).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Métricas del Complejo" })).toBeTruthy();
+  });
+
+  it("el menú tiene una sola sección de canchas, sin el Bloqueo de Canchas obsoleto", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    const nav = within(screen.getByRole("navigation"));
+    expect(nav.getByRole("button", { name: "Canchas" })).toBeTruthy();
+    expect(nav.queryByText("Estado de Canchas")).toBeNull();
+    expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
+  });
+
   it("pide las canchas recién al abrir su sección y las muestra", async () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     expect(getCourts).toHaveBeenCalledTimes(1);
@@ -155,7 +185,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     const row = (courtLabel: string) => within(screen.getByText(courtLabel).closest("tr")!);
@@ -179,11 +209,11 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     openSection("Gestión de Usuarios");
     await flush();
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     openSection("Turnera Global");
     await flush();
@@ -198,7 +228,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     expect(screen.getByText("No se pudieron obtener las canchas.")).toBeTruthy();
@@ -208,7 +238,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);

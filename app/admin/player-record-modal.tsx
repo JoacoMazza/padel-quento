@@ -72,7 +72,7 @@ export function PlayerRecordModal({
   const now = new Date();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="modal-backdrop">
       <div
         role="dialog"
         aria-modal="true"
@@ -90,7 +90,7 @@ export function PlayerRecordModal({
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="icon-btn border-transparent"
           >
             <X className="h-5 w-5" />
           </button>
@@ -133,7 +133,7 @@ export function PlayerRecordModal({
 
         <div className="flex-1 space-y-5 overflow-y-auto">
           {error ? (
-            <div className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm font-medium text-danger">
+            <div className="alert-error">
               {error}
             </div>
           ) : !record ? (

@@ -19,7 +19,6 @@ export type CreatePlayerInput = {
   names: string;
   lastnames: string;
   phoneNumber: string;
-  photoUrl?: string | null;
   category?: PlayerCategory;
 };
 
@@ -48,7 +47,6 @@ export async function createPlayer(
         accounts.create({
           email: input.email,
           passwordHash,
-          photoUrl: input.photoUrl ?? null,
         }),
       );
       return players.save(
@@ -114,10 +112,9 @@ export async function updatePlayer(
         return null;
       }
 
-      const { email, password, photoUrl, names, lastnames, phoneNumber, category } = input;
+      const { email, password, names, lastnames, phoneNumber, category } = input;
 
       if (email !== undefined) player.account.email = email;
-      if (photoUrl !== undefined) player.account.photoUrl = photoUrl;
       if (password) player.account.passwordHash = await bcrypt.hash(password, 12);
       if (names !== undefined) player.names = names;
       if (lastnames !== undefined) player.lastnames = lastnames;

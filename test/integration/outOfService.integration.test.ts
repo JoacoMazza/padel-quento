@@ -137,6 +137,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
       lastnames: "Bloqueo",
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
+    const playerId = player.data.id;
 
     const day = new Date(Date.now() + 50 * 24 * 60 * 60 * 1000);
     const at = (hours: number, minutes = 0) => {
@@ -145,7 +146,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
       return date;
     };
     async function book(hours: number, minutes: number, onCourtId: number) {
-      const booking = await createBooking({ fromDateTime: at(hours, minutes), bookerId: player.data!.id, courtId: onCourtId });
+      const booking = await createBooking({ fromDateTime: at(hours, minutes), bookerId: playerId, courtId: onCourtId });
       if (!booking.success) throw new Error(`no se pudo crear el turno de prueba: ${booking.error}`);
       return booking.data.id;
     }
