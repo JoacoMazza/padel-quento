@@ -1,13 +1,18 @@
-import { afterAll, describe, expect, it } from "vitest";
-import { CourtState } from "@/src/domain/enums";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { CourtState, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import {
   createCourt,
   getCourts,
   getCourtById,
+  updateAllCourtsPrice,
   updateCourt,
 } from "@/src/actions/court";
 import { uniqueCourtNumber } from "./helpers";
+
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
+
+import { getServerSession } from "next-auth/next";
 
 describe("court actions (integración con Postgres real)", () => {
   afterAll(async () => {
@@ -80,5 +85,18 @@ describe("court actions (integración con Postgres real)", () => {
     const result = await updateCourt(999_999_999, { state: CourtState.AVAILABLE });
 
     expect(result).toEqual({ success: false, error: "La cancha no existe." });
+  });
+
+  it("un administrador cambia el precio de todas las canchas a la vez", async () => {
+    vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
+    await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    await createCourt({ number: uniqueCourtNumber(), state: CourtState.CLOSED_DOWN, price: 12000 });
+
+    const result = await updateAllCourtsPrice(17500);
+
+    expect(result).toEqual({ success: true, data: null });
+    const courts = await getCourts();
+    if (!courts.success) throw new Error("expected success");
+    expect(courts.data.every((court) => court.price === 17500)).toBe(true);
   });
 });

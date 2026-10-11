@@ -11,7 +11,7 @@ const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin } = v
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
-vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn() }));
+vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateAllCourtsPrice: vi.fn() }));
 vi.mock("@/src/actions/outOfService", () => ({
   getOutOfServices,
   createOutOfService: vi.fn(),
@@ -78,11 +78,21 @@ describe("AdminPanel", () => {
     expect(getPlayersAdmin).not.toHaveBeenCalled();
   });
 
+  it("el menú tiene una sola sección de canchas, sin el Bloqueo de Canchas obsoleto", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    const nav = within(screen.getByRole("navigation"));
+    expect(nav.getByRole("button", { name: "Canchas" })).toBeTruthy();
+    expect(nav.queryByText("Estado de Canchas")).toBeNull();
+    expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
+  });
+
   it("pide las canchas recién al abrir su sección y las muestra", async () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     expect(getCourts).toHaveBeenCalledTimes(1);
@@ -128,7 +138,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     const row = (courtLabel: string) => within(screen.getByText(courtLabel).closest("tr")!);
@@ -152,11 +162,11 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     openSection("Gestión de Usuarios");
     await flush();
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     openSection("Turnera Global");
     await flush();
@@ -171,7 +181,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
 
     expect(screen.getByText("No se pudieron obtener las canchas.")).toBeTruthy();
@@ -181,7 +191,7 @@ describe("AdminPanel", () => {
     render(<AdminPanel />);
     await flush();
 
-    openSection("Estado de Canchas");
+    openSection("Canchas");
     await flush();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);

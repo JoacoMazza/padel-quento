@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { CourtState, OutOfServiceReason } from "@/src/domain/enums";
-import { updateCourt } from "@/src/actions/court";
+import { updateAllCourtsPrice, updateCourt } from "@/src/actions/court";
 import { createOutOfService, endOutOfService } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import {
@@ -195,6 +195,72 @@ function EditForm({
             className="btn btn-primary"
           >
             {isSaving ? "Guardando..." : "Guardar cambios"}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+/** Aplica un mismo precio a todas las canchas (hoy el turno vale lo mismo en cualquiera). */
+export function AllCourtsPriceModal({
+  initialPrice,
+  onClose,
+  onSaved,
+}: {
+  initialPrice: number;
+  onClose: () => void;
+  onSaved: (price: number) => void;
+}) {
+  const [price, setPrice] = useState(initialPrice);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsSaving(true);
+
+    const result = await updateAllCourtsPrice(price);
+
+    setIsSaving(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    onSaved(price);
+  }
+
+  return (
+    <ModalShell title="Cambiar precio de todas las canchas" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="all-courts-price" className="field-label">
+            Nuevo precio ($)
+          </label>
+          <input
+            id="all-courts-price"
+            type="number"
+            min={1}
+            required
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
+            className="field"
+          />
+        </div>
+
+        <p className="text-xs text-foreground/60">
+          Se aplica a todas las canchas, incluidas las dadas de baja. Las reservas ya hechas conservan su precio.
+        </p>
+
+        {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="btn btn-outline">
+            Cancelar
+          </button>
+          <button type="submit" disabled={isSaving} className="btn btn-primary">
+            {isSaving ? "Guardando..." : "Aplicar a todas"}
           </button>
         </div>
       </form>

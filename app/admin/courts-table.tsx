@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, CircleCheck, Eye, LayoutGrid, Lock, Pencil } from "lucide-react";
+import { Ban, CircleCheck, Eye, LayoutGrid, Lock, Pencil, Tag } from "lucide-react";
 import { courtStatus, summarizeCourts, type CourtItem } from "@/app/admin/court-status";
-import { CourtModal } from "@/app/admin/court-modal";
+import { AllCourtsPriceModal, CourtModal } from "@/app/admin/court-modal";
 import { CourtTag } from "@/app/components/ui/court-tag";
 import { StatCard } from "@/app/components/ui/stat-card";
 import { formatPrice } from "@/app/bookings/slot-utils";
 
 type ModalState =
   | { mode: "view" | "edit" | "outOfService" | "enable"; court: CourtItem }
+  | { mode: "allPrices" }
   | null;
 
 export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) {
@@ -22,6 +23,11 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
 
   function handleSaved(updated: CourtItem) {
     setCourts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    closeModal();
+  }
+
+  function handleAllPricesSaved(price: number) {
+    setCourts((prev) => prev.map((c) => ({ ...c, price })));
     closeModal();
   }
 
@@ -57,6 +63,13 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
           suffix="registradas"
           footer="Editá precio y estado desde la tabla"
         />
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <button type="button" onClick={() => setModal({ mode: "allPrices" })} className="btn btn-sm btn-outline">
+          <Tag className="h-4 w-4" />
+          Cambiar precio de todas
+        </button>
       </div>
 
       <div className="card overflow-x-auto">
@@ -145,6 +158,9 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
       ) : null}
       {modal?.mode === "outOfService" || modal?.mode === "enable" ? (
         <CourtModal mode={modal.mode} court={modal.court} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+      {modal?.mode === "allPrices" ? (
+        <AllCourtsPriceModal initialPrice={courts[0].price} onClose={closeModal} onSaved={handleAllPricesSaved} />
       ) : null}
     </>
   );

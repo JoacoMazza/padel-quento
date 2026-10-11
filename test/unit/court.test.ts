@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
-import { CourtState } from "@/src/domain/enums";
+import { CourtState, Role } from "@/src/domain/enums";
 
 const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoisted(() => {
   const create = vi.fn((data: unknown) => data);
@@ -15,12 +15,15 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 
+import { getServerSession } from "next-auth/next";
 import * as courtActions from "@/src/actions/court";
 import {
   createCourt,
   getCourts,
   getCourtById,
+  updateAllCourtsPrice,
   updateCourt,
 } from "@/src/actions/court";
 
@@ -161,6 +164,46 @@ describe("court actions", () => {
       const result = await updateCourt(1, { number: 7 });
 
       expect(result).toEqual({ success: false, error: "Ya existe una cancha con ese número." });
+    });
+  });
+
+  describe("updateAllCourtsPrice", () => {
+    function signInAs(role: Role) {
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "user@test.com", role } } as never);
+    }
+
+    it("aplica el nuevo precio a todas las canchas, incluidas las dadas de baja", async () => {
+      signInAs(Role.ADMIN);
+      find.mockResolvedValueOnce([
+        { id: 1, price: 10000, state: CourtState.AVAILABLE },
+        { id: 2, price: 12000, state: CourtState.CLOSED_DOWN },
+      ]);
+
+      const result = await updateAllCourtsPrice(15000);
+
+      expect(save).toHaveBeenCalledWith([
+        { id: 1, price: 15000, state: CourtState.AVAILABLE },
+        { id: 2, price: 15000, state: CourtState.CLOSED_DOWN },
+      ]);
+      expect(result).toEqual({ success: true, data: null });
+    });
+
+    it("devuelve error si el precio no es mayor a 0", async () => {
+      signInAs(Role.ADMIN);
+
+      const result = await updateAllCourtsPrice(0);
+
+      expect(result).toEqual({ success: false, error: "El precio de la cancha es obligatorio y debe ser mayor a 0." });
+      expect(find).not.toHaveBeenCalled();
+    });
+
+    it("no permite cambiar los precios a quien no es administrador", async () => {
+      signInAs(Role.PLAYER);
+
+      const result = await updateAllCourtsPrice(15000);
+
+      expect(result).toEqual({ success: false, error: "No se pudo actualizar el precio de las canchas." });
+      expect(save).not.toHaveBeenCalled();
     });
   });
 

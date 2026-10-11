@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, Lock, BarChart3, Users, CalendarClock } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
@@ -15,8 +15,7 @@ import type { ActionResult } from "@/src/lib/action-result";
 
 const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
-  { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
-  { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: false },
+  { id: "courts", label: "Canchas", icon: MapPin, available: true },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: false },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
 ] as const;

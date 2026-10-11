@@ -6,6 +6,7 @@ import { CourtState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { requireAdmin } from "@/src/lib/rbac";
 
 export type CreateCourtInput = {
   number: number;
@@ -15,17 +16,17 @@ export type CreateCourtInput = {
 
 export type UpdateCourtInput = Partial<CreateCourtInput>;
 
+const INVALID_PRICE_ERROR = "El precio de la cancha es obligatorio y debe ser mayor a 0.";
+
+function isValidPrice(price: unknown): price is number {
+  return typeof price === "number" && !isNaN(price) && price > 0;
+}
+
 export async function createCourt(
   input: CreateCourtInput,
 ): Promise<ActionResult<Court>> {
-  if (
-    input.price === undefined ||
-    input.price === null ||
-    typeof input.price !== "number" ||
-    isNaN(input.price) ||
-    input.price <= 0
-  ) {
-    return { success: false, error: "El precio de la cancha es obligatorio y debe ser mayor a 0." };
+  if (!isValidPrice(input.price)) {
+    return { success: false, error: INVALID_PRICE_ERROR };
   }
 
   try {
@@ -95,5 +96,29 @@ export async function updateCourt(
     }
     console.error("updateCourt", error);
     return { success: false, error: "No se pudo actualizar la cancha." };
+  }
+}
+
+/**
+ * Aplica el mismo precio a todas las canchas, incluidas las dadas de baja.
+ * Las reservas ya hechas conservan el precio con el que se tomaron.
+ * Solo accesible por administradores.
+ */
+export async function updateAllCourtsPrice(price: number): Promise<ActionResult<null>> {
+  if (!isValidPrice(price)) {
+    return { success: false, error: INVALID_PRICE_ERROR };
+  }
+
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const courts = dataSource.getRepository<Court>("Court");
+
+    const all = await courts.find();
+    await courts.save(all.map((court) => ({ ...court, price })));
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("updateAllCourtsPrice", error);
+    return { success: false, error: "No se pudo actualizar el precio de las canchas." };
   }
 }
