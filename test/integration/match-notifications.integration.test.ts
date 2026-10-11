@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { BookingState, CourtState, OutOfServiceReason } from "@/src/domain/enums";
+import { BookingState, CourtState, OutOfServiceReason, Role } from "@/src/domain/enums";
 import {
   courtUnavailableNotice,
   matchCancelledByCreatorNotice,
@@ -22,6 +22,9 @@ import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const { notify } = vi.hoisted(() => ({ notify: vi.fn(async () => {}) }));
 vi.mock("@/src/lib/notifications", () => ({ notify }));
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
+
+import { getServerSession } from "next-auth/next";
 
 type NotifyCall = [NotificationRecipient[], (recipient: NotificationRecipient) => NotificationMessage];
 
@@ -334,6 +337,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       await joinOpenMatch({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
+      // Dar de baja una cancha es solo para administradores.
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
       const closedDown = await updateCourt(other.data.id, { state: CourtState.CLOSED_DOWN });
 
       expect(closedDown.success).toBe(true);
