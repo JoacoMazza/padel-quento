@@ -2,6 +2,7 @@ const BAR_CLASSES = {
   success: "bg-success",
   primary: "bg-primary",
   ink: "bg-ink",
+  occupied: "bg-occupied",
 } as const;
 
 /** Tarjeta de indicador: etiqueta, valor grande, texto secundario y barra de progreso opcional. */
