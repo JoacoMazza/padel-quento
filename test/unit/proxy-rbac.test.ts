@@ -49,6 +49,32 @@ describe("proxy RBAC and Route Protection", () => {
     });
   });
 
+  describe("Manifest del sitio (/manifest.webmanifest)", () => {
+    it("permite el acceso sin token, para que el navegador pueda leerlo", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce(null);
+      const req = createMockRequest("/manifest.webmanifest");
+
+      const res = await proxy(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+
+    it("permite el acceso a usuarios autenticados sin redirigirlos", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({
+        sub: "3",
+        email: "admin@test.com",
+        role: Role.ADMIN,
+      });
+      const req = createMockRequest("/manifest.webmanifest");
+
+      const res = await proxy(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+  });
+
   describe("Rutas protegidas generales (/bookings, /profile)", () => {
     it("redirige al login con callbackUrl si no hay token", async () => {
       vi.mocked(getToken).mockResolvedValueOnce(null);

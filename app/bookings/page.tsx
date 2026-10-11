@@ -12,6 +12,9 @@ import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
 import { getBookings } from "@/src/actions/booking";
 import { getOutOfServices } from "@/src/actions/outOfService";
+import { pageMetadata } from "@/app/site-metadata";
+
+export const metadata = pageMetadata("Turnos", "/bookings");
 
 export default async function BookingsPage() {
   const session = await getServerSession(authOptions);

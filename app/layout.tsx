@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Providers } from "@/app/providers";
+import { siteMetadata } from "@/app/site-metadata";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -8,10 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Padel Quento",
-  description: "Reservas y gestión de partidos — Complejo Quento, City Bell",
-};
+export const metadata: Metadata = siteMetadata;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
