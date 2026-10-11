@@ -68,6 +68,83 @@ describe("BookingsBoard", () => {
     expect(screen.getByRole("button", { name: /Reservar turno/ })).toBeTruthy();
   });
 
+  it("las celdas de la grilla solo muestran el estado del turno, sin precios", () => {
+    renderBoard();
+
+    expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }).textContent).toBe("Disponible");
+    expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" }).textContent).toBe(
+      "Partido abierto",
+    );
+    expect(screen.queryByText(/18\.000/)).toBeNull();
+  });
+
+  it("muestra fuera de servicio los turnos de una cancha bloqueada", () => {
+    render(
+      <BookingsBoard
+        playerId={7}
+        bookerId={7}
+        courts={courts}
+        schedules={schedules}
+        bookings={[]}
+        outOfServices={[
+          { id: 1, fromDateTime: new Date(2026, 9, 12, 18, 0), toDateTime: new Date(2026, 9, 12, 19, 30), courtId: 1 },
+        ]}
+      />,
+    );
+
+    const cell = screen.getByRole("button", { name: "Cancha 1, 18:00, fuera de servicio" });
+    expect(cell.textContent).toBe("Fuera de servicio");
+    expect((cell as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("muestra el título Filtrar antes de los botones de fecha", () => {
+    renderBoard();
+
+    const title = screen.getByText("Filtrar");
+    const firstDay = screen.getByRole("button", { name: /Hoy/ });
+    expect(title.compareDocumentPosition(firstDay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("muestra el resumen del turno solo al elegir un turno disponible", () => {
+    renderBoard();
+
+    expect(screen.queryByRole("complementary", { name: "Resumen de tu turno" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+    expect(screen.getByRole("complementary", { name: "Resumen de tu turno" })).toBeTruthy();
+  });
+
+  it("el resumen se cierra al volver a hacer click en el turno elegido", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, seleccionado" }));
+
+    expect(screen.queryByRole("complementary", { name: "Resumen de tu turno" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeTruthy();
+  });
+
+  it("el resumen se cierra con el botón Cerrar y descarta el turno elegido", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+
+    expect(screen.queryByRole("complementary", { name: "Resumen de tu turno" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeTruthy();
+  });
+
+  it("el resumen muestra la modalidad y el precio por jugador", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+    expect(screen.getByText("Modalidad")).toBeTruthy();
+    expect(screen.queryByText("¿Cómo vienen?")).toBeNull();
+    expect(screen.getByText("$ 4.500 por jugador (4 jugadores)")).toBeTruthy();
+  });
+
   it("al volver a hacer click en el partido abierto elegido lo deselecciona en vez de ofrecer reservarlo", () => {
     renderBoard();
 

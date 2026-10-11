@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CLUB_ADDRESS, CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
+import { CLUB_ADDRESS, CLUB_MAPS_URL } from "@/app/components/club-info";
 
 const FOOTER_LINKS = [
   { href: "/bookings", label: "Reservar cancha" },
@@ -13,9 +13,7 @@ export function AppFooter({ showLinks = true }: { showLinks?: boolean }) {
     <footer className="mt-auto border-t border-line bg-card">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-8 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-extrabold tracking-wide text-foreground uppercase">
-            Quento Club <span className="font-semibold text-foreground/40">· {CLUB_LOCATION}</span>
-          </p>
+          <p className="text-sm font-extrabold tracking-wide text-foreground uppercase">Quento Club</p>
           <a
             href={CLUB_MAPS_URL}
             target="_blank"

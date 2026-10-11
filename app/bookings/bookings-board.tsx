@@ -123,8 +123,13 @@ export function BookingsBoard({
     setJoinGroupSize(1);
   }
 
+  function handleSummaryClose() {
+    resetSelection();
+    setFeedback(null);
+  }
+
   function handleSlotClick(court: CourtProp, slot: Slot) {
-    if (slot.status === "occupied") return;
+    if (slot.status === "occupied" || slot.status === "outOfService") return;
     setFeedback(null);
 
     // Ya elegido, el partido abierto figura como "selected": volver a tocarlo lo deselecciona.
@@ -241,6 +246,7 @@ export function BookingsBoard({
         </span>
       </div>
 
+      <p className="label-caps mb-3">Filtrar</p>
       <DayStrip
         days={days}
         selectedISO={dateInput}
@@ -252,8 +258,7 @@ export function BookingsBoard({
         }}
       />
 
-      <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">
-        <span className="label-caps mr-2 shrink-0">Filtrar:</span>
+      <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
         {[{ id: "all", label: `Todas las canchas (${courts.length})` }, ...courts.map((c) => ({ id: String(c.id), label: `Cancha ${c.number}` }))].map(
           (option) => (
             <button
@@ -272,7 +277,10 @@ export function BookingsBoard({
         )}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* La columna del resumen aparece solo mientras hay un turno elegido. */}
+      <div
+        className={`mt-6 grid grid-cols-1 gap-6 ${selectedSlot || selectedOpenMatch ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""}`}
+      >
         <AvailabilityGrid courtSlots={courtSlots} onSlotClick={handleSlotClick} />
 
         {selectedOpenMatch ? (
@@ -285,8 +293,9 @@ export function BookingsBoard({
             groupSize={joinGroupSize}
             onGroupSizeChange={setJoinGroupSize}
             onConfirm={handleJoinConfirm}
+            onClose={handleSummaryClose}
           />
-        ) : (
+        ) : selectedSlot ? (
           <BookingSummary
             selectedDate={selectedDate}
             selectedSlot={selectedSlot}
@@ -297,8 +306,9 @@ export function BookingsBoard({
             openMatchGroupSize={openMatchGroupSize}
             onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
             onConfirm={handleConfirm}
+            onClose={handleSummaryClose}
           />
-        )}
+        ) : null}
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">

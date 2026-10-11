@@ -133,10 +133,13 @@ export function buildCourtSlots({
       return rangesOverlap(start, end, bookingStart, bookingEnd);
     });
 
-    const isUnavailable = isCourtOutOfService || isPast || isBlockedByOutOfService;
+    if (isCourtOutOfService || isBlockedByOutOfService) {
+      slots.push({ minutesOfDay, start, end, status: "outOfService" });
+      continue;
+    }
 
     // Un partido abierto no cuenta como ocupado: todavía busca jugadores.
-    if (overlappingBooking?.needPlayers && !isUnavailable) {
+    if (overlappingBooking?.needPlayers && !isPast) {
       slots.push({
         minutesOfDay,
         start,
@@ -149,7 +152,7 @@ export function buildCourtSlots({
       continue;
     }
 
-    slots.push({ minutesOfDay, start, end, status: isUnavailable || overlappingBooking ? "occupied" : "available" });
+    slots.push({ minutesOfDay, start, end, status: isPast || overlappingBooking ? "occupied" : "available" });
   }
 
   return slots;

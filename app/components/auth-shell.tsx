@@ -5,7 +5,7 @@ import { CLUB_ADDRESS } from "@/app/components/club-info";
 const HIGHLIGHTS = [
   { icon: CalendarCheck, text: "Reservá tu cancha en segundos" },
   { icon: Users, text: "Sumate a partidos abiertos de la comunidad" },
-  { icon: Trophy, text: "Sumá puntos de fidelidad por cada turno" },
+  { icon: Trophy, text: "Sumá puntos asistiendo a tus turnos" },
 ];
 
 export function AuthShell({

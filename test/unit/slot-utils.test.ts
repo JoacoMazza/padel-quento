@@ -93,21 +93,21 @@ describe("buildCourtSlots", () => {
     expect(result.map((s) => s.status)).toEqual(["occupied", "available", "available"]);
   });
 
-  it("marca ocupados los turnos que caen dentro de un bloqueo", () => {
+  it("marca fuera de servicio los turnos que caen dentro de un bloqueo", () => {
     const result = slots({
       outOfServices: [
         { id: 1, fromDateTime: new Date(2026, 9, 12, 20, 0), toDateTime: new Date(2026, 9, 12, 23, 0), courtId: 1 },
       ],
     });
-    expect(result.map((s) => s.status)).toEqual(["available", "occupied", "occupied"]);
+    expect(result.map((s) => s.status)).toEqual(["available", "outOfService", "outOfService"]);
   });
 
-  it("marca ocupados todos los turnos de una cancha fuera de servicio, aunque haya un partido abierto", () => {
+  it("marca fuera de servicio todos los turnos de una cancha fuera de servicio, aunque haya un partido abierto", () => {
     const result = slots({
       court: { ...court, state: CourtState.OUT_OF_SERVICE },
       bookings: [booking({ needPlayers: true, confirmedPlayers: 2 })],
     });
-    expect(result.every((s) => s.status === "occupied")).toBe(true);
+    expect(result.every((s) => s.status === "outOfService")).toBe(true);
   });
 });
 

@@ -28,7 +28,7 @@ export default async function OpenMatchesPage() {
       <PageHeading
         eyebrow="Comunidad Quento"
         title="Partidos abiertos"
-        description="Sumate a una cancha que ya está armada. Solo necesitás tu cuenta para confirmar tu lugar."
+        description="Partidos que buscan jugadores para completar la cancha. Elegí uno, sumate solo o con tu grupo y coordiná por el chat del partido."
       />
       {!bookingsResult.success ? <p className="alert-error mt-6">{bookingsResult.error}</p> : null}
       <OpenMatchesList matches={matches} />

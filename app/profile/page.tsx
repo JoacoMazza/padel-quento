@@ -1,12 +1,12 @@
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { CalendarPlus, Check, Mail, Pencil, Phone, ShieldAlert, ShieldCheck, Trophy } from "lucide-react";
+import { CalendarPlus, Check, Mail, Phone, ShieldAlert, ShieldCheck, Trophy } from "lucide-react";
 import { authOptions } from "@/src/lib/auth";
 import { getProfileData } from "@/src/actions/profile";
 import { PageShell } from "@/app/components/page-shell";
 import { Avatar } from "@/app/components/ui/avatar";
-import { ProfileForm } from "@/app/profile/profile-form";
+import { EditProfileModal } from "@/app/profile/edit-profile-modal";
 import { PointsHistory } from "@/app/profile/points-history";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import type { PlayerCategory } from "@/src/domain/enums";
@@ -53,9 +53,7 @@ export default async function ProfilePage() {
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground">{fullName}</h1>
-            <span className={`badge tracking-wide uppercase ${profile.isBlocked ? "badge-danger" : "badge-primary"}`}>
-              {profile.isBlocked ? "Cuenta bloqueada" : "Socio activo"}
-            </span>
+            {profile.isBlocked ? <span className="badge badge-danger tracking-wide uppercase">Cuenta bloqueada</span> : null}
           </div>
           <p className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-foreground/60">
             <span className="flex items-center gap-1.5">
@@ -69,10 +67,14 @@ export default async function ProfilePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <a href="#editar-perfil" className="btn btn-soft">
-            <Pencil className="h-4 w-4" />
-            Editar perfil
-          </a>
+          <EditProfileModal
+            initialData={{
+              names: profile.names,
+              lastnames: profile.lastnames,
+              category: profile.category,
+              photoUrl: profile.photoUrl,
+            }}
+          />
           <Link href="/bookings" className="btn btn-primary">
             <CalendarPlus className="h-4 w-4" />
             Nuevo turno
@@ -103,23 +105,13 @@ export default async function ProfilePage() {
         </StatusCard>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex flex-col gap-6">
-          <section id="editar-perfil" className="card scroll-mt-24 p-6">
-            <h2 className="mb-5 text-lg font-bold text-foreground">Información personal</h2>
-            <ProfileForm
-              initialData={{
-                names: profile.names,
-                lastnames: profile.lastnames,
-                category: profile.category,
-                photoUrl: profile.photoUrl,
-              }}
-            />
-          </section>
+      {/* Mismas columnas y separación que las tarjetas de arriba: el historial ocupa dos y las reglas, la última. */}
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 md:grid-cols-3">
+        <div className="md:col-span-2">
           <PointsHistory movements={profile.movements} />
         </div>
 
-        <aside className="card h-fit p-6">
+        <aside className="card p-6">
           <h2 className="flex items-center gap-2 text-sm font-extrabold tracking-wide text-foreground uppercase">
             <ShieldCheck className="h-5 w-5 text-primary" />
             Reglas de convivencia

@@ -36,11 +36,17 @@ export function UserMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Menú de usuario"
+        aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary-hover"
+        className="group flex cursor-pointer items-center gap-3 rounded-full py-1 pr-3 pl-1 text-left transition-colors hover:bg-background"
       >
-        {getInitials(name, email)}
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow-md shadow-primary/25 transition-colors group-hover:bg-primary-hover">
+          {getInitials(name, email)}
+        </span>
+        <span className="hidden min-w-0 flex-col leading-tight md:flex">
+          <span className="truncate text-sm font-semibold text-foreground">{name ?? "Mi cuenta"}</span>
+          <span className="truncate text-xs text-foreground/55">{email}</span>
+        </span>
       </button>
       {open ? (
         <div className="absolute right-0 z-10 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-card shadow-xl">

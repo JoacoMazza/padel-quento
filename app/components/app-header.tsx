@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { QuentoLogo } from "@/app/components/quento-logo";
 import { UserMenu } from "@/app/components/user-menu";
-import { CLUB_LOCATION } from "@/app/components/club-info";
 import { Role } from "@/src/domain/enums";
 
 export type HeaderActiveTab =
@@ -35,17 +34,17 @@ export function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
+      {/* Tres columnas en una fila: logo a la izquierda, navegación centrada y menú de usuario a la derecha. */}
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-x-4 px-6 py-3">
         <div className="flex items-center gap-2.5">
           <QuentoLogo size="sm" variant="icon" />
-          <span className="text-base font-extrabold tracking-wide text-foreground uppercase">Quento Club</span>
-          <span className="hidden text-xs font-semibold tracking-wider text-foreground/40 uppercase sm:inline">
-            · {CLUB_LOCATION}
+          <span className="hidden text-base font-extrabold tracking-wide text-foreground uppercase sm:inline">
+            Quento Club
           </span>
         </div>
         {showNav ? (
-          // En mobile baja a una segunda fila con scroll horizontal.
-          <nav className="order-last -mx-2 flex w-full gap-1 overflow-x-auto md:order-none md:mx-0 md:w-auto">
+          // Si no entra en pantallas chicas, scrollea en horizontal.
+          <nav className="flex min-w-0 gap-1 overflow-x-auto">
             {NAV_ITEMS.map((item) => {
               const isActive = item.href === active;
               return (
@@ -61,7 +60,9 @@ export function AppHeader({
             })}
           </nav>
         ) : null}
-        <UserMenu name={userName} email={userEmail} role={userRole} />
+        <div className="col-start-3 justify-self-end">
+          <UserMenu name={userName} email={userEmail} role={userRole} />
+        </div>
       </div>
     </header>
   );

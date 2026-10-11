@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerPlayer, type RegisterState } from "@/src/actions/register";
+import { PasswordInput } from "@/app/components/ui/password-input";
 
 const initialState: RegisterState = {};
 
@@ -113,17 +114,30 @@ function Field({
       <label htmlFor={id} className="field-label mb-0">
         {label}
       </label>
-      <input
-        id={id}
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        minLength={minLength}
-        maxLength={maxLength}
-        required
-        className="field h-11 bg-card"
-      />
+      {type === "password" ? (
+        <PasswordInput
+          id={id}
+          name={name}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          minLength={minLength}
+          maxLength={maxLength}
+          required
+          className="h-11 bg-card"
+        />
+      ) : (
+        <input
+          id={id}
+          name={name}
+          type={type}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          minLength={minLength}
+          maxLength={maxLength}
+          required
+          className="field h-11 bg-card"
+        />
+      )}
       {error ? (
         <p className="text-xs font-medium text-danger" role="alert">
           {error}

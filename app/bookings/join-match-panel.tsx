@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CircleCheck, UserPlus } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import { PlayerDots, missingPlayersLabel } from "@/app/components/ui/player-dots";
 import {
   GroupSizePicker,
@@ -9,6 +9,8 @@ import {
   SummaryFeedback,
   SummaryField,
   SummaryHeader,
+  SummaryPanel,
+  SummaryTotal,
 } from "@/app/bookings/summary-parts";
 import type { SelectedOpenMatch } from "@/app/bookings/types";
 
@@ -21,6 +23,7 @@ export function JoinMatchPanel({
   groupSize,
   onGroupSizeChange,
   onConfirm,
+  onClose,
 }: {
   selectedDate: Date;
   selectedMatch: SelectedOpenMatch;
@@ -30,20 +33,18 @@ export function JoinMatchPanel({
   groupSize: number;
   onGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
+  onClose: () => void;
 }) {
   const remainingSpots = OPEN_MATCH_MAX_PLAYERS - selectedMatch.confirmedPlayers;
   const groupSizeOptions = Array.from({ length: remainingSpots }, (_, i) => i + 1);
   const timeRange = `${minutesToTimeLabel(selectedMatch.start.getHours() * 60 + selectedMatch.start.getMinutes())} – ${minutesToTimeLabel(selectedMatch.end.getHours() * 60 + selectedMatch.end.getMinutes())}`;
 
   return (
-    <aside className="card-dark h-fit p-6 lg:sticky lg:top-24">
+    <SummaryPanel label="Partido abierto">
       <SummaryHeader
         title="Partido abierto"
-        status={
-          <span className="text-red-300">
-            {missingPlayersLabel(remainingSpots)}
-          </span>
-        }
+        status={<span className="text-red-300">{missingPlayersLabel(remainingSpots)}</span>}
+        onClose={onClose}
       />
 
       <SummaryFeedback feedback={feedback} />
@@ -65,9 +66,8 @@ export function JoinMatchPanel({
         <PlayerDots confirmed={selectedMatch.confirmedPlayers} tone="primary" />
       </div>
 
-      <div className="flex items-end justify-between pt-5">
-        <span className="text-sm text-white/60">Total cancha</span>
-        <span className="text-4xl font-extrabold tracking-tight">{formatPrice(selectedMatch.price)}</span>
+      <div className="pt-5">
+        <SummaryTotal price={selectedMatch.price} />
       </div>
 
       {alreadyJoined ? (
@@ -99,6 +99,6 @@ export function JoinMatchPanel({
         Ver detalle del partido
         <ArrowRight className="h-3.5 w-3.5" />
       </Link>
-    </aside>
+    </SummaryPanel>
   );
 }

@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { PasswordInput } from "@/app/components/ui/password-input";
 
 export function LoginForm() {
   const router = useRouter();
@@ -77,14 +78,13 @@ export function LoginForm() {
         <label htmlFor="password" className="field-label mb-0">
           Contraseña
         </label>
-        <input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           placeholder="••••••••"
-          className="field h-11 bg-card"
+          className="h-11 bg-card"
         />
       </div>
 

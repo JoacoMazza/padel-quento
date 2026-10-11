@@ -39,6 +39,23 @@ describe("AppHeader", () => {
     expect(screen.getByRole("link", { name: "Turnos" }).getAttribute("aria-current")).toBeNull();
   });
 
+  it("muestra solo el nombre del club, sin la localidad", () => {
+    render(<AppHeader active="/" />);
+
+    expect(screen.getByText("Quento Club")).toBeTruthy();
+    expect(screen.queryByText(/Villa Elisa/)).toBeNull();
+  });
+
+  it("distribuye logo, navegación y menú de usuario en tres columnas", () => {
+    render(<AppHeader active="/" />);
+
+    const nav = screen.getByRole("navigation");
+    const row = nav.parentElement!;
+    expect(row.className).toContain("grid-cols-[1fr_minmax(0,auto)_1fr]");
+    expect([...row.children].indexOf(nav)).toBe(1);
+    expect(row.children).toHaveLength(3);
+  });
+
   it("oculta la navegación en el panel de administración", () => {
     render(<AppHeader active="/admin" showNav={false} />);
 
