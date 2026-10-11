@@ -74,6 +74,9 @@ const { recordPointsMovement } = vi.hoisted(() => ({
 
 vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
 
+const { notifyPlayerJoined } = vi.hoisted(() => ({ notifyPlayerJoined: vi.fn(async () => {}) }));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined }));
+
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
   createBooking,
@@ -353,6 +356,7 @@ describe("booking actions", () => {
       });
       expect(save).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
+      expect(notifyPlayerJoined).toHaveBeenCalledWith(10, 5);
     });
 
     it("crea la sala de chat al sumarse el segundo jugador con cuenta propia", async () => {

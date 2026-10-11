@@ -26,6 +26,9 @@ const { recordPointsMovement } = vi.hoisted(() => ({
 
 vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
 
+const { notifyPlayerLeft } = vi.hoisted(() => ({ notifyPlayerLeft: vi.fn(async () => {}) }));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerLeft }));
+
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import { closeMatch, cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
 
@@ -120,6 +123,7 @@ describe("match actions", () => {
       expect(deleteFn).toHaveBeenCalledWith(20);
       expect(update).toHaveBeenCalledWith(1, { needPlayers: true });
       expect(recordPointsMovement).not.toHaveBeenCalled();
+      expect(notifyPlayerLeft).toHaveBeenCalledWith(1, 5);
     });
 
     it("penaliza al jugador que se da de baja con menos de 3 horas y no reabre la búsqueda", async () => {
@@ -141,6 +145,7 @@ describe("match actions", () => {
       expect(result).toEqual({ success: false, error: "No formás parte de este partido." });
       expect(deleteFn).not.toHaveBeenCalled();
       expect(recordPointsMovement).not.toHaveBeenCalled();
+      expect(notifyPlayerLeft).not.toHaveBeenCalled();
     });
 
     it("no deja darse de baja a quien creó el partido (debe cancelar el turno)", async () => {

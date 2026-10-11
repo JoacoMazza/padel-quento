@@ -84,6 +84,20 @@ Variables relevantes en `.env`:
 | `NEXTAUTH_SECRET` | Secreto usado por NextAuth para firmar sesiones |
 | `NEXTAUTH_URL` | URL base de la app (`http://localhost:3000` en desarrollo) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
+| `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
+
+### Avisos a los jugadores (correo y WhatsApp)
+
+Se avisa a los jugadores cuando la cancha queda fuera de servicio y se cancela su turno, y cuando alguien se suma o se baja de un partido abierto del que forman parte (ver [src/lib/match-notifications.ts](src/lib/match-notifications.ts)). Cada canal se activa solo si están cargadas sus variables; sin ninguna, en desarrollo los avisos se muestran por consola y en tests no se envía nada. Un aviso que falla nunca hace fallar la operación que lo originó.
+
+WhatsApp no permite mandar texto libre en mensajes que inicia el club, así que usa estas plantillas, que hay que crear (categoría *Utility*, idioma `es_AR`) y tener aprobadas en el WhatsApp Manager de Meta:
+
+| Plantilla | Texto |
+| --- | --- |
+| `quento_turno_cancelado` | Hola {{1}}, tu turno del {{2}} a las {{3}} en la cancha {{4}} fue cancelado porque la cancha no va a estar disponible. No se aplicó ninguna penalización. |
+| `quento_jugador_se_sumo` | Hola {{1}}, {{2}} se sumó al partido del {{3}} a las {{4}} en la cancha {{5}}. Lugares libres: {{6}}. |
+| `quento_jugador_se_bajo` | Hola {{1}}, {{2}} se bajó del partido del {{3}} a las {{4}} en la cancha {{5}}. Lugares libres: {{6}}. |
 
 Para los tests de integración, copiar también:
 

@@ -9,6 +9,7 @@ import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POIN
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyPlayerLeft } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 const NOT_OPEN_MESSAGE = "Este partido ya no está buscando jugadores.";
@@ -126,6 +127,8 @@ export async function leaveMatch(matchId: number, playerId: number): Promise<Act
     if (late) {
       await recordPointsMovement(playerId, PENALTY_POINTS, "penalty", LATE_LEAVE_REASON);
     }
+
+    await notifyPlayerLeft(matchId, playerId);
 
     return { success: true, data: null };
   } catch (error) {

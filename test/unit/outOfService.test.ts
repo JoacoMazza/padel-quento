@@ -15,6 +15,7 @@ const { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSou
     set: vi.fn(),
     where: vi.fn(),
     andWhere: vi.fn(),
+    returning: vi.fn(),
     execute: vi.fn(),
   };
   const manager = { getRepository, createQueryBuilder: vi.fn(() => bookingsUpdate) };
@@ -24,6 +25,9 @@ const { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSou
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+
+const { notifyCourtUnavailable } = vi.hoisted(() => ({ notifyCourtUnavailable: vi.fn(async () => {}) }));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyCourtUnavailable }));
 
 import {
   createOutOfService,
@@ -43,10 +47,10 @@ describe("outOfService actions", () => {
     create.mockImplementation((data: unknown) => data);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
     save.mockImplementation(async (entity: unknown) => entity);
-    for (const method of ["update", "set", "where", "andWhere"] as const) {
+    for (const method of ["update", "set", "where", "andWhere", "returning"] as const) {
       bookingsUpdate[method].mockReturnValue(bookingsUpdate);
     }
-    bookingsUpdate.execute.mockResolvedValue({ affected: 0 });
+    bookingsUpdate.execute.mockResolvedValue({ affected: 0, raw: [] });
   });
 
   describe("createOutOfService", () => {
@@ -126,6 +130,31 @@ describe("outOfService actions", () => {
         ]),
       );
       expect(bookingsUpdate.execute).toHaveBeenCalled();
+    });
+
+    it("avisa a los jugadores de los turnos que canceló el bloqueo", async () => {
+      bookingsUpdate.execute.mockResolvedValueOnce({ affected: 2, raw: [{ id: 7 }, { id: 9 }] });
+
+      await createOutOfService({
+        fromDateTime,
+        toDateTime,
+        reason: OutOfServiceReason.MAINTENANCE,
+        courtId: 1,
+      });
+
+      expect(bookingsUpdate.returning).toHaveBeenCalledWith("id");
+      expect(notifyCourtUnavailable).toHaveBeenCalledWith([7, 9]);
+    });
+
+    it("no avisa nada si el bloqueo no canceló ningún turno", async () => {
+      await createOutOfService({
+        fromDateTime,
+        toDateTime,
+        reason: OutOfServiceReason.MAINTENANCE,
+        courtId: 1,
+      });
+
+      expect(notifyCourtUnavailable).not.toHaveBeenCalled();
     });
 
     it("devuelve un error genérico si falla el guardado", async () => {

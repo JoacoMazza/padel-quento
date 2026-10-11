@@ -14,6 +14,7 @@ import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POIN
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyPlayerJoined } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 export type CreateBookingInput = {
@@ -336,6 +337,8 @@ export async function joinOpenMatch(
 
       return booking;
     });
+
+    await notifyPlayerJoined(input.bookingId, input.playerId);
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
