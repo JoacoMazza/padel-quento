@@ -49,16 +49,17 @@ export function MyBookingsBoard({
   }
 
   return (
-    <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-6 rounded-2xl border border-line bg-card p-5 shadow-sm">
+    <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex flex-col gap-10">
         <section>
-          <h2 className="flex items-center gap-2 text-base font-extrabold text-foreground">
+          <h2 className="flex items-center gap-2 text-lg font-extrabold text-foreground">
             <Calendar className="h-5 w-5 text-primary" />
             Próximos turnos
+            <span className="badge badge-primary">{upcoming.length}</span>
           </h2>
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="mt-4 flex flex-col gap-3">
             {upcoming.length === 0 ? (
-              <p className="text-sm text-foreground/50">No tenés turnos próximos con estos filtros.</p>
+              <p className="card p-6 text-sm text-foreground/50">No tenés turnos próximos con estos filtros.</p>
             ) : (
               upcoming.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} playerId={playerId} />)
             )}
@@ -66,13 +67,14 @@ export function MyBookingsBoard({
         </section>
 
         <section>
-          <h2 className="flex items-center gap-2 text-base font-extrabold text-foreground">
+          <h2 className="flex items-center gap-2 text-lg font-extrabold text-foreground">
             <Clock className="h-5 w-5 text-foreground/50" />
             Turnos anteriores
+            <span className="badge badge-neutral">{past.length}</span>
           </h2>
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="mt-4 flex flex-col gap-3">
             {past.length === 0 ? (
-              <p className="text-sm text-foreground/50">No tenés turnos anteriores con estos filtros.</p>
+              <p className="card p-6 text-sm text-foreground/50">No tenés turnos anteriores con estos filtros.</p>
             ) : (
               past.map((booking) => <BookingRow key={booking.id} booking={booking} now={now} playerId={playerId} />)
             )}

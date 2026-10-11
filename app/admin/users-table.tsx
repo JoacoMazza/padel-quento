@@ -64,21 +64,21 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
           placeholder="Buscar por nombre o email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-line bg-background py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="field bg-card pl-9"
         />
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-2xl border border-line bg-card shadow-sm">
+      <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line bg-background/60">
             <tr>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Jugador</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Email</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Teléfono</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Categoría</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Estado</th>
-              <th className="px-5 py-3 text-right font-semibold text-foreground/70">Acciones</th>
+              <th className="table-head">Jugador</th>
+              <th className="table-head">Email</th>
+              <th className="table-head">Teléfono</th>
+              <th className="table-head">Categoría</th>
+              <th className="table-head">Estado</th>
+              <th className="table-head text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -94,44 +94,44 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
                 const thisError = actionError?.id === player.id ? actionError.msg : null;
 
                 return (
-                  <tr key={player.id}>
+                  <tr key={player.id} className="transition-colors hover:bg-background/60">
                     {/* Nombre */}
-                    <td className="whitespace-nowrap px-5 py-3.5 font-semibold text-foreground">
+                    <td className="table-cell font-semibold text-foreground">
                       {player.names} {player.lastnames}
                     </td>
 
                     {/* Email */}
-                    <td className="whitespace-nowrap px-5 py-3.5 text-foreground/70">
+                    <td className="table-cell text-foreground/70">
                       {player.email}
                     </td>
 
                     {/* Teléfono */}
-                    <td className="whitespace-nowrap px-5 py-3.5 text-foreground/70">
+                    <td className="table-cell text-foreground/70">
                       {player.phoneNumber}
                     </td>
 
                     {/* Categoría */}
-                    <td className="whitespace-nowrap px-5 py-3.5 text-foreground/70">
+                    <td className="table-cell text-foreground/70">
                       {CATEGORY_LABELS[player.category] ?? player.category}
                     </td>
 
                     {/* Estado */}
-                    <td className="whitespace-nowrap px-5 py-3.5">
+                    <td className="table-cell">
                       {player.isBlocked ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">
-                          <span className="h-2 w-2 rounded-full bg-danger" />
+                        <span className="badge badge-danger">
+                          <span className="h-1.5 w-1.5 rounded-full bg-danger" />
                           Bloqueado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-                          <span className="h-2 w-2 rounded-full bg-success" />
+                        <span className="badge badge-success">
+                          <span className="h-1.5 w-1.5 rounded-full bg-success" />
                           Activo
                         </span>
                       )}
                     </td>
 
                     {/* Acciones */}
-                    <td className="whitespace-nowrap px-5 py-3.5 text-right">
+                    <td className="table-cell text-right">
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex items-center gap-2">
                           <button
@@ -139,7 +139,7 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
                             aria-label={`Ver ficha de ${player.names}`}
                             title="Ver ficha"
                             onClick={() => setRecordPlayerId(player.id)}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                            className="btn btn-sm btn-soft"
                           >
                             <IdCard className="h-3.5 w-3.5" />
                             Ver ficha

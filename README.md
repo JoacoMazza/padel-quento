@@ -28,7 +28,7 @@ El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quent
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
-Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, foto, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
+Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
 
 ## Estructura del proyecto
 
@@ -38,7 +38,10 @@ app/                  Rutas y páginas (App Router de Next.js)
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
-  components/         Componentes de UI compartidos (header, menú de usuario, logo)
+  open-matches/       Partidos abiertos: listado y detalle para sumarse ([bookingId])
+  components/         Componentes de UI compartidos (header, footer, shell de página, menú de usuario, logo)
+    ui/               Piezas visuales reutilizables (encabezado de página, avatar, tag de cancha, KPIs, campo de contraseña)
+  globals.css         Tokens de color y clases de componentes (`card`, `btn-*`, `chip`, `badge-*`, `field`, ...)
 src/
   entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, ...)
   domain/             Enums y tipos de dominio
@@ -160,6 +163,14 @@ Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 
 
 También crea, si no existen, una cuenta de administrador (`admin@quento.com` / `admin123`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
+Para tener datos con los que revisar las métricas de ocupación del panel admin, hay un seed aparte de turnos (requiere haber corrido antes `pnpm db:seed`):
+
+```bash
+pnpm db:seed:bookings
+```
+
+Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+
 > Si tu base de desarrollo es anterior a la división de `users` en `accounts`/`admins`/`bookers`, `synchronize` no migra los datos (crea las tablas nuevas vacías y deja `users` huérfana). Lo más simple es recrearla (`docker compose down -v && docker compose up -d`), levantar la app una vez (`pnpm dev`) para que `synchronize` cree las tablas y recién ahí correr el seed: el seed usa la `DataSource` de CLI, que no sincroniza el esquema, así que sobre una base vacía falla con `no existe la relación «courts»`. Las bases gestionadas con migraciones conservan sus datos: `SplitUsersIntoAccounts` los copia de `users` a las tablas nuevas.
 
 ## Comandos importantes
@@ -182,6 +193,7 @@ pnpm migration:run                                      # aplica las migraciones
 pnpm migration:revert                                   # revierte la última migración aplicada
 pnpm migration:show                                     # lista migraciones aplicadas/pendientes
 pnpm db:seed                                             # crea 8 canchas con horario 09-23hs todos los días (idempotente)
+pnpm db:seed:bookings                                    # crea turnos de ejemplo alrededor de la fecha actual, para las métricas
 ```
 
 Ver [Migraciones](#4-migraciones) y [Datos de ejemplo (seed)](#5-datos-de-ejemplo-seed) para más detalle.

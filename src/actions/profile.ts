@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth/next";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
-import { Account } from "@/src/entities/Account";
 import { Player } from "@/src/entities/Player";
 import { Penalty } from "@/src/entities/Penalty";
 import {
@@ -24,9 +23,10 @@ export type PlayerProfileData = {
   email: string;
   names: string;
   lastnames: string;
+  phoneNumber: string;
   category: string;
   scoring: number;
-  photoUrl: string | null;
+  isBlocked: boolean;
   movements: Array<{
     id: number;
     amount: number;
@@ -70,9 +70,10 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
     email: player.account.email,
     names: player.names,
     lastnames: player.lastnames,
+    phoneNumber: player.phoneNumber,
     category: player.category,
     scoring: netScoring,
-    photoUrl: player.account.photoUrl,
+    isBlocked: player.account.isBlocked,
     movements: penalties.map((p) => ({
       id: p.id,
       amount: Number(p.penalizedScoring),
@@ -97,7 +98,7 @@ export async function updatePlayerProfile(
     return { errors: parsed.errors };
   }
 
-  const { names, lastnames, category, photoUrl } = parsed.data;
+  const { names, lastnames, category } = parsed.data;
 
   try {
     const dataSource = await getDataSource();
@@ -111,11 +112,7 @@ export async function updatePlayerProfile(
       return { message: "No se encontró el perfil de jugador." };
     }
 
-    // La foto vive en la cuenta; nombre, apellido y categoría en el jugador.
-    await dataSource.transaction(async (manager) => {
-      await manager.getRepository<Account>("Account").update(player.account.id, { photoUrl });
-      await manager.getRepository<Player>("Player").update(player.id, { names, lastnames, category });
-    });
+    await playerRepo.update(player.id, { names, lastnames, category });
     console.log(`[Profile] Perfil actualizado exitosamente para: ${session.user.email}`);
 
     revalidatePath("/profile");

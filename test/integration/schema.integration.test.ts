@@ -21,8 +21,9 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
 
   it("las cuentas se dividen en accounts, admins y bookers (Player hereda de Booker), y ya no existen users ni players", async () => {
     expect(await columnsOf("accounts")).toEqual(
-      expect.arrayContaining(["id", "email", "photo_url", "password_hashed", "is_blocked"]),
+      expect.arrayContaining(["id", "email", "password_hashed", "is_blocked"]),
     );
+    expect(await columnsOf("accounts")).not.toContain("photo_url");
     expect(await columnsOf("admins")).toEqual(
       expect.arrayContaining(["id", "account_id", "dni", "names", "last_names"]),
     );

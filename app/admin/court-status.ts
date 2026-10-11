@@ -9,20 +9,20 @@ export const STATE_LABELS: Record<CourtState, string> = {
 
 export const STATE_BADGE_STYLES: Record<CourtState, { badge: string; dot: string }> = {
   [CourtState.AVAILABLE]: {
-    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    dot: "bg-emerald-500",
+    badge: "badge-success",
+    dot: "bg-success",
   },
   [CourtState.OUT_OF_SERVICE]: {
-    badge: "bg-danger/10 text-danger",
+    badge: "badge-danger",
     dot: "bg-danger",
   },
   [CourtState.MAINTENANCE]: {
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    badge: "badge-warning",
     dot: "bg-amber-500",
   },
   [CourtState.CLOSED_DOWN]: {
-    badge: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-    dot: "bg-slate-500",
+    badge: "badge-neutral",
+    dot: "bg-foreground/40",
   },
 };
 
@@ -49,6 +49,15 @@ export type CourtItem = {
   price: number;
   activeOutOfService: ActiveOutOfService | null;
 };
+
+/** Totales del tablero de canchas: habilitadas (disponibles y sin bloqueo activo) y bloqueos vigentes. */
+export function summarizeCourts(courts: CourtItem[]): { total: number; enabled: number; activeBlocks: number } {
+  return {
+    total: courts.length,
+    enabled: courts.filter((c) => c.state === CourtState.AVAILABLE && !c.activeOutOfService).length,
+    activeBlocks: courts.filter((c) => c.activeOutOfService).length,
+  };
+}
 
 /** Etiqueta y estilo del estado a mostrar: un bloqueo activo manda sobre el estado guardado. */
 export function courtStatus(court: CourtItem): { label: string; style: { badge: string; dot: string } } {

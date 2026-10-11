@@ -65,6 +65,16 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(profile?.movements).toEqual([]);
   });
 
+  it("incluye el teléfono del jugador y si su cuenta está bloqueada", async () => {
+    const dataSource = await getDataSource();
+    const player = await dataSource.getRepository<Player>("Player").findOneOrFail({ where: { id: playerId } });
+
+    const profile = await getProfileData(playerEmail);
+
+    expect(profile?.phoneNumber).toBe(player.phoneNumber);
+    expect(profile?.isBlocked).toBe(false);
+  });
+
   it("modifica el nombre y categoría del jugador y los persiste inmediatamente", async () => {
     vi.mocked(getServerSession).mockResolvedValueOnce({
       user: { email: playerEmail, name: "Esteban Quito" },
@@ -74,7 +84,6 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     formData.set("names", "Esteban Modificado");
     formData.set("lastnames", "Quito Nuevo");
     formData.set("category", PlayerCategory.THIRD);
-    formData.set("photoUrl", "https://ejemplo.com/foto.png");
 
     const result = await updatePlayerProfile(initialState, formData);
 
@@ -92,7 +101,6 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(updated?.names).toBe("Esteban Modificado");
     expect(updated?.lastnames).toBe("Quito Nuevo");
     expect(updated?.category).toBe(PlayerCategory.THIRD);
-    expect(updated?.account.photoUrl).toBe("https://ejemplo.com/foto.png");
   });
 
   it("registra movimientos de bonificación y penalización y calcula el saldo neto en solo lectura", async () => {

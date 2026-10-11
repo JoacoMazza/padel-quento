@@ -54,7 +54,7 @@ function storedPlayer() {
     phoneNumber: "2215550101",
     category: PlayerCategory.WITHOUT_CATEGORY,
     scoring: 0,
-    account: { id: 10, email: "ana@test.com", passwordHash: "old-hash", photoUrl: null, isBlocked: false },
+    account: { id: 10, email: "ana@test.com", passwordHash: "old-hash", isBlocked: false },
   };
 }
 
@@ -76,7 +76,6 @@ describe("player actions", () => {
       expect(repos.Account.create).toHaveBeenCalledWith({
         email: "ana@test.com",
         passwordHash: "hashed-password",
-        photoUrl: null,
       });
       expect(repos.Player.create).toHaveBeenCalledWith({
         account: expect.objectContaining({ email: "ana@test.com" }),

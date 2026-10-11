@@ -1,58 +1,81 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
-import { AppHeader } from "@/app/components/app-header";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { User, Shield, ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarCheck, CalendarPlus, User, Users } from "lucide-react";
+import { PageShell } from "@/app/components/page-shell";
+import { PageHeading } from "@/app/components/ui/page-heading";
+
+// La home usa el título por defecto del sitio; solo define su URL canónica.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+const SHORTCUTS = [
+  {
+    href: "/bookings",
+    icon: CalendarPlus,
+    title: "Reservar turno",
+    description: "Mirá la disponibilidad de las canchas y reservá en segundos.",
+  },
+  {
+    href: "/open-matches",
+    icon: Users,
+    title: "Partidos abiertos",
+    description: "Sumate a un partido que ya está armado y completá la cancha.",
+  },
+  {
+    href: "/my-bookings",
+    icon: CalendarCheck,
+    title: "Mis reservas",
+    description: "Revisá tus próximos turnos, el chat del partido y cancelaciones.",
+  },
+  {
+    href: "/profile",
+    icon: User,
+    title: "Mi perfil",
+    description: "Actualizá tus datos y consultá tu saldo de puntos.",
+  },
+];
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user?.email) {
     redirect("/login");
   }
 
-  const isAdmin = session.user.role === "admin";
-
   return (
-    <div className="flex flex-1 flex-col bg-background min-h-screen">
-      <AppHeader
-        active="/"
-        userName={session.user.name}
-        userEmail={session.user.email}
-        userRole={session.user.role}
+    <PageShell active="/" user={session.user}>
+      <PageHeading
+        eyebrow="Quento Club"
+        title={`Bienvenido${session.user.name ? `, ${session.user.name}` : ""}`}
+        description="Reservá tu cancha, sumate a partidos abiertos y seguí tus puntos, todo desde un mismo lugar."
+        actions={
+          <Link href="/bookings" className="btn btn-primary">
+            <CalendarPlus className="h-4 w-4" />
+            Nuevo turno
+          </Link>
+        }
       />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-16">
-        <div className="rounded-2xl border border-line bg-card p-8 shadow-sm space-y-4">
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Bienvenido{session?.user?.name ? `, ${session.user.name}` : ""}
-          </h1>
-          <p className="max-w-lg text-base leading-relaxed text-foreground/70">
-            Ya estás dentro de <span className="font-semibold text-primary">Quento CLUB</span>. Podés acceder a tu perfil para editar tus datos personales y revisar tu saldo acumulado de puntos.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href="/profile"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
-            >
-              <User size={18} />
-              Ir a Mi Perfil
-              <ArrowRight size={18} />
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-colors dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                <Shield size={18} />
-                Ir al Panel Admin
-                <ArrowRight size={18} />
-              </Link>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
+
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {SHORTCUTS.map(({ href, icon: Icon, title, description }) => (
+          <Link
+            key={href}
+            href={href}
+            className="card group flex items-start gap-4 p-6 transition-all hover:border-foreground/20 hover:shadow-md"
+          >
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-light text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+              <Icon className="h-6 w-6" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-lg font-bold text-foreground">{title}</span>
+              <span className="mt-1 block text-sm text-foreground/60">{description}</span>
+            </span>
+            <ArrowRight className="mt-1 h-5 w-5 text-foreground/30 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+          </Link>
+        ))}
+      </div>
+    </PageShell>
   );
 }
-
