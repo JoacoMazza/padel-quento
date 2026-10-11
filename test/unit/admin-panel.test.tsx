@@ -2,12 +2,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin } = vi.hoisted(() => ({
-  getScheduleBoardData: vi.fn(),
-  getCourts: vi.fn(),
-  getOutOfServices: vi.fn(),
-  getPlayersAdmin: vi.fn(),
-}));
+const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin, getOccupancyReportData } = vi.hoisted(
+  () => ({
+    getScheduleBoardData: vi.fn(),
+    getCourts: vi.fn(),
+    getOutOfServices: vi.fn(),
+    getPlayersAdmin: vi.fn(),
+    getOccupancyReportData: vi.fn(),
+  }),
+);
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
@@ -18,6 +21,7 @@ vi.mock("@/src/actions/outOfService", () => ({
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
+vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 
 import { CourtState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
@@ -46,6 +50,10 @@ describe("AdminPanel", () => {
       data: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
     });
     getOutOfServices.mockResolvedValue({ success: true, data: [] });
+    getOccupancyReportData.mockResolvedValue({
+      success: true,
+      data: { courts: [], schedules: [], bookings: [], outOfServices: [] },
+    });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -76,6 +84,18 @@ describe("AdminPanel", () => {
     expect(getCourts).not.toHaveBeenCalled();
     expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+    expect(getOccupancyReportData).not.toHaveBeenCalled();
+  });
+
+  it("pide las métricas de ocupación recién al abrir su sección", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Métricas del Complejo");
+    await flush();
+
+    expect(getOccupancyReportData).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Métricas del Complejo" })).toBeTruthy();
   });
 
   it("pide las canchas recién al abrir su sección y las muestra", async () => {

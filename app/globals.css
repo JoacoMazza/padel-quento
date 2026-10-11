@@ -10,6 +10,8 @@
   --line: #e2e8f0;
   --danger: #dc2626;
   --danger-light: #fef2f2;
+  /* Ocupación en las métricas del panel admin: mismo azul que "Reservado" en la turnera. */
+  --occupied: #3b82f6;
 }
 
 @theme inline {
@@ -22,6 +24,7 @@
   --color-line: var(--line);
   --color-danger: var(--danger);
   --color-danger-light: var(--danger-light);
+  --color-occupied: var(--occupied);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
