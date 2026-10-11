@@ -10,7 +10,6 @@ interface ProfileFormProps {
     names: string;
     lastnames: string;
     category: string;
-    photoUrl: string | null;
   };
 }
 
@@ -22,7 +21,6 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
   const [names, setNames] = useState(initialData.names);
   const [lastnames, setLastnames] = useState(initialData.lastnames);
   const [category, setCategory] = useState(initialData.category);
-  const [photoUrl, setPhotoUrl] = useState(initialData.photoUrl ?? "");
 
   const initials = `${names[0] ?? ""}${lastnames[0] ?? ""}`.toUpperCase() || "J";
 
@@ -32,21 +30,8 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
 
       {state?.message && !state.success && <div className="alert-error">{state.message}</div>}
 
-      {/* Avatar Preview */}
       <div className="flex items-center gap-4 rounded-xl bg-background p-4">
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink">
-          {photoUrl.trim() ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={photoUrl}
-              alt="Avatar de perfil"
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => {
-                // If image fails to load, clear image to show fallback initials
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : null}
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-ink">
           <span className="text-lg font-bold text-white">{initials}</span>
         </div>
         <div>
@@ -117,22 +102,6 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             ))}
           </select>
           {state?.errors?.category && <p className="mt-1 text-xs text-danger">{state.errors.category}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="photoUrl" className="field-label">
-            URL de foto de perfil
-          </label>
-          <input
-            id="photoUrl"
-            name="photoUrl"
-            type="text"
-            value={photoUrl}
-            onChange={(e) => setPhotoUrl(e.target.value)}
-            className="field"
-            placeholder="https://ejemplo.com/mi-foto.jpg"
-          />
-          {state?.errors?.photoUrl && <p className="mt-1 text-xs text-danger">{state.errors.photoUrl}</p>}
         </div>
       </div>
 

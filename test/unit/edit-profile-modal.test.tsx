@@ -6,7 +6,7 @@ vi.mock("@/src/actions/profile", () => ({ updatePlayerProfile: vi.fn() }));
 
 import { EditProfileModal } from "@/app/profile/edit-profile-modal";
 
-const initialData = { names: "Juan", lastnames: "Pérez", category: "FOURTH", photoUrl: null };
+const initialData = { names: "Juan", lastnames: "Pérez", category: "FOURTH" };
 
 describe("EditProfileModal", () => {
   afterEach(() => {
@@ -23,6 +23,8 @@ describe("EditProfileModal", () => {
     const dialog = screen.getByRole("dialog", { name: "Información personal" });
     expect(dialog).toBeTruthy();
     expect((screen.getByLabelText("Nombre") as HTMLInputElement).value).toBe("Juan");
+    expect(screen.queryByLabelText(/foto de perfil/i)).toBeNull();
+    expect(dialog.querySelector("img")).toBeNull();
   });
 
   it("se cierra con el botón de cerrar", () => {

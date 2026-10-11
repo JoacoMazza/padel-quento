@@ -51,7 +51,7 @@ describe("player actions (integración con Postgres real)", () => {
       phoneNumber,
       category: PlayerCategory.WITHOUT_CATEGORY,
       scoring: 0,
-      account: { email, isBlocked: false, photoUrl: null },
+      account: { email, isBlocked: false },
     });
 
     const dataSource = await getDataSource();

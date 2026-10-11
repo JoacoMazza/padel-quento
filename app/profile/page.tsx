@@ -72,7 +72,6 @@ export default async function ProfilePage() {
               names: profile.names,
               lastnames: profile.lastnames,
               category: profile.category,
-              photoUrl: profile.photoUrl,
             }}
           />
           <Link href="/bookings" className="btn btn-primary">

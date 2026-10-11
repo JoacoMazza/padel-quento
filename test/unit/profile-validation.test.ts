@@ -7,9 +7,6 @@ function buildProfileFormData(overrides: Record<string, string> = {}) {
   formData.set("names", overrides.names ?? "Carlos");
   formData.set("lastnames", overrides.lastnames ?? "Perez");
   formData.set("category", overrides.category ?? PlayerCategory.FIFTH);
-  if (overrides.photoUrl !== undefined) {
-    formData.set("photoUrl", overrides.photoUrl);
-  }
   return formData;
 }
 
@@ -19,7 +16,6 @@ describe("parseProfileForm", () => {
       names: "Carlos",
       lastnames: "Perez",
       category: PlayerCategory.THIRD,
-      photoUrl: "https://example.com/avatar.jpg",
     });
 
     const result = parseProfileForm(formData);
@@ -28,7 +24,6 @@ describe("parseProfileForm", () => {
       names: "Carlos",
       lastnames: "Perez",
       category: PlayerCategory.THIRD,
-      photoUrl: "https://example.com/avatar.jpg",
     });
   });
 
@@ -53,19 +48,13 @@ describe("parseProfileForm", () => {
     expect(result.errors?.category).toBe("Categoría inválida.");
   });
 
-  it("acepta URL de foto vacía o nula", () => {
-    const formData = buildProfileFormData({ photoUrl: "" });
+  it("ignora la foto de perfil: ya no forma parte del perfil", () => {
+    const formData = buildProfileFormData();
+    formData.set("photoUrl", "https://example.com/avatar.jpg");
     const result = parseProfileForm(formData);
 
     expect(result.errors).toBeUndefined();
-    expect(result.data?.photoUrl).toBeNull();
-  });
-
-  it("rechaza URL de foto sin esquema válido", () => {
-    const formData = buildProfileFormData({ photoUrl: "invalid-url-path" });
-    const result = parseProfileForm(formData);
-
-    expect(result.errors?.photoUrl).toBe("La URL de la foto debe comenzar con http://, https:// o /");
+    expect(result.data).not.toHaveProperty("photoUrl");
   });
 });
 
