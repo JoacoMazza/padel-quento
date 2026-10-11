@@ -1,4 +1,4 @@
-import { Check, CirclePlus, Lock, Users, Wrench } from "lucide-react";
+import { CircleCheck, CirclePlus, Lock, Users, Wrench } from "lucide-react";
 import { SLOT_DURATION_MINUTES, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import { CourtTag } from "@/app/components/ui/court-tag";
 import type { CourtProp, Slot } from "@/app/bookings/types";
@@ -45,7 +45,7 @@ export function AvailabilityGrid({
     );
   }
 
-  const gridTemplateColumns = `5.5rem repeat(${courtSlots.length}, minmax(10rem, 1fr))`;
+  const gridTemplateColumns = `5.5rem repeat(${courtSlots.length}, minmax(7.5rem, 1fr))`;
 
   return (
     <div className="overflow-x-auto pb-2">
@@ -97,7 +97,7 @@ function Row({
 const CELL_STYLES: Record<Slot["status"], string> = {
   available: "cursor-pointer border border-line bg-card text-success hover:border-foreground/30 hover:shadow-sm",
   open: "cursor-pointer border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
-  selected: "cursor-pointer border-2 border-primary bg-primary-light/60 text-primary shadow-md shadow-primary/10",
+  selected: "cursor-pointer bg-panel text-white shadow-md shadow-black/20",
   occupied: "cursor-not-allowed bg-line/50 text-foreground/40",
   outOfService: "cursor-not-allowed border border-dashed border-danger/30 bg-danger-light text-danger/70",
 };
@@ -105,7 +105,7 @@ const CELL_STYLES: Record<Slot["status"], string> = {
 const CELL_ICONS: Record<Slot["status"], React.ReactNode> = {
   available: <CirclePlus className="h-4 w-4" />,
   open: <Users className="h-4 w-4" />,
-  selected: <Check className="h-4 w-4" />,
+  selected: <CircleCheck className="h-4 w-4" />,
   occupied: <Lock className="h-4 w-4" />,
   outOfService: <Wrench className="h-4 w-4" />,
 };
@@ -121,7 +121,7 @@ function SlotCell({ court, slot, onClick }: { court: CourtProp; slot: Slot; onCl
       onClick={onClick}
       aria-label={`Cancha ${court.number}, ${minutesToTimeLabel(slot.minutesOfDay)}, ${STATUS_LABELS[slot.status]}`}
       aria-pressed={slot.status === "available" || slot.status === "selected" ? slot.status === "selected" : undefined}
-      className={`flex h-16 w-full items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition-all ${CELL_STYLES[slot.status]}`}
+      className={`flex h-16 w-full flex-col items-center justify-center gap-1 rounded-xl px-2 text-center text-sm leading-tight font-semibold transition-all ${CELL_STYLES[slot.status]}`}
     >
       <span aria-hidden="true">{CELL_ICONS[slot.status]}</span>
       {CELL_TEXTS[slot.status]}

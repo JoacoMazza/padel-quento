@@ -68,6 +68,24 @@ describe("BookingsBoard", () => {
     expect(screen.getByRole("button", { name: /Reservar turno/ })).toBeTruthy();
   });
 
+  it("el turno seleccionado usa el fondo oscuro del resumen y apila el ícono sobre el texto", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+    const classes = screen.getByRole("button", { name: "Cancha 1, 18:00, seleccionado" }).className.split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["flex-col", "bg-panel", "text-white"]));
+    expect(classes).not.toContain("border-primary");
+  });
+
+  it("todas las celdas apilan el ícono sobre el texto", () => {
+    renderBoard();
+
+    for (const name of ["Cancha 1, 18:00, disponible", "Cancha 1, 19:30, partido abierto"]) {
+      expect(screen.getByRole("button", { name }).className.split(" ")).toContain("flex-col");
+    }
+  });
+
   it("las celdas de la grilla solo muestran el estado del turno, sin precios", () => {
     renderBoard();
 
@@ -95,6 +113,13 @@ describe("BookingsBoard", () => {
     const cell = screen.getByRole("button", { name: "Cancha 1, 18:00, fuera de servicio" });
     expect(cell.textContent).toBe("Fuera de servicio");
     expect((cell as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("las columnas de las canchas se achican hasta 7.5rem para que entren todas en el ancho disponible", () => {
+    renderBoard();
+
+    const grid = screen.getByText("Horario").parentElement!;
+    expect(grid.style.gridTemplateColumns).toBe("5.5rem repeat(1, minmax(7.5rem, 1fr))");
   });
 
   it("muestra el título Filtrar antes de los botones de fecha", () => {
