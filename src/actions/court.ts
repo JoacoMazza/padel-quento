@@ -79,6 +79,7 @@ export async function updateCourt(
   input: UpdateCourtInput,
 ): Promise<ActionResult<Court>> {
   try {
+    await requireAdmin();
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
 

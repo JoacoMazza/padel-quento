@@ -31,6 +31,10 @@ function duplicateError() {
   return new QueryFailedError("insert into courts...", [], { code: "23505" } as never);
 }
 
+function signInAs(role: Role) {
+  vi.mocked(getServerSession).mockResolvedValue({ user: { email: "user@test.com", role } } as never);
+}
+
 describe("court actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,6 +141,20 @@ describe("court actions", () => {
   });
 
   describe("updateCourt", () => {
+    beforeEach(() => {
+      signInAs(Role.ADMIN);
+    });
+
+    it("no permite editar una cancha a quien no es administrador", async () => {
+      signInAs(Role.PLAYER);
+
+      const result = await updateCourt(1, { price: 15000 });
+
+      expect(result).toEqual({ success: false, error: "No se pudo actualizar la cancha." });
+      expect(findOne).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
     it("actualiza los campos provistos", async () => {
       findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE });
 
@@ -168,10 +186,6 @@ describe("court actions", () => {
   });
 
   describe("updateAllCourtsPrice", () => {
-    function signInAs(role: Role) {
-      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "user@test.com", role } } as never);
-    }
-
     it("aplica el nuevo precio a todas las canchas, incluidas las dadas de baja", async () => {
       signInAs(Role.ADMIN);
       find.mockResolvedValueOnce([

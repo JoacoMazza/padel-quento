@@ -34,8 +34,11 @@ export function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">
-      {/* Tres columnas en una fila: logo a la izquierda, navegación centrada y menú de usuario a la derecha. */}
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-x-4 px-6 py-3">
+      {/* Tres columnas en una fila: logo a la izquierda, navegación centrada y menú de usuario a la derecha.
+          En el panel de administración ocupa todo el ancho, con el mismo margen que las opciones del aside. */}
+      <div
+        className={`grid w-full grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-x-4 px-6 py-3 ${showNav ? "mx-auto max-w-7xl" : ""}`}
+      >
         <div className="flex items-center gap-2.5">
           <QuentoLogo size="sm" variant="icon" />
           <span className="hidden text-base font-extrabold tracking-wide text-foreground uppercase sm:inline">

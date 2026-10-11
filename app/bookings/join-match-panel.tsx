@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CircleCheck, UserPlus } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
-import { PlayerDots, missingPlayersLabel } from "@/app/components/ui/player-dots";
+import { PlayerDots } from "@/app/components/ui/player-dots";
 import {
   GroupSizePicker,
   SummaryCourt,
@@ -41,11 +41,7 @@ export function JoinMatchPanel({
 
   return (
     <SummaryPanel label="Partido abierto">
-      <SummaryHeader
-        title="Partido abierto"
-        status={<span className="text-red-300">{missingPlayersLabel(remainingSpots)}</span>}
-        onClose={onClose}
-      />
+      <SummaryHeader title="Partido abierto" onClose={onClose} />
 
       <SummaryFeedback feedback={feedback} />
 

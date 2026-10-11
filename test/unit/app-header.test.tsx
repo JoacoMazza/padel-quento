@@ -56,6 +56,20 @@ describe("AppHeader", () => {
     expect(row.children).toHaveLength(3);
   });
 
+  it("en el panel de administración pega el logo y el perfil a los bordes, con el margen del aside", () => {
+    const { container } = render(<AppHeader active="/admin" showNav={false} />);
+
+    const row = container.querySelector("header > div")!;
+    expect(row.className).not.toContain("max-w-7xl");
+    expect(row.className.split(" ")).toContain("px-6");
+  });
+
+  it("fuera del panel de administración centra el contenido en el ancho máximo", () => {
+    const { container } = render(<AppHeader active="/" />);
+
+    expect(container.querySelector("header > div")!.className).toContain("max-w-7xl");
+  });
+
   it("oculta la navegación en el panel de administración", () => {
     render(<AppHeader active="/admin" showNav={false} />);
 
