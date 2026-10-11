@@ -76,7 +76,7 @@ export function BookingSummary({
             onChange={() => onIsOpenMatchChange(true)}
             icon={<UserPlus className="h-4 w-4" />}
             title="Buscar jugadores"
-            description="Abrí el partido para que se sume la comunidad"
+            description="Abrí el partido para que se sume gente"
           />
           {isOpenMatch ? (
             <div className="pt-2">

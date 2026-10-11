@@ -9,7 +9,7 @@ import { formatPrice } from "@/app/bookings/slot-utils";
 /** Columna lateral oscura con el resumen del turno elegido; acompaña el scroll en desktop. */
 export function SummaryPanel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <aside aria-label={label} className="card-dark h-fit p-6 lg:sticky lg:top-24">
+    <aside aria-label={label} className="card-dark h-fit p-6 lg:sticky lg:top-22">
       {children}
     </aside>
   );

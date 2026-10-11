@@ -52,7 +52,7 @@ export function AvailabilityGrid({
       <div className="grid gap-3" style={{ gridTemplateColumns }}>
         <span className="label-caps sticky left-0 z-10 self-stretch bg-background pt-4 pl-1">Horario</span>
         {courtSlots.map(({ court }) => (
-          <div key={court.id} className="card flex items-center gap-2 px-3 py-2.5 text-sm font-bold whitespace-nowrap text-foreground">
+          <div key={court.id} className="card flex justify-center items-center gap-2 px-3 py-2.5 text-sm font-bold whitespace-nowrap text-foreground">
             <CourtTag number={court.number} size="xs" />
             Cancha {court.number}
           </div>
