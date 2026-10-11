@@ -45,18 +45,12 @@ export function BookingSummary({
     <SummaryPanel label="Resumen de tu turno">
       <SummaryHeader
         title="Resumen de tu turno"
-        status={
-          <>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Disponible
-          </>
-        }
         onClose={onClose}
       />
 
       <SummaryFeedback feedback={feedback} />
 
-      <SummaryCourt courtNumber={selectedSlot.courtNumber} />
+      <SummaryCourt courtNumber={selectedSlot.courtNumber}/>
 
       <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />
@@ -66,33 +60,36 @@ export function BookingSummary({
         />
       </div>
 
-      <fieldset className="space-y-2 border-b border-white/10 py-5">
-        <legend className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Modalidad</legend>
-        <ModeOption
-          checked={!isOpenMatch}
-          onChange={() => onIsOpenMatchChange(false)}
-          icon={<Users className="h-4 w-4" />}
-          title="Cancha completa"
-          description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores`}
-        />
-        <ModeOption
-          checked={isOpenMatch}
-          onChange={() => onIsOpenMatchChange(true)}
-          icon={<UserPlus className="h-4 w-4" />}
-          title="Buscar jugadores"
-          description="Abrí el partido para que se sume la comunidad"
-        />
-        {isOpenMatch ? (
-          <div className="pt-2">
-            <GroupSizePicker
-              question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
-              options={openMatchGroupSizeOptions}
-              value={openMatchGroupSize}
-              onChange={onOpenMatchGroupSizeChange}
-            />
-          </div>
-        ) : null}
-      </fieldset>
+      {/* El padding va en un div: el navegador ubica el legend sobre el borde superior del fieldset e ignora su padding. */}
+      <div className="border-b border-white/10 py-5">
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Modalidad</legend>
+          <ModeOption
+            checked={!isOpenMatch}
+            onChange={() => onIsOpenMatchChange(false)}
+            icon={<Users className="h-4 w-4" />}
+            title="Cancha completa"
+            description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores`}
+          />
+          <ModeOption
+            checked={isOpenMatch}
+            onChange={() => onIsOpenMatchChange(true)}
+            icon={<UserPlus className="h-4 w-4" />}
+            title="Buscar jugadores"
+            description="Abrí el partido para que se sume la comunidad"
+          />
+          {isOpenMatch ? (
+            <div className="pt-2">
+              <GroupSizePicker
+                question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
+                options={openMatchGroupSizeOptions}
+                value={openMatchGroupSize}
+                onChange={onOpenMatchGroupSizeChange}
+              />
+            </div>
+          ) : null}
+        </fieldset>
+      </div>
 
       <div className="pt-5">
         <SummaryTotal price={selectedSlot.price} />

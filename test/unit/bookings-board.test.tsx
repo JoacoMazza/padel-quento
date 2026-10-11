@@ -142,7 +142,7 @@ describe("BookingsBoard", () => {
 
     expect(screen.getByText("Modalidad")).toBeTruthy();
     expect(screen.queryByText("¿Cómo vienen?")).toBeNull();
-    expect(screen.getByText("$ 4.500 por jugador (4 jugadores)")).toBeTruthy();
+    expect(screen.getByText("$ 4.500 por jugador")).toBeTruthy();
   });
 
   it("al volver a hacer click en el partido abierto elegido lo deselecciona en vez de ofrecer reservarlo", () => {

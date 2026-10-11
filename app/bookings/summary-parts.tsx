@@ -16,25 +16,22 @@ export function SummaryPanel({ label, children }: { label: string; children: Rea
 }
 export function SummaryHeader({
   title,
-  status,
   onClose,
 }: {
   title: string;
-  status?: React.ReactNode;
   onClose: () => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-5">
       <span className="label-caps text-white/50">{title}</span>
       <div className="flex items-center gap-3">
-        {status ? <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">{status}</span> : null}
         <button
           type="button"
           onClick={onClose}
-          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+          aria-label="Cerrar"
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-white/10 p-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
         >
           <X className="h-3.5 w-3.5" />
-          Cerrar
         </button>
       </div>
     </div>
@@ -69,8 +66,8 @@ export function SummaryTotal({ price }: { price: number }) {
         <span className="text-sm text-white/60">Total cancha</span>
         <span className="text-4xl font-extrabold tracking-tight">{formatPrice(price)}</span>
       </div>
-      <p className="mt-1 text-right text-sm text-white/60">
-        {formatPrice(Math.round(price / OPEN_MATCH_MAX_PLAYERS))} por jugador ({OPEN_MATCH_MAX_PLAYERS} jugadores)
+      <p className="mt-1 text-right text-xs font-light text-white/60">
+        {formatPrice(Math.round(price / OPEN_MATCH_MAX_PLAYERS))} por jugador
       </p>
     </div>
   );
