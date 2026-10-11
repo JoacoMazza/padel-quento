@@ -16,6 +16,9 @@ import {
   OPEN_MATCH_JOIN_BONUS_POINTS,
   PENALTY_POINTS,
 } from "@/src/domain/constants";
+import { pageMetadata } from "@/app/site-metadata";
+
+export const metadata = pageMetadata("Mi perfil", "/profile");
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);

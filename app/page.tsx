@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
 import { redirect } from "next/navigation";
@@ -5,6 +6,9 @@ import Link from "next/link";
 import { ArrowRight, CalendarCheck, CalendarPlus, User, Users } from "lucide-react";
 import { PageShell } from "@/app/components/page-shell";
 import { PageHeading } from "@/app/components/ui/page-heading";
+
+// La home usa el título por defecto del sitio; solo define su URL canónica.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const SHORTCUTS = [
   {

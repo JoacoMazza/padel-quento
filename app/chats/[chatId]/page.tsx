@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -13,6 +14,8 @@ import { getChatById, getChatMessages } from "@/src/actions/chat";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { ChatRoom } from "./chat-room";
 import { SLOT_DURATION_MINUTES, formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+
+export const metadata: Metadata = { title: "Chat del partido" };
 
 function initialsOf(names: string, lastnames: string) {
   return `${names.charAt(0)}${lastnames.charAt(0)}`.toUpperCase();

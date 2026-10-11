@@ -7,6 +7,9 @@ import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getBookings } from "@/src/actions/booking";
+import { pageMetadata } from "@/app/site-metadata";
+
+export const metadata = pageMetadata("Mis reservas", "/my-bookings");
 
 export default async function MyBookingsPage() {
   const session = await getServerSession(authOptions);

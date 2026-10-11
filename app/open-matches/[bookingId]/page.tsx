@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
@@ -14,6 +15,8 @@ import { Player } from "@/src/entities/Player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
+
+export const metadata: Metadata = { title: "Partido abierto" };
 
 function timeLabel(date: Date) {
   return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());

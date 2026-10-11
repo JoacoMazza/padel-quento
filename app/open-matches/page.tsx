@@ -8,6 +8,9 @@ import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getBookings } from "@/src/actions/booking";
+import { pageMetadata } from "@/app/site-metadata";
+
+export const metadata = pageMetadata("Partidos abiertos", "/open-matches");
 
 export default async function OpenMatchesPage() {
   const session = await getServerSession(authOptions);
