@@ -2,13 +2,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { updateCourt, createOutOfService, endOutOfService } = vi.hoisted(() => ({
+const { updateCourt, updateAllCourtsPrice, createOutOfService, endOutOfService } = vi.hoisted(() => ({
   updateCourt: vi.fn(),
+  updateAllCourtsPrice: vi.fn(),
   createOutOfService: vi.fn(),
   endOutOfService: vi.fn(),
 }));
 
-vi.mock("@/src/actions/court", () => ({ updateCourt }));
+vi.mock("@/src/actions/court", () => ({ updateCourt, updateAllCourtsPrice }));
 vi.mock("@/src/actions/outOfService", () => ({ createOutOfService, endOutOfService }));
 
 import { CourtState, OutOfServiceReason } from "@/src/domain/enums";
@@ -159,6 +160,34 @@ describe("CourtsTable", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByText("No se pudo habilitar la cancha.")).toBeTruthy();
+  });
+
+  it("cambia el precio de todas las canchas a la vez y lo muestra en la tabla", async () => {
+    updateAllCourtsPrice.mockResolvedValueOnce({ success: true, data: null });
+    render(<CourtsTable courts={[court, { ...court, id: 2, number: 4, price: 12000 }]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar precio de todas" }));
+    fireEvent.change(screen.getByLabelText("Nuevo precio ($)"), { target: { value: "15000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar a todas" }));
+
+    await waitFor(() => expect(updateAllCourtsPrice).toHaveBeenCalledWith(15000));
+    await waitFor(() => expect(screen.getAllByText("$ 15.000")).toHaveLength(2));
+    expect(screen.queryByRole("button", { name: "Aplicar a todas" })).toBeNull();
+  });
+
+  it("muestra el error si no se pudo cambiar el precio de todas las canchas", async () => {
+    updateAllCourtsPrice.mockResolvedValueOnce({
+      success: false,
+      error: "No se pudo actualizar el precio de las canchas.",
+    });
+    render(<CourtsTable courts={[court]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar precio de todas" }));
+    fireEvent.change(screen.getByLabelText("Nuevo precio ($)"), { target: { value: "15000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar a todas" }));
+
+    expect(await screen.findByText("No se pudo actualizar el precio de las canchas.")).toBeTruthy();
+    expect(screen.getByText("$ 10.000")).toBeTruthy();
   });
 
   it("al editar solo permite elegir entre Disponible y Dada de Baja", () => {

@@ -76,8 +76,8 @@ export function ChatRoom({
   return (
     <>
       {messages.length === 0 ? (
-        <div className="flex min-h-[320px] flex-1 flex-col items-center justify-center gap-2 bg-background/60 p-8 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-line/50 text-foreground/40">
+        <div className="flex min-h-[320px] flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-background text-foreground/40">
             <MessageCircle className="h-6 w-6" />
           </span>
           <p className="text-sm font-semibold text-foreground/70">Todavía no hay mensajes</p>
@@ -87,32 +87,38 @@ export function ChatRoom({
           </p>
         </div>
       ) : (
-        <div
-          ref={listRef}
-          className="flex max-h-[480px] min-h-[320px] flex-1 flex-col gap-3 overflow-y-auto bg-background/60 p-4"
-        >
+        <div ref={listRef} className="flex max-h-[520px] min-h-[320px] flex-1 flex-col gap-4 overflow-y-auto p-5 sm:p-6">
           {messages.map((message) => {
             const isMine = message.sender.id === currentPlayerId;
             return (
-              <div key={message.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
-                <p className="mb-1 flex items-center gap-1.5 px-1 text-xs text-foreground/60">
-                  <span className="font-semibold text-foreground/80">
-                    {message.sender.names} {message.sender.lastnames}
+              <div key={message.id} className={`flex gap-3 ${isMine ? "flex-row-reverse" : ""}`}>
+                {!isMine ? (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
+                    {`${message.sender.names.charAt(0)}${message.sender.lastnames.charAt(0)}`.toUpperCase()}
                   </span>
-                  <span className="rounded-full bg-line/50 px-2 py-0.5 text-[10px] font-medium">
-                    {PLAYER_CATEGORY_LABELS[message.sender.category] ?? message.sender.category}
-                  </span>
-                </p>
-                <div
-                  className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm ${
-                    isMine ? "rounded-br-sm bg-primary text-white" : "rounded-bl-sm bg-line/40 text-foreground"
-                  }`}
-                >
-                  {message.content}
+                ) : null}
+                <div className={`flex max-w-[80%] flex-col ${isMine ? "items-end" : "items-start"}`}>
+                  <p className={`mb-1 flex items-center gap-2 px-1 text-xs ${isMine ? "flex-row-reverse" : ""}`}>
+                    <span className={`font-semibold ${isMine ? "text-primary" : "text-foreground"}`}>
+                      {isMine ? "Vos" : `${message.sender.names} ${message.sender.lastnames}`}
+                    </span>
+                    {!isMine ? (
+                      <span className="text-[10px] text-foreground/50">
+                        {PLAYER_CATEGORY_LABELS[message.sender.category] ?? message.sender.category}
+                      </span>
+                    ) : null}
+                    <span className="text-[10px] text-foreground/40" suppressHydrationWarning>
+                      {formatTime(message.sentAt)} hs
+                    </span>
+                  </p>
+                  <div
+                    className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm ${
+                      isMine ? "rounded-tr-sm bg-primary text-white" : "rounded-tl-sm bg-background text-foreground"
+                    }`}
+                  >
+                    {message.content}
+                  </div>
                 </div>
-                <span className="mt-0.5 px-1 text-[10px] text-foreground/40" suppressHydrationWarning>
-                  {formatTime(message.sentAt)}
-                </span>
               </div>
             );
           })}
@@ -120,18 +126,18 @@ export function ChatRoom({
       )}
 
       {closedReason ? (
-        <div className="flex items-center gap-2 border-t border-line bg-line/20 px-4 py-3 text-xs text-foreground/60">
+        <div className="flex items-center gap-2 border-t border-line bg-background px-5 py-4 text-xs text-foreground/60">
           <Lock className="h-4 w-4 shrink-0" />
           <p>Este chat está cerrado porque {CLOSED_REASON_LABELS[closedReason]}. Podés leer la conversación, pero no enviar mensajes nuevos.</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="border-t border-line p-3">
+        <form onSubmit={handleSubmit} className="border-t border-line bg-background/50 p-4">
           {error && (
-            <p role="alert" className="mb-2 px-1 text-xs text-red-400">
+            <p role="alert" className="mb-2 px-1 text-xs text-danger">
               {error}
             </p>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
               type="text"
               name="content"
@@ -141,14 +147,15 @@ export function ChatRoom({
               autoComplete="off"
               placeholder="Escribir mensaje…"
               aria-label="Mensaje"
-              className="flex-1 rounded-full border border-line bg-background px-4 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="field flex-1 bg-card"
             />
             <button
               type="submit"
               disabled={isPending || draft.trim().length === 0}
               aria-label="Enviar mensaje"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn btn-primary"
             >
+              <span className="hidden sm:inline">Enviar</span>
               <Send className="h-4 w-4" />
             </button>
           </div>

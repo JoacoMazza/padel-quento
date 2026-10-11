@@ -17,9 +17,6 @@ export class Account {
   @Column({ type: "varchar" })
   email!: string;
 
-  @Column({ type: "varchar", nullable: true, name: "photo_url" })
-  photoUrl!: string | null;
-
   /** Hash bcrypt; nunca se envía al cliente. RNF-03. */
   @Column({ type: "varchar", name: "password_hashed" })
   passwordHash!: string;

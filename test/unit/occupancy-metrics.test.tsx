@@ -80,6 +80,13 @@ describe("OccupancyMetrics", () => {
     expect(screen.queryByText(/pico/i)).toBeNull();
   });
 
+  it("la barra de ocupación general usa el mismo color de ocupación que los gráficos", async () => {
+    await renderLastWeek();
+
+    const card = (await screen.findByTestId("kpi-occupancy")).closest(".card")!;
+    expect(card.querySelector(".bg-occupied")).toBeTruthy();
+  });
+
   it("grafica el porcentaje de uso por cancha", async () => {
     await renderLastWeek();
 

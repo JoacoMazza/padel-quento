@@ -28,7 +28,7 @@ El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quent
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
-Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, foto, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
+Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
 
 ## Estructura del proyecto
 
@@ -38,7 +38,10 @@ app/                  Rutas y páginas (App Router de Next.js)
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
-  components/         Componentes de UI compartidos (header, menú de usuario, logo)
+  open-matches/       Partidos abiertos: listado y detalle para sumarse ([bookingId])
+  components/         Componentes de UI compartidos (header, footer, shell de página, menú de usuario, logo)
+    ui/               Piezas visuales reutilizables (encabezado de página, avatar, tag de cancha, KPIs, campo de contraseña)
+  globals.css         Tokens de color y clases de componentes (`card`, `btn-*`, `chip`, `badge-*`, `field`, ...)
 src/
   entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, ...)
   domain/             Enums y tipos de dominio

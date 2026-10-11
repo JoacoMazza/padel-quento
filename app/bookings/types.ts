@@ -31,7 +31,7 @@ export type OutOfServiceProp = {
   courtId?: number;
 };
 
-export type SlotStatus = "available" | "occupied" | "selected" | "open";
+export type SlotStatus = "available" | "occupied" | "outOfService" | "selected" | "open";
 
 export type Slot = {
   minutesOfDay: number;
