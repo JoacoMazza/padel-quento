@@ -6,10 +6,11 @@ import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
 import { Court } from "@/src/entities/Court";
+import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, FixedBookingDateState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
@@ -61,6 +62,7 @@ const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede rea
 const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
 const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
 const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
+const FIXED_BOOKING_CANCELLATION_MESSAGE = "Es un turno fijo: para liberar esta fecha comunicate con el club.";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
@@ -80,6 +82,7 @@ class BlockedPlayerError extends Error {}
 class BookerNotFoundError extends Error {}
 class NoPlayerAccountError extends Error {}
 class InvalidPriceError extends Error {}
+class FixedBookingCancellationError extends Error {}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
@@ -425,6 +428,16 @@ export async function updateBooking(
       cancelled =
         input.bookingState === BookingState.CANCELLED && booking.bookingState !== BookingState.CANCELLED;
 
+      // Las fechas de un turno fijo (HU-41) solo las libera el admin desde el panel.
+      if (
+        cancelled &&
+        (await manager
+          .getRepository<FixedBookingDate>("FixedBookingDate")
+          .existsBy({ booking: { id }, state: FixedBookingDateState.BOOKED }))
+      ) {
+        throw new FixedBookingCancellationError();
+      }
+
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
       // turno previo a la migración puede no tener quien reservó.
       if (
@@ -489,6 +502,9 @@ export async function updateBooking(
     }
     if (error instanceof NoPlayerAccountError) {
       return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
+    }
+    if (error instanceof FixedBookingCancellationError) {
+      return { success: false, error: FIXED_BOOKING_CANCELLATION_MESSAGE };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La reserva no existe." };

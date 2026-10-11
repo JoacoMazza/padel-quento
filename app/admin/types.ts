@@ -19,6 +19,8 @@ export type AdminBookingProp = BookingProp & {
   bookerName: string;
   attended: boolean;
   matchPlayers: AdminMatchPlayerProp[];
+  /** Id de la fecha de turno fijo (HU-41) si el turno es parte de uno; si no, null. */
+  fixedBookingDateId: number | null;
 };
 
 /**
@@ -27,7 +29,7 @@ export type AdminBookingProp = BookingProp & {
  * cargados). Se usa tanto en el render inicial (server) como en el refresco en
  * vivo (client), por eso no depende de nada del lado del servidor.
  */
-export function mapBookingToAdminProp(booking: Booking): AdminBookingProp {
+export function mapBookingToAdminProp(booking: Booking, fixedBookingDateId: number | null = null): AdminBookingProp {
   return {
     id: booking.id,
     fromDateTime: new Date(booking.fromDateTime),
@@ -49,5 +51,6 @@ export function mapBookingToAdminProp(booking: Booking): AdminBookingProp {
       playerName: `${mp.player.names} ${mp.player.lastnames}`,
       attended: mp.attended,
     })),
+    fixedBookingDateId,
   };
 }

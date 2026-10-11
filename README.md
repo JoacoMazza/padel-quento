@@ -40,7 +40,7 @@ app/                  Rutas y páginas (App Router de Next.js)
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
   components/         Componentes de UI compartidos (header, menú de usuario, logo)
 src/
-  entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, ...)
+  entities/           Entidades de TypeORM (Account, Admin, Player, Booker, Court, Booking, Schedule, OutOfService, FixedBooking, ...)
   domain/             Enums y tipos de dominio
   actions/            Server Actions con CRUD básico por entidad (incluye validación de solapamiento en reservas)
   lib/                Infraestructura (conexión a DB en runtime, DataSource de CLI, auth, validaciones)
@@ -53,6 +53,15 @@ docs/
   classes/            Diagrama de clases (imagen + fuente editable)
   der/                Diagrama Entidad-Relación (imagen + fuente editable)
 ```
+
+## Turnos fijos
+
+Los turnos fijos (HU-41) los gestiona solo el administrador, desde la sección **Turnos Fijos** del panel: una cancha reservada para el mismo titular todas las semanas o cada dos semanas, a la misma hora, con fecha de fin opcional. El titular puede ser un jugador registrado o alguien sin cuenta (nombre, apellido y teléfono).
+
+- Cada fecha se reserva como un turno común en `bookings`, así que la web y el bot de WhatsApp la ven ocupada sin cambios. Los jugadores solo ven el horario como reservado; el titular, si tiene cuenta, la ve en "Mis turnos" como turno fijo, sin poder cancelarla.
+- Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
+- El admin puede liberar una sola fecha (desde la sección o tocando el turno en la Turnera Global), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
+- Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
 
 ## Configuración del proyecto
 
@@ -111,6 +120,8 @@ WhatsApp no permite mandar texto libre en mensajes que inicia el club, así que 
 | `quento_partido_sin_cupo` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} se canceló porque no se completó el cupo de jugadores. No se aplicó ninguna penalización. |
 | `quento_partido_completo` | Hola {{1}}, ¡el partido del {{2}} a las {{3}} en la cancha {{4}} está completo! {{5}} se sumó y ya son 4 jugadores. |
 | `quento_partido_cerrado` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} ya no busca más jugadores. Se juega con los que están anotados. |
+| `quento_turno_fijo_liberado` | Hola {{1}}, liberamos tu turno fijo del {{2}} a las {{3}} en la cancha {{4}}. Tus próximos turnos fijos siguen reservados. |
+| `quento_turno_fijo_cancelado` | Hola {{1}}, se dio de baja tu turno fijo de los {{2}} a las {{3}} en la cancha {{4}}. Se cancelaron todas sus próximas fechas. |
 
 Para los tests de integración, copiar también:
 

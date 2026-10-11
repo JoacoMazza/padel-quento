@@ -158,3 +158,31 @@ export function matchCompleteNotice(
     whatsappTemplate: { name: "quento_partido_completo", parameters: [recipientName, day, time, court, playerName] },
   };
 }
+
+/** El admin liberó una sola fecha de un turno fijo (HU-41): las demás siguen reservadas. */
+export function fixedDateReleasedNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Liberamos tu turno fijo del ${day}`,
+    text: `Hola ${recipientName}, liberamos tu turno fijo del ${day} a las ${time} en la cancha ${court}. Tus próximos turnos fijos siguen reservados.`,
+    whatsappTemplate: { name: "quento_turno_fijo_liberado", parameters: [recipientName, day, time, court] },
+  };
+}
+
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long", timeZone: "UTC" });
+
+export type NoticeFixedBooking = { startDate: string; startTime: string; courtNumber: number };
+
+/** El admin dio de baja el turno fijo completo (HU-41). */
+export function fixedBookingCancelledNotice(recipientName: string, fixedBooking: NoticeFixedBooking): NotificationMessage {
+  const weekday = WEEKDAY_FORMATTER.format(new Date(`${fixedBooking.startDate}T00:00:00Z`));
+  // "lunes" a "viernes" ya están en plural; "sábado" y "domingo" no.
+  const weekdays = weekday.endsWith("s") ? weekday : `${weekday}s`;
+  const time = fixedBooking.startTime.slice(0, 5);
+  const court = String(fixedBooking.courtNumber);
+  return {
+    subject: `Se dio de baja tu turno fijo de los ${weekdays}`,
+    text: `Hola ${recipientName}, se dio de baja tu turno fijo de los ${weekdays} a las ${time} en la cancha ${court}. Se cancelaron todas sus próximas fechas.`,
+    whatsappTemplate: { name: "quento_turno_fijo_cancelado", parameters: [recipientName, weekdays, time, court] },
+  };
+}

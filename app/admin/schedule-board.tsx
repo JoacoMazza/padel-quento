@@ -70,6 +70,9 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
     try {
       const result = await getScheduleBoardData();
       if (result.success) {
+        const fixedDates = new Map(
+          result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
+        );
         setData({
           courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
           schedules: result.data.schedules.map((s) => ({
@@ -79,7 +82,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
             closingTime: String(s.closingTime),
             courtId: s.court?.id,
           })),
-          bookings: result.data.bookings.map(mapBookingToAdminProp),
+          bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
           outOfServices: result.data.outOfServices.map((o) => ({
             id: o.id,
             fromDateTime: new Date(o.fromDateTime),
@@ -300,7 +303,11 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
                           title={isClickable ? "Ver y marcar asistencia" : undefined}
                           className={`inline-flex h-9 w-full items-center justify-center rounded-lg text-xs font-semibold ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""}`}
                         >
-                          {state === "closed" ? "—" : LEGEND.find((l) => l.state === state)?.label}
+                          {state === "closed"
+                            ? "—"
+                            : booking?.fixedBookingDateId
+                              ? "Turno fijo"
+                              : LEGEND.find((l) => l.state === state)?.label}
                         </span>
                       </td>
                     );
@@ -335,6 +342,10 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleAttendanceUpdated}
+          onReleased={() => {
+            setSelectedBooking(null);
+            refresh();
+          }}
         />
       ) : null}
     </div>

@@ -1,11 +1,14 @@
 import "reflect-metadata";
 import type { Booker } from "@/src/entities/Booker";
 import type { Booking } from "@/src/entities/Booking";
+import type { FixedBooking } from "@/src/entities/FixedBooking";
 import type { Match } from "@/src/entities/Match";
 import type { Player } from "@/src/entities/Player";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   courtUnavailableNotice,
+  fixedBookingCancelledNotice,
+  fixedDateReleasedNotice,
   matchCancelledByCreatorNotice,
   matchClosedNotice,
   matchCompleteNotice,
@@ -60,6 +63,15 @@ async function send(
   if (recipients.length > 0) {
     await notify(recipients, buildMessage);
   }
+}
+
+/** Quien reservó, con su correo si es un jugador (el booker se carga sin la cuenta). */
+async function bookerRecipient(booker: Booker): Promise<NotificationRecipient> {
+  const dataSource = await getDataSource();
+  const player = await dataSource
+    .getRepository<Player>("Player")
+    .findOne({ where: { id: booker.id }, relations: { account: true } });
+  return toRecipient(player ?? booker);
 }
 
 async function findBooking(bookingId: number) {
@@ -174,25 +186,49 @@ export async function notifyMatchesExpired(bookingIds: number[]): Promise<void> 
  */
 export async function notifyCourtUnavailable(bookingIds: number[]): Promise<void> {
   try {
-    const dataSource = await getDataSource();
     for (const bookingId of bookingIds) {
       const booking = await findBooking(bookingId);
       if (!booking) continue;
 
-      let recipients: NotificationRecipient[];
-      if (booking.match) {
-        recipients = allPlayers(booking.match);
-      } else {
-        // El booker se carga sin la cuenta; si es un jugador, se busca para tener su correo.
-        const player = await dataSource
-          .getRepository<Player>("Player")
-          .findOne({ where: { id: booking.booker.id }, relations: { account: true } });
-        recipients = [toRecipient(player ?? booking.booker)];
-      }
-
+      const recipients = booking.match ? allPlayers(booking.match) : [await bookerRecipient(booking.booker)];
       await send(recipients, (recipient) => courtUnavailableNotice(recipient.names, noticeBookingOf(booking)));
     }
   } catch (error) {
     console.error("notifyCourtUnavailable", error);
+  }
+}
+
+/** Avisa al titular del turno fijo que se liberó una de sus fechas (HU-41). */
+export async function notifyFixedDateReleased(bookingId: number): Promise<void> {
+  try {
+    const booking = await findBooking(bookingId);
+    if (!booking) return;
+
+    await send([await bookerRecipient(booking.booker)], (recipient) =>
+      fixedDateReleasedNotice(recipient.names, noticeBookingOf(booking)),
+    );
+  } catch (error) {
+    console.error("notifyFixedDateReleased", error);
+  }
+}
+
+/** Avisa al titular que se dio de baja su turno fijo (HU-41). */
+export async function notifyFixedBookingCancelled(fixedBookingId: number): Promise<void> {
+  try {
+    const dataSource = await getDataSource();
+    const fixed = await dataSource
+      .getRepository<FixedBooking>("FixedBooking")
+      .findOne({ where: { id: fixedBookingId }, relations: { court: true, booker: true } });
+    if (!fixed) return;
+
+    await send([await bookerRecipient(fixed.booker)], (recipient) =>
+      fixedBookingCancelledNotice(recipient.names, {
+        startDate: fixed.startDate,
+        startTime: fixed.startTime,
+        courtNumber: fixed.court.number,
+      }),
+    );
+  } catch (error) {
+    console.error("notifyFixedBookingCancelled", error);
   }
 }

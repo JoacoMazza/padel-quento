@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   courtUnavailableNotice,
+  fixedBookingCancelledNotice,
+  fixedDateReleasedNotice,
   matchCancelledByCreatorNotice,
   matchClosedNotice,
   matchCompleteNotice,
@@ -131,6 +133,42 @@ describe("matchCompleteNotice", () => {
       name: "quento_partido_completo",
       parameters: ["Ana", "sábado 17 de octubre", "19:30", "3", "Carla Gómez"],
     });
+  });
+});
+
+describe("fixedDateReleasedNotice", () => {
+  it("confirma que se liberó una sola fecha del turno fijo y que las demás siguen", () => {
+    const notice = fixedDateReleasedNotice("Ana", booking);
+
+    expect(notice.subject).toBe("Liberamos tu turno fijo del sábado 17 de octubre");
+    expect(notice.text).toBe(
+      "Hola Ana, liberamos tu turno fijo del sábado 17 de octubre a las 19:30 en la cancha 3. Tus próximos turnos fijos siguen reservados.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_turno_fijo_liberado",
+      parameters: ["Ana", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("fixedBookingCancelledNotice", () => {
+  it("confirma la baja del turno fijo con su día, hora y cancha", () => {
+    const notice = fixedBookingCancelledNotice("Ana", { startDate: "2026-10-17", startTime: "19:30:00", courtNumber: 3 });
+
+    expect(notice.subject).toBe("Se dio de baja tu turno fijo de los sábados");
+    expect(notice.text).toBe(
+      "Hola Ana, se dio de baja tu turno fijo de los sábados a las 19:30 en la cancha 3. Se cancelaron todas sus próximas fechas.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_turno_fijo_cancelado",
+      parameters: ["Ana", "sábados", "19:30", "3"],
+    });
+  });
+
+  it("no pluraliza los días que ya terminan en s", () => {
+    const notice = fixedBookingCancelledNotice("Ana", { startDate: "2026-10-05", startTime: "18:00:00", courtNumber: 1 });
+
+    expect(notice.whatsappTemplate.parameters[1]).toBe("lunes");
   });
 });
 

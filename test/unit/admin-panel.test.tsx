@@ -2,11 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin } = vi.hoisted(() => ({
+const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin, getFixedBookingsAdmin } = vi.hoisted(() => ({
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
   getOutOfServices: vi.fn(),
   getPlayersAdmin: vi.fn(),
+  getFixedBookingsAdmin: vi.fn(),
 }));
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
@@ -19,11 +20,21 @@ vi.mock("@/src/actions/outOfService", () => ({
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
+vi.mock("@/src/actions/fixedBooking", () => ({
+  getFixedBookingsAdmin,
+  createFixedBooking: vi.fn(),
+  releaseFixedBookingDate: vi.fn(),
+  restoreFixedBookingDate: vi.fn(),
+  cancelFixedBooking: vi.fn(),
+}));
 
 import { CourtState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
 
-const EMPTY_BOARD = { success: true, data: { courts: [], schedules: [], bookings: [], outOfServices: [] } };
+const EMPTY_BOARD = {
+  success: true,
+  data: { courts: [], schedules: [], bookings: [], outOfServices: [], fixedBookingDates: [] },
+};
 
 // Deja que se resuelvan las promesas de las Server Actions mockeadas y se apliquen los setState.
 async function flush() {
@@ -46,6 +57,7 @@ describe("AdminPanel", () => {
       data: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
     });
     getOutOfServices.mockResolvedValue({ success: true, data: [] });
+    getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [] });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -76,6 +88,21 @@ describe("AdminPanel", () => {
     expect(getCourts).not.toHaveBeenCalled();
     expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+    expect(getFixedBookingsAdmin).not.toHaveBeenCalled();
+  });
+
+  it("al abrir Turnos Fijos pide los turnos fijos, las canchas y los jugadores para el alta", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Turnos Fijos");
+    await flush();
+
+    expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(1);
+    expect(getCourts).toHaveBeenCalledTimes(1);
+    expect(getPlayersAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Todavía no hay turnos fijos.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Nuevo turno fijo" })).toBeTruthy();
   });
 
   it("pide las canchas recién al abrir su sección y las muestra", async () => {

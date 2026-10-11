@@ -7,7 +7,7 @@ const { getScheduleBoardData } = vi.hoisted(() => ({ getScheduleBoardData: vi.fn
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 
-import { CourtState, DayOfWeek } from "@/src/domain/enums";
+import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 
 const BOARD = {
@@ -19,6 +19,7 @@ const BOARD = {
     ],
     bookings: [],
     outOfServices: [],
+    fixedBookingDates: [],
   },
 };
 
@@ -109,5 +110,42 @@ describe("ScheduleBoard - refresco", () => {
 
     await advance(60_000);
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ScheduleBoard - turnos fijos", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 12, 9, 0));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("marca como turno fijo las fechas de un turno fijo", async () => {
+    const booking = {
+      id: 5,
+      fromDateTime: new Date(2026, 9, 12, 18, 0),
+      durationMinutes: 90,
+      bookingState: BookingState.RESERVED,
+      price: 10000,
+      attended: true,
+      court: { id: 1 },
+      booker: { id: 3, names: "Grupo", lastnames: "Lunes" },
+      match: null,
+    };
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: { ...BOARD.data, bookings: [booking], fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }] },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    // El turno ocupa varias celdas de la grilla: todas lo muestran como turno fijo.
+    expect(screen.getAllByText("Turno fijo").length).toBeGreaterThan(0);
   });
 });

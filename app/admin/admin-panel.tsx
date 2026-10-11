@@ -1,21 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, Lock, BarChart3, Users, CalendarClock } from "lucide-react";
+import { MapPin, Lock, BarChart3, Users, CalendarClock, Repeat } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
+import {
+  FixedBookingsPanel,
+  type FixedBookingCourtOption,
+  type FixedBookingPlayerOption,
+} from "@/app/admin/fixed-bookings-panel";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
+import { getFixedBookingsAdmin, type FixedBookingAdminItem } from "@/src/actions/fixedBooking";
+import { CourtState } from "@/src/domain/enums";
 import type { ActionResult } from "@/src/lib/action-result";
 
 const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Estado de Canchas", icon: MapPin, available: true },
+  { id: "fixed", label: "Turnos Fijos", icon: Repeat, available: true },
   { id: "blocks", label: "Bloqueo de Canchas", icon: Lock, available: false },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: false },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
@@ -85,6 +93,45 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 function CourtsSection() {
   const state = useSectionData(loadCourts);
   return state.status === "ready" ? <CourtsTable courts={state.data} /> : <SectionStatus state={state} />;
+}
+
+type FixedBookingsData = {
+  fixedBookings: FixedBookingAdminItem[];
+  courts: FixedBookingCourtOption[];
+  players: FixedBookingPlayerOption[];
+};
+
+// Junto con los turnos fijos se traen las canchas (sin las dadas de baja) y los
+// jugadores, que el formulario de alta ofrece para elegir.
+async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
+  const [fixedResult, courtsResult, playersResult] = await Promise.all([
+    getFixedBookingsAdmin(),
+    getCourts(),
+    getPlayersAdmin(),
+  ]);
+  if (!fixedResult.success) return fixedResult;
+  if (!courtsResult.success) return courtsResult;
+  if (!playersResult.success) return playersResult;
+
+  return {
+    success: true,
+    data: {
+      fixedBookings: fixedResult.data,
+      courts: courtsResult.data
+        .filter((c) => c.state !== CourtState.CLOSED_DOWN)
+        .map((c) => ({ id: c.id, number: c.number })),
+      players: playersResult.data.map((p) => ({
+        id: p.id,
+        name: `${p.names} ${p.lastnames}`,
+        phoneNumber: p.phoneNumber,
+      })),
+    },
+  };
+}
+
+function FixedBookingsSection() {
+  const state = useSectionData(loadFixedBookings);
+  return state.status === "ready" ? <FixedBookingsPanel {...state.data} /> : <SectionStatus state={state} />;
 }
 
 function UsersSection() {
@@ -157,6 +204,11 @@ export function AdminPanel() {
         {visitedSections.includes("courts") ? (
           <div hidden={activeSection !== "courts"}>
             <CourtsSection />
+          </div>
+        ) : null}
+        {visitedSections.includes("fixed") ? (
+          <div hidden={activeSection !== "fixed"}>
+            <FixedBookingsSection />
           </div>
         ) : null}
         {visitedSections.includes("users") ? (

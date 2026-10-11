@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
+import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, UserPlus, Users, Volleyball, X } from "lucide-react";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
@@ -46,7 +46,7 @@ export function BookingRow({
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
   // Quien se sumó a un partido de otro jugador no puede cancelar el turno completo.
-  const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant;
+  const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant && !booking.isFixed;
   // En cambio, sí puede darse de baja del partido y liberar su lugar.
   const canLeave =
     (tone === "confirmed" || tone === "pending") &&
@@ -154,6 +154,12 @@ export function BookingRow({
             {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores
           </span>
         ) : null}
+        {booking.isFixed ? (
+          <span className="flex items-center gap-1 text-xs font-medium text-primary">
+            <Repeat className="h-3.5 w-3.5" />
+            Turno fijo
+          </span>
+        ) : null}
         {booking.joinedAsParticipant ? (
           <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
             <UserPlus className="h-3.5 w-3.5" />
@@ -164,6 +170,9 @@ export function BookingRow({
 
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
         {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}
+        {booking.isFixed && (tone === "confirmed" || tone === "pending") ? (
+          <p className="max-w-xs text-xs text-foreground/60">Para no ir a esta fecha, avisale al club.</p>
+        ) : null}
 
         {(pendingAction === "cancel" || pendingAction === "leave") && isLateCancellation(booking.fromDateTime, now) ? (
           <p role="alert" className="max-w-xs text-xs font-medium text-amber-600">
