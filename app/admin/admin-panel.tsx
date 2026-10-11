@@ -148,7 +148,9 @@ export function AdminPanel() {
         </p>
         <h1 className="mb-8 text-3xl font-extrabold tracking-tight text-foreground">
           {activeLabel}
-          <span className="text-primary">.</span>
+          <span aria-hidden="true" className="text-primary">
+            .
+          </span>
         </h1>
 
         {/* Las secciones visitadas quedan montadas y solo se ocultan, para no volver a pedir sus datos. */}
