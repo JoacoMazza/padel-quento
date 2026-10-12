@@ -123,7 +123,7 @@ export function AttendanceReport() {
               value={<span data-testid="kpi-absenteeism">{formatPercent(report.total.absenteeismRate)}</span>}
               icon={<Gauge className="h-4 w-4" />}
               progress={report.total.absenteeismRate}
-              tone="primary"
+              tone="occupied"
               footer="Ausencias y cancelaciones tardías sobre los turnos comprometidos"
             />
             <StatCard
