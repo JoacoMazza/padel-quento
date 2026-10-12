@@ -51,8 +51,20 @@ const courts = [
 ];
 const players = [{ id: 7, name: "Ana Gómez", phoneNumber: "2215550102" }];
 
-function renderPanel(items = [fixedBooking()]) {
-  return render(<FixedBookingsPanel fixedBookings={items} courts={courts} players={players} />);
+const onCloseCreate = vi.fn();
+const onChanged = vi.fn();
+
+function renderPanel(items = [fixedBooking()], { isCreating = false } = {}) {
+  return render(
+    <FixedBookingsPanel
+      fixedBookings={items}
+      courts={courts}
+      players={players}
+      isCreating={isCreating}
+      onCloseCreate={onCloseCreate}
+      onChanged={onChanged}
+    />,
+  );
 }
 
 describe("FixedBookingsPanel", () => {
@@ -82,6 +94,14 @@ describe("FixedBookingsPanel", () => {
     expect(screen.getByText("Todavía no hay turnos fijos.")).toBeTruthy();
   });
 
+  it("tiene su título y no su propio botón de alta (está junto a Actualizar en la turnera)", () => {
+    renderPanel();
+
+    expect(screen.getByRole("heading", { name: "Turnos fijos" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Nuevo turno fijo" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Nuevo turno fijo" })).toBeNull();
+  });
+
   describe("próximas fechas", () => {
     it("muestra el estado de cada fecha", () => {
       renderPanel();
@@ -102,6 +122,8 @@ describe("FixedBookingsPanel", () => {
 
       await waitFor(() => expect(getFixedBookingsAdmin).toHaveBeenCalled());
       expect(releaseFixedBookingDate).toHaveBeenCalledWith(100);
+      // La grilla de la turnera también tiene que mostrar el horario libre.
+      expect(onChanged).toHaveBeenCalled();
     });
 
     it("restaura una fecha liberada o salteada", async () => {
@@ -136,6 +158,7 @@ describe("FixedBookingsPanel", () => {
 
     await waitFor(() => expect(getFixedBookingsAdmin).toHaveBeenCalled());
     expect(cancelFixedBooking).toHaveBeenCalledWith(1);
+    expect(onChanged).toHaveBeenCalled();
   });
 
   it("un turno fijo dado de baja no ofrece acciones", () => {
@@ -147,7 +170,6 @@ describe("FixedBookingsPanel", () => {
 
   describe("alta", () => {
     function fillCommonFields() {
-      fireEvent.click(screen.getByRole("button", { name: "Nuevo turno fijo" }));
       fireEvent.change(screen.getByLabelText("Cancha"), { target: { value: "11" } });
       fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
       fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "19:30" } });
@@ -157,7 +179,7 @@ describe("FixedBookingsPanel", () => {
 
     it("crea un turno fijo para un jugador registrado y avisa qué fechas se saltearon", async () => {
       createFixedBooking.mockResolvedValue({ success: true, data: { id: 2, conflicts: ["2026-11-03"] } });
-      renderPanel();
+      renderPanel(undefined, { isCreating: true });
 
       fillCommonFields();
       fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
@@ -173,11 +195,13 @@ describe("FixedBookingsPanel", () => {
         holder: { playerId: 7 },
       });
       expect(screen.getByText(/No se reservaron estas fechas porque ya estaban ocupadas: 2026-11-03/)).toBeTruthy();
+      expect(onCloseCreate).toHaveBeenCalled();
+      expect(onChanged).toHaveBeenCalled();
     });
 
     it("crea un turno fijo para alguien sin cuenta con su nombre y teléfono", async () => {
       createFixedBooking.mockResolvedValue({ success: true, data: { id: 2, conflicts: [] } });
-      renderPanel();
+      renderPanel(undefined, { isCreating: true });
 
       fillCommonFields();
       fireEvent.click(screen.getByLabelText("Sin cuenta"));
@@ -197,7 +221,7 @@ describe("FixedBookingsPanel", () => {
 
     it("muestra el error si no se pudo crear", async () => {
       createFixedBooking.mockResolvedValue({ success: false, error: "La cancha no está abierta en ese horario ese día." });
-      renderPanel();
+      renderPanel(undefined, { isCreating: true });
 
       fillCommonFields();
       fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
@@ -205,6 +229,16 @@ describe("FixedBookingsPanel", () => {
 
       expect(await screen.findByText("La cancha no está abierta en ese horario ese día.")).toBeTruthy();
       expect(getFixedBookingsAdmin).not.toHaveBeenCalled();
+      expect(onCloseCreate).not.toHaveBeenCalled();
+    });
+
+    it("cierra el alta con Cancelar sin crear nada", () => {
+      renderPanel(undefined, { isCreating: true });
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+      expect(onCloseCreate).toHaveBeenCalled();
+      expect(createFixedBooking).not.toHaveBeenCalled();
     });
   });
 });

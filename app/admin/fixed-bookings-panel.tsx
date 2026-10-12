@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { CalendarDays, CalendarX, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { CalendarDays, CalendarX, RotateCcw, Trash2, X } from "lucide-react";
 import { DayOfWeek, FixedBookingDateState, FixedBookingFrequency } from "@/src/domain/enums";
 import { dayOfWeekOfISO } from "@/src/domain/fixed-booking";
 import {
@@ -53,28 +53,35 @@ function formatShortDate(iso: string): string {
 }
 
 /**
- * Sección "Turnos Fijos" del panel (HU-41): alta de turnos fijos semanales o
- * quincenales, y gestión de sus próximas fechas (liberar o restaurar una sola
- * fecha) o baja del turno fijo completo.
+ * Turnos fijos (HU-41), debajo de la grilla de la Turnera Global: listado con
+ * sus próximas fechas (liberar o restaurar una sola fecha) y baja del turno
+ * fijo completo. El alta se abre desde el botón junto a Actualizar
+ * (isCreating), y onChanged avisa para refrescar la grilla.
  */
 export function FixedBookingsPanel({
   fixedBookings: initialFixedBookings,
   courts,
   players,
+  isCreating,
+  onCloseCreate,
+  onChanged,
 }: {
   fixedBookings: FixedBookingAdminItem[];
   courts: FixedBookingCourtOption[];
   players: FixedBookingPlayerOption[];
+  isCreating: boolean;
+  onCloseCreate: () => void;
+  onChanged: () => void;
 }) {
   const [fixedBookings, setFixedBookings] = useState(initialFixedBookings);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function reload() {
+    onChanged();
     const result = await getFixedBookingsAdmin();
     if (result.success) setFixedBookings(result.data);
   }
@@ -98,7 +105,7 @@ export function FixedBookingsPanel({
   }
 
   async function handleCreated(conflicts: string[]) {
-    setIsCreating(false);
+    onCloseCreate();
     setError(null);
     setNotice(
       conflicts.length > 0
@@ -110,19 +117,12 @@ export function FixedBookingsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-foreground/60">
+      <div>
+        <h2 className="text-lg font-bold text-foreground">Turnos fijos</h2>
+        <p className="mt-1 text-sm text-foreground/60">
           Turnos que se reservan solos todas las semanas o cada dos semanas. Los jugadores solo ven el horario como
           reservado.
         </p>
-        <button
-          type="button"
-          onClick={() => setIsCreating(true)}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo turno fijo
-        </button>
       </div>
 
       {notice ? <p className="text-sm font-medium text-success">{notice}</p> : null}
@@ -279,7 +279,7 @@ export function FixedBookingsPanel({
         <CreateFixedBookingModal
           courts={courts}
           players={players}
-          onClose={() => setIsCreating(false)}
+          onClose={onCloseCreate}
           onCreated={handleCreated}
         />
       ) : null}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, Repeat } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { MapPin, BarChart3, Users, CalendarClock, Plus } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
@@ -24,7 +24,6 @@ import type { ActionResult } from "@/src/lib/action-result";
 const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Canchas", icon: MapPin, available: true },
-  { id: "fixed", label: "Turnos Fijos", icon: Repeat, available: true },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
 ] as const;
@@ -125,9 +124,46 @@ async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
   };
 }
 
-function FixedBookingsSection() {
-  const state = useSectionData(loadFixedBookings);
-  return state.status === "ready" ? <FixedBookingsPanel {...state.data} /> : <SectionStatus state={state} />;
+/**
+ * Turnera Global: la grilla con el botón para registrar un turno fijo junto a
+ * Actualizar y, debajo, el listado de turnos fijos. Al crear, liberar o dar de
+ * baja un turno fijo se refresca la grilla para que se vea el cambio.
+ */
+function ScheduleSection({ isActive }: { isActive: boolean }) {
+  const fixedState = useSectionData(loadFixedBookings);
+  const [isCreatingFixed, setIsCreatingFixed] = useState(false);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
+  const refreshBoard = useCallback(() => setBoardRefreshKey((key) => key + 1), []);
+
+  return (
+    <div className="space-y-10">
+      <ScheduleBoard
+        isActive={isActive}
+        refreshKey={boardRefreshKey}
+        toolbarActions={
+          <button
+            type="button"
+            disabled={fixedState.status !== "ready"}
+            onClick={() => setIsCreatingFixed(true)}
+            className="btn btn-sm btn-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Registrar turno fijo
+          </button>
+        }
+      />
+      {fixedState.status === "ready" ? (
+        <FixedBookingsPanel
+          {...fixedState.data}
+          isCreating={isCreatingFixed}
+          onCloseCreate={() => setIsCreatingFixed(false)}
+          onChanged={refreshBoard}
+        />
+      ) : (
+        <SectionStatus state={fixedState} />
+      )}
+    </div>
+  );
 }
 
 function UsersSection() {
@@ -203,17 +239,12 @@ export function AdminPanel() {
         {/* Las secciones visitadas quedan montadas y solo se ocultan, para no volver a pedir sus datos. */}
         {visitedSections.includes("schedule") ? (
           <div hidden={activeSection !== "schedule"}>
-            <ScheduleBoard isActive={activeSection === "schedule"} />
+            <ScheduleSection isActive={activeSection === "schedule"} />
           </div>
         ) : null}
         {visitedSections.includes("courts") ? (
           <div hidden={activeSection !== "courts"}>
             <CourtsSection />
-          </div>
-        ) : null}
-        {visitedSections.includes("fixed") ? (
-          <div hidden={activeSection !== "fixed"}>
-            <FixedBookingsSection />
           </div>
         ) : null}
         {visitedSections.includes("metrics") ? (
