@@ -5,9 +5,9 @@ import type { Message } from "@/src/entities/Message";
 
 /**
  * Sala de chat temporal de un partido abierto. Se crea y asocia automáticamente
- * junto con el partido (ver createBooking en src/actions/booking.ts), así quien
- * lo creó puede compartirla mediante un link o agregar jugadores registrados
- * desde el primer momento (ver joinChatMatch y addPlayerToChat en src/actions/chat.ts).
+ * al partido (ver joinOpenMatch en src/actions/booking.ts) recién cuando se suma
+ * un segundo jugador con cuenta propia: antes de eso quien reservó no tendría
+ * con quién hablar, y si nadie llega a sumarse el partido nunca llega a tener chat.
  */
 @Entity({ name: "chats" })
 export class Chat {

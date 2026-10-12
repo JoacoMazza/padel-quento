@@ -205,21 +205,27 @@ describe("chat actions (integración con Postgres real)", () => {
   describe("sharing the chat room", () => {
     let dayOffset = 50;
 
-    /** Open match created by a new player with the given group size; returns its chat. */
+    /**
+     * Open match created by a new player with the given group size, plus a second
+     * player who joins alone: that join is what creates the chat room.
+     */
     async function openMatchChat(groupSize: number) {
       const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
       if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
       const creator = await newPlayer("Creador");
+      const second = await newPlayer("Segundo");
 
       const fromDateTime = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
       dayOffset += 1;
       fromDateTime.setHours(9, 0, 0, 0);
       const booking = await createBooking({ fromDateTime, bookerId: creator.bookerId, courtId: court.data.id, groupSize });
       if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
+      const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: second.id });
+      if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
       const found = await getBookingById(booking.data.id);
       if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
 
-      return { creator, bookingId: booking.data.id, chatId: found.data.match.chat.id };
+      return { creator, second, bookingId: booking.data.id, chatId: found.data.match.chat.id };
     }
 
     async function matchState(bookingId: number) {
@@ -232,7 +238,7 @@ describe("chat actions (integración con Postgres real)", () => {
     }
 
     it("a registered player who opens the shared link joins the match and gets access to the chat", async () => {
-      const { creator, bookingId, chatId } = await openMatchChat(1);
+      const { creator, second, bookingId, chatId } = await openMatchChat(1);
       const guest = await newPlayer("Invitado");
 
       actAs(guest.email);
@@ -243,12 +249,12 @@ describe("chat actions (integración con Postgres real)", () => {
       expect((await sendMessage(chatId, "¡Me sumo!")).success).toBe(true);
       expect(await matchState(bookingId)).toEqual({
         needPlayers: true,
-        players: { [creator.id]: 1, [guest.id]: 1 },
+        players: { [creator.id]: 1, [second.id]: 1, [guest.id]: 1 },
       });
     });
 
     it("joining through the link fails once the match is full", async () => {
-      const { chatId } = await openMatchChat(3);
+      const { chatId } = await openMatchChat(2);
       const fourth = await newPlayer("Cuarto");
       const fifth = await newPlayer("Quinto");
 
@@ -261,14 +267,11 @@ describe("chat actions (integración con Postgres real)", () => {
     });
 
     it("any participant can add a registered player by email, taking a free spot", async () => {
-      const { creator, bookingId, chatId } = await openMatchChat(1);
-      const joiner = await newPlayer("Sumado");
+      const { creator, second, bookingId, chatId } = await openMatchChat(1);
       const added = await newPlayer("Agregado", { names: "Caro" });
 
-      actAs(joiner.email);
-      expect((await joinChatMatch(chatId)).success).toBe(true);
-
       // Quien agrega no es el creador: cualquier participante puede hacerlo.
+      actAs(second.email);
       const result = await addPlayerToChat(chatId, added.email.toUpperCase());
       expect(result).toEqual({
         success: true,
@@ -276,7 +279,7 @@ describe("chat actions (integración con Postgres real)", () => {
       });
       expect(await matchState(bookingId)).toEqual({
         needPlayers: true,
-        players: { [creator.id]: 1, [joiner.id]: 1, [added.id]: 1 },
+        players: { [creator.id]: 1, [second.id]: 1, [added.id]: 1 },
       });
 
       actAs(added.email);
@@ -284,7 +287,7 @@ describe("chat actions (integración con Postgres real)", () => {
     });
 
     it("adding a player by phone replaces one of the inviter's companions without changing the total", async () => {
-      const { creator, bookingId, chatId } = await openMatchChat(3);
+      const { creator, second, bookingId, chatId } = await openMatchChat(2);
       const companionPhone = uniquePhoneNumber();
       const companion = await newPlayer("Acompañante", { phoneNumber: companionPhone });
 
@@ -294,18 +297,16 @@ describe("chat actions (integración con Postgres real)", () => {
 
       expect(await matchState(bookingId)).toEqual({
         needPlayers: true,
-        players: { [creator.id]: 2, [companion.id]: 1 },
+        players: { [creator.id]: 1, [second.id]: 1, [companion.id]: 1 },
       });
     });
 
     it("adding the player that completes the match stops the search for players", async () => {
       const { bookingId, chatId, creator } = await openMatchChat(1);
-      const second = await newPlayer("Segundo");
       const third = await newPlayer("Tercero");
       const fourth = await newPlayer("Cuarto");
 
       actAs(creator.email);
-      expect((await addPlayerToChat(chatId, second.email)).success).toBe(true);
       expect((await addPlayerToChat(chatId, third.email)).success).toBe(true);
       expect((await addPlayerToChat(chatId, fourth.email)).success).toBe(true);
 
