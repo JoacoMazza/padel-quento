@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { Mail, MessageCircle, ShieldCheck, ShieldOff, X } from "lucide-react";
 import {
+  changePlayerCategoryAdmin,
+  deductPlayerPointsAdmin,
   getPlayerRecordAdmin,
   type PlayerAdminItem,
   type PlayerRecordAdmin,
   type PlayerRecordBooking,
 } from "@/src/actions/player";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory, ReviewLevel } from "@/src/domain/enums";
+import { ReputationBadge } from "@/app/components/reputation-badge";
+import type { ReviewForAdmin } from "@/src/lib/player-reviews";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { mailtoUrl, whatsappUrl } from "@/app/admin/player-contact";
 
@@ -23,6 +27,20 @@ function attendanceLabel(booking: PlayerRecordBooking, now: Date): { text: strin
   return booking.attended
     ? { text: "Asistió", className: "bg-success/10 text-success" }
     : { text: "Ausente", className: "bg-danger/10 text-danger" };
+}
+
+const LEVEL_LABELS: Record<ReviewLevel, string> = {
+  [ReviewLevel.LOWER]: "Nivel más bajo",
+  [ReviewLevel.AS_DECLARED]: "Nivel acorde",
+  [ReviewLevel.HIGHER]: "Nivel más alto",
+};
+
+function reviewSummary(review: ReviewForAdmin) {
+  return [
+    review.onTime ? "Llegó a horario" : "Llegó tarde",
+    review.goodAttitude ? "Buena actitud" : "Mala actitud",
+    LEVEL_LABELS[review.level],
+  ].join(" · ");
 }
 
 function formatDateTime(iso: string) {
@@ -55,6 +73,12 @@ export function PlayerRecordModal({
 }) {
   const [record, setRecord] = useState<PlayerRecordAdmin | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [category, setCategory] = useState<PlayerCategory>(player.category);
+  const [points, setPoints] = useState("");
+  const [reason, setReason] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isActionPending, setIsActionPending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +90,22 @@ export function PlayerRecordModal({
     return () => {
       cancelled = true;
     };
-  }, [player.id]);
+  }, [player.id, reloadKey]);
+
+  // Recategorizar o descontar puntos (HU-36): al terminar se vuelve a pedir la ficha.
+  async function runAction(action: () => Promise<{ success: boolean; error?: string }>) {
+    setActionError(null);
+    setIsActionPending(true);
+    const result = await action();
+    setIsActionPending(false);
+    if (!result.success) {
+      setActionError(result.error ?? "No se pudo completar la acción.");
+      return;
+    }
+    setPoints("");
+    setReason("");
+    setReloadKey((key) => key + 1);
+  }
 
   const fullName = `${player.names} ${player.lastnames}`;
   const now = new Date();
@@ -158,6 +197,92 @@ export function PlayerRecordModal({
                   </p>
                 </div>
               </div>
+
+              <section aria-label="Reputación" className="space-y-3">
+                <h3 className="text-sm font-bold text-foreground">Reputación</h3>
+                <ReputationBadge summary={record.reputation} />
+                {record.reputationAlerts.length > 0 ? (
+                  <ul className="space-y-1">
+                    {record.reputationAlerts.map((alert) => (
+                      <li key={alert} className="rounded-lg bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger">
+                        {alert}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {record.reviews.length > 0 ? (
+                  <ul className="divide-y divide-line/60">
+                    {record.reviews.map((review) => (
+                      <li key={review.id} className="py-2.5 text-sm">
+                        <p className="font-medium text-foreground">{reviewSummary(review)}</p>
+                        {review.comment ? <p className="text-foreground/70">{review.comment}</p> : null}
+                        <p className="text-xs text-foreground/50">
+                          {review.reviewerName} · {formatDateTime(review.createdAt)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="grid grid-cols-1 gap-3 rounded-xl border border-line p-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label htmlFor="record-category" className="block text-xs font-semibold text-foreground/70">
+                      Categoría
+                    </label>
+                    <select
+                      id="record-category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value as PlayerCategory)}
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                    >
+                      {Object.values(PlayerCategory).map((value) => (
+                        <option key={value} value={value}>
+                          {PLAYER_CATEGORY_LABELS[value]}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => runAction(() => changePlayerCategoryAdmin(player.id, category))}
+                      className="btn btn-outline btn-sm w-full"
+                    >
+                      Cambiar categoría
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="record-points" className="block text-xs font-semibold text-foreground/70">
+                      Puntos a descontar
+                    </label>
+                    <input
+                      id="record-points"
+                      type="number"
+                      min={1}
+                      value={points}
+                      onChange={(e) => setPoints(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                    />
+                    <label htmlFor="record-reason" className="block text-xs font-semibold text-foreground/70">
+                      Motivo
+                    </label>
+                    <input
+                      id="record-reason"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => runAction(() => deductPlayerPointsAdmin(player.id, Number(points), reason))}
+                      className="btn btn-danger-soft btn-sm w-full"
+                    >
+                      Descontar puntos
+                    </button>
+                  </div>
+                </div>
+                {actionError ? <p className="text-xs font-medium text-danger">{actionError}</p> : null}
+              </section>
 
               <section>
                 <h3 className="mb-2 text-sm font-bold text-foreground">Historial de reservas</h3>

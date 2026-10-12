@@ -8,6 +8,7 @@ import {
   playerJoinedNotice,
   playerLeftLateNotice,
   playerLeftNotice,
+  reviewInviteNotice,
   toWhatsAppNumber,
 } from "@/src/domain/notifications";
 
@@ -130,6 +131,21 @@ describe("matchCompleteNotice", () => {
     expect(notice.whatsappTemplate).toEqual({
       name: "quento_partido_completo",
       parameters: ["Ana", "sábado 17 de octubre", "19:30", "3", "Carla Gómez"],
+    });
+  });
+});
+
+describe("reviewInviteNotice", () => {
+  it("agradece por venir e invita a calificar a los compañeros dentro de las 48 horas", () => {
+    const notice = reviewInviteNotice("Ana", booking);
+
+    expect(notice.subject).toBe("¡Ya podés calificar a tus compañeros!");
+    expect(notice.text).toBe(
+      "Hola Ana, ¡gracias por venir a jugar con nosotros! Ya podés calificar a tus compañeros del partido del sábado 17 de octubre en la cancha 3 desde Mis turnos. Tenés 48 horas.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_calificar_companeros",
+      parameters: ["Ana", "sábado 17 de octubre", "3"],
     });
   });
 });

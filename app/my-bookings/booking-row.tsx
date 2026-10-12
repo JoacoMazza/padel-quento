@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Star, UserPlus, Users, X } from "lucide-react";
 import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
@@ -18,6 +18,7 @@ import {
   getBookingTone,
 } from "@/app/my-bookings/booking-status";
 import type { MyBookingItem } from "@/app/my-bookings/types";
+import { ReviewTeammatesModal } from "@/app/my-bookings/review-teammates-modal";
 
 function timeLabel(date: Date) {
   return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
@@ -50,6 +51,7 @@ export function BookingRow({
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<"cancel" | "close" | "leave" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
@@ -215,6 +217,12 @@ export function BookingRow({
                 Ver detalle
               </Link>
             ) : null}
+            {booking.canReview && booking.matchId !== null ? (
+              <button type="button" onClick={() => setIsReviewing(true)} className="btn btn-primary btn-sm">
+                <Star className="h-4 w-4" />
+                Calificar compañeros
+              </button>
+            ) : null}
             {booking.chatId !== null ? (
               <Link href={`/chats/${booking.chatId}`} className="btn btn-outline btn-sm">
                 <MessageCircle className="h-4 w-4" />
@@ -257,6 +265,10 @@ export function BookingRow({
           </div>
         )}
       </div>
+
+      {isReviewing && booking.matchId !== null ? (
+        <ReviewTeammatesModal matchId={booking.matchId} onClose={() => setIsReviewing(false)} />
+      ) : null}
     </div>
   );
 }

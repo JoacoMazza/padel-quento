@@ -15,6 +15,8 @@ import { Player } from "@/src/entities/Player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
+import { getReputations } from "@/src/lib/player-reviews";
+import { ReputationBadge } from "@/app/components/reputation-badge";
 
 export const metadata: Metadata = { title: "Partido abierto" };
 
@@ -42,6 +44,8 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
   if (!detail) {
     notFound();
   }
+  // Reputación de cada jugador según sus compañeros de partidos anteriores (HU-36).
+  const reputations = await getReputations(detail.participants.map((participant) => participant.playerId));
 
   const timeRange = `${timeLabel(detail.start)} – ${timeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
@@ -131,6 +135,11 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
                         ? ` · +${participant.playersCount - 1} acompañante${participant.playersCount === 2 ? "" : "s"}`
                         : ""}
                     </p>
+                    {reputations.get(participant.playerId) ? (
+                      <div className="mt-1">
+                        <ReputationBadge summary={reputations.get(participant.playerId)!} />
+                      </div>
+                    ) : null}
                   </div>
                   <span className="flex items-center gap-1.5 text-sm font-semibold text-success">
                     <Check className="h-4 w-4" />

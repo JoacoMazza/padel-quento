@@ -15,6 +15,9 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
 vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch }));
+vi.mock("@/app/my-bookings/review-teammates-modal", () => ({
+  ReviewTeammatesModal: ({ matchId }: { matchId: number }) => <div role="dialog">Calificando el partido {matchId}</div>,
+}));
 
 import { BookingState } from "@/src/domain/enums";
 import { BookingRow } from "@/app/my-bookings/booking-row";
@@ -35,6 +38,7 @@ function booking(overrides: Partial<MyBookingItem> = {}): MyBookingItem {
     confirmedPlayers: 4,
     chatId: null,
     joinedAsParticipant: false,
+    canReview: false,
     ...overrides,
   };
 }
@@ -183,6 +187,22 @@ describe("BookingRow", () => {
       );
 
       expect(screen.queryByRole("button", { name: "Darme de baja del partido" })).toBeNull();
+    });
+  });
+
+  describe("calificar compañeros", () => {
+    it("en un partido terminado que se puede calificar ofrece calificar a los compañeros", () => {
+      render(<BookingRow booking={booking({ matchId: 7, canReview: true })} now={NOW} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Calificar compañeros" }));
+
+      expect(screen.getByRole("dialog").textContent).toBe("Calificando el partido 7");
+    });
+
+    it("no lo ofrece si el partido no se puede calificar", () => {
+      render(<BookingRow booking={booking({ matchId: 7, canReview: false })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: "Calificar compañeros" })).toBeNull();
     });
   });
 });

@@ -15,6 +15,8 @@ export type MyBookingItem = {
   chatId: number | null;
   /** true si este jugador se sumó a un partido abierto creado por otro (no lo reservó él). */
   joinedAsParticipant: boolean;
+  /** true si es un partido terminado en el que puede calificar a sus compañeros (HU-36). */
+  canReview: boolean;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";

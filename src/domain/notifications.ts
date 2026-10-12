@@ -158,3 +158,13 @@ export function matchCompleteNotice(
     whatsappTemplate: { name: "quento_partido_completo", parameters: [recipientName, day, time, court, playerName] },
   };
 }
+
+/** Terminó el partido abierto (HU-36): se invita a los que asistieron a calificar a sus compañeros. */
+export function reviewInviteNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
+  const { day, court } = describeBooking(booking);
+  return {
+    subject: "¡Ya podés calificar a tus compañeros!",
+    text: `Hola ${recipientName}, ¡gracias por venir a jugar con nosotros! Ya podés calificar a tus compañeros del partido del ${day} en la cancha ${court} desde Mis turnos. Tenés 48 horas.`,
+    whatsappTemplate: { name: "quento_calificar_companeros", parameters: [recipientName, day, court] },
+  };
+}

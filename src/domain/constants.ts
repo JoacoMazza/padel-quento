@@ -32,3 +32,15 @@ export const ATTENDANCE_POINTS = 10;
  * usuario y asistir, para incentivar el armado colaborativo de partidos.
  */
 export const OPEN_MATCH_JOIN_BONUS_POINTS = 5;
+
+/** Horas que tienen los jugadores para calificar a sus compañeros desde que termina el partido (HU-36). */
+export const REVIEW_WINDOW_HOURS = 48;
+
+/** Reseñas mínimas para mostrar la reputación de un jugador: una sola no alcanza para marcarlo. */
+export const REPUTATION_MIN_REVIEWS = 3;
+
+/** Por debajo de este porcentaje, la ficha del admin marca una alerta de reputación. */
+export const REPUTATION_ALERT_PCT = 70;
+
+/** Largo máximo, en caracteres, del comentario de una reseña (HU-36). */
+export const REVIEW_COMMENT_MAX_LENGTH = 500;
