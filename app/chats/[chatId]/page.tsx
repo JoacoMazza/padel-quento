@@ -8,6 +8,7 @@ import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getChatById, getChatMessages } from "@/src/actions/chat";
 import { ChatRoom } from "./chat-room";
+import { InvitePanel } from "./invite-panel";
 import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 
 function initialsOf(names: string, lastnames: string) {
@@ -37,8 +38,12 @@ export default async function ChatPage({
   // Solo los jugadores que se sumaron con su cuenta al partido pueden entrar a la sala.
   const isParticipant = player ? participants.some((participant) => participant.id === player.id) : false;
 
-  if (!player || !chat || !isParticipant) {
+  if (!player || !chat) {
     redirect("/my-bookings");
+  }
+  // Quien llega por el link compartido sin participar todavía puede sumarse (HU-40).
+  if (!isParticipant) {
+    redirect(`/chats/${chat.id}/join`);
   }
 
   const booking = chat.booking;
@@ -110,6 +115,8 @@ export default async function ChatPage({
               ))}
             </div>
           </div>
+
+          {chat.isClosed ? null : <InvitePanel chatId={chat.id} />}
 
           <ChatRoom
             chatId={chat.id}

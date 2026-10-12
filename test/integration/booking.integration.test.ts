@@ -255,7 +255,7 @@ describe("booking actions (integración con Postgres real)", () => {
       expect(found.data?.match?.needPlayers).toBe(true);
     });
 
-    it("no crea sala de chat mientras el partido abierto solo tiene al creador", async () => {
+    it("creates the chat room together with the open match, so its creator can share it right away", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
         bookerId,
@@ -266,10 +266,10 @@ describe("booking actions (integración con Postgres real)", () => {
 
       const found = await getBookingById(opener.data.id);
       if (!found.success) throw new Error("expected success");
-      expect(found.data?.match?.chat).toBeFalsy();
+      expect(found.data?.match?.chat).toMatchObject({ id: expect.any(Number) });
     });
 
-    it("crea y asocia automáticamente la sala de chat al sumarse el segundo jugador con cuenta", async () => {
+    it("keeps a single chat room per match as players join", async () => {
       const opener = await createBooking({
         fromDateTime: uniqueFromDateTime(),
         bookerId,
@@ -277,6 +277,8 @@ describe("booking actions (integración con Postgres real)", () => {
         groupSize: 1,
       });
       if (!opener.success) throw new Error("expected success");
+      const created = await getBookingById(opener.data.id);
+      if (!created.success) throw new Error("expected success");
 
       const joinerId = await createExtraPlayer("joiner-chat");
       const joined = await joinOpenMatch({ bookingId: opener.data.id, playerId: joinerId });
@@ -284,7 +286,7 @@ describe("booking actions (integración con Postgres real)", () => {
 
       const found = await getBookingById(opener.data.id);
       if (!found.success) throw new Error("expected success");
-      expect(found.data?.match?.chat).toMatchObject({ id: expect.any(Number) });
+      expect(found.data?.match?.chat?.id).toBe(created.data?.match?.chat?.id);
 
       const thirdId = await createExtraPlayer("joiner-chat-third");
       await joinOpenMatch({ bookingId: opener.data.id, playerId: thirdId });

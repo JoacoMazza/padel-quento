@@ -4,10 +4,16 @@ vi.mock("next-auth/next", () => ({
   getServerSession: vi.fn(),
 }));
 
-const { chats, players, matchPlayers, messages, getDataSource } = vi.hoisted(() => {
+const { chats, players, matches, matchPlayers, messages, getDataSource } = vi.hoisted(() => {
   const chats = { findOne: vi.fn() };
   const players = { findOne: vi.fn() };
-  const matchPlayers = { count: vi.fn() };
+  const matches = { findOne: vi.fn(), update: vi.fn() };
+  const matchPlayers = {
+    count: vi.fn(),
+    create: vi.fn((entity: unknown) => entity),
+    save: vi.fn(),
+    update: vi.fn(),
+  };
   const messages = {
     find: vi.fn(),
     create: vi.fn((entity: unknown) => entity),
@@ -16,20 +22,27 @@ const { chats, players, matchPlayers, messages, getDataSource } = vi.hoisted(() 
   const repositories: Record<string, unknown> = {
     Chat: chats,
     Player: players,
+    Match: matches,
     MatchPlayer: matchPlayers,
     Message: messages,
   };
   const getRepository = vi.fn((name: string) => repositories[name]);
-  const getDataSource = vi.fn(async () => ({ getRepository }));
-  return { chats, players, matchPlayers, messages, getDataSource };
+  const query = vi.fn();
+  const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb({ getRepository, query }));
+  const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
+  return { chats, players, matches, matchPlayers, messages, getDataSource };
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
+const { joinOpenMatch } = vi.hoisted(() => ({ joinOpenMatch: vi.fn() }));
+
+vi.mock("@/src/actions/booking", () => ({ joinOpenMatch }));
+
 import { getServerSession } from "next-auth/next";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
-import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
+import { addPlayerToChat, getChatById, getChatMessages, joinChatMatch, sendMessage } from "@/src/actions/chat";
 
 // Jugador tal como lo devuelve la base: con su teléfono (heredado de Booker) y
 // su cuenta, que traen todos sus datos de contacto y privados.
@@ -77,6 +90,7 @@ describe("chat actions", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     messages.create.mockImplementation((entity: unknown) => entity);
+    matchPlayers.create.mockImplementation((entity: unknown) => entity);
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(BEFORE_BOOKING_END);
   });
@@ -111,6 +125,7 @@ describe("chat actions", () => {
           id: 1,
           booking: { fromDateTime, courtNumber: 3 },
           participants: [{ id: 7, names: "Ana", lastnames: "Gómez", category: PlayerCategory.FOURTH }],
+          confirmedPlayers: 1,
           isClosed: false,
           closedReason: null,
         },
@@ -342,6 +357,257 @@ describe("chat actions", () => {
       const result = await sendMessage(1, "Hola");
 
       expect(result).toEqual({ success: false, error: "No se pudo enviar el mensaje." });
+    });
+  });
+
+  describe("joinChatMatch", () => {
+    it("joins the session player to the chat's match through joinOpenMatch", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      const chat = chatWithBooking();
+      chats.findOne.mockResolvedValueOnce({ ...chat, match: { ...chat.match, booking: { ...chat.match.booking, id: 3 } } });
+      joinOpenMatch.mockResolvedValueOnce({ success: true, data: { id: 3 } });
+
+      const result = await joinChatMatch(1);
+
+      expect(joinOpenMatch).toHaveBeenCalledWith({ bookingId: 3, playerId: 7 });
+      expect(result).toEqual({ success: true, data: null });
+    });
+
+    it("returns the joinOpenMatch error (e.g. full match)", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+      joinOpenMatch.mockResolvedValueOnce({
+        success: false,
+        error: "El partido ya está completo, no quedan lugares libres.",
+      });
+
+      const result = await joinChatMatch(1);
+
+      expect(result).toEqual({ success: false, error: "El partido ya está completo, no quedan lugares libres." });
+    });
+
+    it("rejects unauthenticated users", async () => {
+      mockSession(null);
+
+      const result = await joinChatMatch(1);
+
+      expect(result).toEqual({ success: false, error: "No estás autenticado." });
+      expect(joinOpenMatch).not.toHaveBeenCalled();
+    });
+
+    it("rejects accounts without a player profile", async () => {
+      mockSession("admin@test.com");
+      players.findOne.mockResolvedValueOnce(null);
+
+      const result = await joinChatMatch(1);
+
+      expect(result).toEqual({ success: false, error: "Necesitás una cuenta de jugador para sumarte a un partido." });
+      expect(joinOpenMatch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a chat that does not exist", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      chats.findOne.mockResolvedValueOnce(null);
+
+      const result = await joinChatMatch(999);
+
+      expect(result).toEqual({ success: false, error: "El chat no existe." });
+    });
+
+    it("rejects joining once the chat is closed", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      chats.findOne.mockResolvedValueOnce(chatWithBooking(BookingState.CANCELLED));
+
+      const result = await joinChatMatch(1);
+
+      expect(result).toEqual({ success: false, error: "El chat está cerrado: ya no se pueden sumar jugadores." });
+      expect(joinOpenMatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addPlayerToChat", () => {
+    const CARO = { id: 9, names: "Caro" };
+
+    /**
+     * The inviter (Ana, id 7) participates in chat 1, whose match (id 2) is
+     * loaded inside the transaction with the given confirmed players.
+     */
+    function arrange(options: { inviterPlayersCount?: number; otherPlayersCount?: number; needPlayers?: boolean } = {}) {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer()).mockResolvedValueOnce(fullPlayer(CARO));
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+      matches.findOne.mockResolvedValueOnce({
+        id: 2,
+        needPlayers: options.needPlayers ?? true,
+        matchPlayers: [
+          { id: 30, playerId: 7, playersCount: options.inviterPlayersCount ?? 1 },
+          ...(options.otherPlayersCount ? [{ id: 31, playerId: 8, playersCount: options.otherPlayersCount }] : []),
+        ],
+      });
+    }
+
+    it("adds a registered player found by email, taking a free spot", async () => {
+      arrange({ otherPlayersCount: 1 });
+
+      const result = await addPlayerToChat(1, "  Caro@Test.com ");
+
+      expect(players.findOne).toHaveBeenLastCalledWith({
+        where: { account: { email: "caro@test.com" } },
+        relations: { account: true },
+      });
+      expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1 });
+      expect(matchPlayers.save).toHaveBeenCalledTimes(1);
+      expect(matches.update).not.toHaveBeenCalled();
+      // Only name and category of the added player: never their email or phone.
+      expect(result).toEqual({
+        success: true,
+        data: { id: 9, names: "Caro", lastnames: "Gómez", category: PlayerCategory.FOURTH },
+      });
+    });
+
+    it("finds the player by phone number, ignoring spaces, dashes and parentheses", async () => {
+      arrange();
+
+      const result = await addPlayerToChat(1, "(221) 555-0101");
+
+      expect(players.findOne).toHaveBeenLastCalledWith({
+        where: { phoneNumber: "2215550101" },
+        relations: { account: true },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("stops looking for players when the added player completes the match", async () => {
+      arrange({ otherPlayersCount: 2 });
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result.success).toBe(true);
+      expect(matches.update).toHaveBeenCalledWith(2, { needPlayers: false });
+    });
+
+    it("replaces one of the inviter's companions instead of taking a free spot", async () => {
+      arrange({ inviterPlayersCount: 2 });
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result.success).toBe(true);
+      expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1 });
+      expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1 });
+      expect(matches.update).not.toHaveBeenCalled();
+    });
+
+    it("can replace a companion even if the match is no longer looking for players", async () => {
+      arrange({ inviterPlayersCount: 2, otherPlayersCount: 2, needPlayers: false });
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result.success).toBe(true);
+      expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1 });
+    });
+
+    it("rejects adding when there are neither free spots nor companions to replace", async () => {
+      arrange({ otherPlayersCount: 3, needPlayers: false });
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({ success: false, error: "No quedan lugares libres en el partido." });
+      expect(matchPlayers.save).not.toHaveBeenCalled();
+    });
+
+    it("rejects a player who is already in the match", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer()).mockResolvedValueOnce(fullPlayer(CARO));
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+      matches.findOne.mockResolvedValueOnce({
+        id: 2,
+        needPlayers: true,
+        matchPlayers: [
+          { id: 30, playerId: 7, playersCount: 1 },
+          { id: 31, playerId: 9, playersCount: 1 },
+        ],
+      });
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({ success: false, error: "Ese jugador ya forma parte del partido." });
+      expect(matchPlayers.save).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty identifier", async () => {
+      const result = await addPlayerToChat(1, "   ");
+
+      expect(result).toEqual({ success: false, error: "Ingresá el email o el teléfono del jugador." });
+    });
+
+    it("rejects an identifier that does not belong to a registered player", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer()).mockResolvedValueOnce(null);
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+
+      const result = await addPlayerToChat(1, "nadie@test.com");
+
+      expect(result).toEqual({
+        success: false,
+        error: "No encontramos un jugador registrado con ese email o teléfono.",
+      });
+    });
+
+    it("rejects adding a blocked player", async () => {
+      mockSession("ana@test.com");
+      players.findOne
+        .mockResolvedValueOnce(fullPlayer())
+        .mockResolvedValueOnce(fullPlayer({ ...CARO, isBlocked: true }));
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking());
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Ese jugador se encuentra bloqueado y no puede sumarse a partidos.",
+      });
+    });
+
+    it("rejects inviters who do not participate in the chat", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      matchPlayers.count.mockResolvedValueOnce(0);
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({ success: false, error: "No tenés acceso a este chat." });
+    });
+
+    it("rejects blocked inviters", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer({ isBlocked: true }));
+      matchPlayers.count.mockResolvedValueOnce(1);
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({
+        success: false,
+        error: "El usuario se encuentra bloqueado y no puede sumar jugadores.",
+      });
+    });
+
+    it("rejects adding players once the chat is closed", async () => {
+      mockSession("ana@test.com");
+      players.findOne.mockResolvedValueOnce(fullPlayer());
+      matchPlayers.count.mockResolvedValueOnce(1);
+      chats.findOne.mockResolvedValueOnce(chatWithBooking(BookingState.CANCELLED));
+
+      const result = await addPlayerToChat(1, "caro@test.com");
+
+      expect(result).toEqual({ success: false, error: "El chat está cerrado: ya no se pueden sumar jugadores." });
     });
   });
 });

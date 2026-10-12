@@ -10,7 +10,12 @@ import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
 import { BookingState } from "@/src/domain/enums";
-import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POINTS } from "@/src/domain/constants";
+import {
+  JOIN_MATCH_LOCK_CLASS,
+  OPEN_MATCH_MAX_PLAYERS,
+  OPEN_MATCH_MIN_HOURS_BEFORE_START,
+  PENALTY_POINTS,
+} from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
@@ -63,10 +68,6 @@ const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipac
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
-
-// Namespace distinto (forma de dos claves) al lock por cancha de createBooking/updateBooking,
-// para que un bookingId nunca contienda con un courtId que tenga el mismo número.
-const JOIN_MATCH_LOCK_CLASS = 42;
 
 class DoubleBookingError extends Error {}
 class InvalidGroupSizeError extends Error {}
@@ -198,7 +199,8 @@ export async function createBooking(
       const saved = await bookings.save(booking);
 
       // Partido abierto: el turno queda reservado y, además, se crea el partido
-      // asociado con quien lo creó como primer jugador confirmado.
+      // asociado con quien lo creó como primer jugador confirmado, junto con su
+      // sala de chat, para que pueda compartirla desde el primer momento (HU-40).
       if (isOpenMatch) {
         const matches = manager.getRepository<Match>("Match");
         const match = await matches.save(
@@ -213,6 +215,9 @@ export async function createBooking(
             playersCount: groupSize,
           }),
         );
+
+        const chats = manager.getRepository<Chat>("Chat");
+        await chats.save(chats.create({ match: { id: match.id } }));
       }
 
       return saved;
@@ -315,16 +320,6 @@ export async function joinOpenMatch(
           playersCount: groupSize,
         }),
       );
-
-      // La sala de chat temporal se crea la primera vez que se suma un segundo
-      // jugador con cuenta propia: antes de esto (match.matchPlayers.length === 1,
-      // solo quien creó el partido) no habría con quién hablar. match.matchPlayers
-      // todavía no incluye la fila recién insertada arriba, así que el chequeo se
-      // hace contra la cantidad previa a esta suma.
-      if (match.matchPlayers.length === 1) {
-        const chats = manager.getRepository<Chat>("Chat");
-        await chats.save(chats.create({ match: { id: match.id } }));
-      }
 
       if (confirmedPlayers + groupSize >= OPEN_MATCH_MAX_PLAYERS) {
         // Update() en vez de save(match): el match tiene precargado el array

@@ -104,6 +104,7 @@ describe("booking actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
+    save.mockImplementation(async (entity: unknown) => entity);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
     playerFindOne.mockResolvedValue(bookingPlayer());
@@ -222,10 +223,19 @@ describe("booking actions", () => {
         player: { id: 1 },
         playersCount: 2,
       });
-      expect(save).toHaveBeenCalledTimes(3);
+      // Turno, partido, creador y sala de chat del partido.
+      expect(save).toHaveBeenCalledTimes(4);
       expect(result.success).toBe(true);
       if (!result.success) throw new Error("expected success");
       expect(result.data.bookingState).toBe(BookingState.RESERVED);
+    });
+
+    it("creates the match chat room together with the open match", async () => {
+      save.mockImplementation(async (entity: object) => ({ ...entity, id: "booking" in entity ? 20 : 10 }));
+
+      await createBooking({ fromDateTime, groupSize: 1, bookerId: 1, courtId: 2 });
+
+      expect(create).toHaveBeenCalledWith({ match: { id: 20 } });
     });
 
     it("con groupSize 4 crea una reserva completa (no un partido abierto) y no crea ningún partido", async () => {
@@ -355,33 +365,19 @@ describe("booking actions", () => {
       expect(result.success).toBe(true);
     });
 
-    it("crea la sala de chat al sumarse el segundo jugador con cuenta propia", async () => {
+    it("does not create a chat room when the second player joins (it already exists since the match was created)", async () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce({
         id: 20,
         needPlayers: true,
-        // Solo el creador confirmado hasta ahora: esta suma es la segunda cuenta.
         matchPlayers: [{ playerId: 1 }],
       });
 
       const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
 
-      expect(create).toHaveBeenCalledWith({ match: { id: 20 } });
-      expect(save).toHaveBeenCalledTimes(2);
-      expect(result.success).toBe(true);
-    });
-
-    it("no crea otra sala de chat si el partido ya tenía más de un jugador confirmado", async () => {
-      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
-      findOne.mockResolvedValueOnce({
-        id: 20,
-        needPlayers: true,
-        matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
-      });
-
-      await joinOpenMatch({ bookingId: 10, playerId: 5 });
-
       expect(create).not.toHaveBeenCalledWith({ match: { id: 20 } });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(result.success).toBe(true);
     });
 
     it("permite sumarse con acompañantes indicando groupSize", async () => {
