@@ -12,6 +12,7 @@ import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
 import { cancelExpiredMatches, leaveMatch } from "@/src/actions/match";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
+import { LATE_CANCELLATION_REASON } from "@/src/domain/late-cancellation";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
@@ -80,6 +81,31 @@ describe("penalización por cancelación tardía (integración con Postgres real
 
     const profile = await getProfileData(player.email);
     expect(profile?.scoring).toBe(INITIAL_POINTS - PENALTY_POINTS);
+  });
+
+  it("registra la penalidad por cancelación tardía aunque el jugador no tenga puntos para descontar", async () => {
+    const created = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
+      email: uniqueEmail("cancela-tarde-sin-puntos"),
+      password: "secreto123",
+      names: "Jugador",
+      lastnames: "SinPuntos",
+    });
+    if (!created.success) throw new Error("no se pudo crear el jugador de prueba");
+    const booking = await createBooking({
+      fromDateTime: new Date(Date.now() + 2 * 60 * 60_000 + 30 * 60_000),
+      bookerId: created.data.id,
+      courtId,
+    });
+    if (!booking.success) throw new Error("expected success");
+
+    await updateBooking(booking.data.id, { bookingState: BookingState.CANCELLED });
+
+    const profile = await getProfileData(created.data.account.email);
+    expect(profile?.scoring).toBe(0);
+    expect(profile?.movements).toEqual([
+      expect.objectContaining({ amount: 0, type: "penalty", description: LATE_CANCELLATION_REASON }),
+    ]);
   });
 
   it("no descuenta puntos al cancelar un turno con 3 horas o más de anticipación", async () => {

@@ -10,12 +10,15 @@ import type { Schedule } from "@/src/entities/Schedule";
 import type { Booking } from "@/src/entities/Booking";
 import type { OutOfService } from "@/src/entities/OutOfService";
 import type { ActionResult } from "@/src/lib/action-result";
+import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 
 export type ScheduleBoardData = {
   courts: Court[];
   schedules: Schedule[];
   bookings: Booking[];
   outOfServices: OutOfService[];
+  /** Turnos que son una fecha de un turno fijo (HU-41), para marcarlos en la turnera. */
+  fixedBookingDates: Array<{ bookingId: number; fixedBookingDateId: number }>;
 };
 
 /**
@@ -37,6 +40,8 @@ export async function getScheduleBoardData(): Promise<ActionResult<ScheduleBoard
   if (!bookingsResult.success) return { success: false, error: bookingsResult.error };
   if (!outOfServicesResult.success) return { success: false, error: outOfServicesResult.error };
 
+  const fixedDates = await findFixedBookingDates(bookingsResult.data.map((booking) => booking.id));
+
   return {
     success: true,
     data: {
@@ -44,6 +49,7 @@ export async function getScheduleBoardData(): Promise<ActionResult<ScheduleBoard
       schedules: schedulesResult.data,
       bookings: bookingsResult.data,
       outOfServices: outOfServicesResult.data,
+      fixedBookingDates: [...fixedDates].map(([bookingId, fixedBookingDateId]) => ({ bookingId, fixedBookingDateId })),
     },
   };
 }

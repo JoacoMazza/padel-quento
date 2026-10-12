@@ -7,6 +7,7 @@ import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getBookings } from "@/src/actions/booking";
+import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
 
 export const metadata = pageMetadata("Mis reservas", "/my-bookings");
@@ -24,13 +25,15 @@ export default async function MyBookingsPage() {
   const bookingsResult = await getBookings();
   const allBookings = bookingsResult.success ? bookingsResult.data : [];
 
-  const myBookings = allBookings
-    .filter((b) => {
-      if (!player) return false;
-      const isOwner = b.booker?.id === player.id;
-      const isMatchPlayer = (b.match?.matchPlayers ?? []).some((mp) => mp.playerId === player.id);
-      return isOwner || isMatchPlayer;
-    })
+  const ownBookings = allBookings.filter((b) => {
+    if (!player) return false;
+    const isOwner = b.booker?.id === player.id;
+    const isMatchPlayer = (b.match?.matchPlayers ?? []).some((mp) => mp.playerId === player.id);
+    return isOwner || isMatchPlayer;
+  });
+  const fixedDates = await findFixedBookingDates(ownBookings.map((b) => b.id));
+
+  const myBookings = ownBookings
     .map((b) => ({
       id: b.id,
       fromDateTime: b.fromDateTime,
@@ -47,6 +50,7 @@ export default async function MyBookingsPage() {
       chatId: b.match?.chat?.id ?? null,
       // Turno creado por otro jugador al que este jugador se sumó (no es quien reservó).
       joinedAsParticipant: player ? b.booker?.id !== player.id : false,
+      isFixed: fixedDates.has(b.id),
     }));
 
   return (

@@ -6,6 +6,7 @@ import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
 
 export type CreateOutOfServiceInput = {
   fromDateTime: Date;
@@ -25,6 +26,7 @@ export type UpdateOutOfServiceInput = Partial<
  * Crea el bloqueo y, en la misma transacción, cancela los turnos de la cancha que
  * se superponen con su período (OutOfService.cancelAffectedBookings() del diagrama
  * de clases). No se penaliza a nadie: la cancelación no la pidió ningún jugador.
+ * Después se les avisa a los jugadores de cada turno cancelado (HU-37).
  */
 export async function createOutOfService(
   input: CreateOutOfServiceInput,
@@ -36,7 +38,7 @@ export async function createOutOfService(
   try {
     const dataSource = await getDataSource();
 
-    const saved = await dataSource.transaction(async (manager) => {
+    const { saved, cancelledBookingIds } = await dataSource.transaction(async (manager) => {
       const outOfServices = manager.getRepository<OutOfService>("OutOfService");
 
       const outOfService = outOfServices.create({
@@ -48,7 +50,7 @@ export async function createOutOfService(
       });
       const created = await outOfServices.save(outOfService);
 
-      await manager
+      const cancelled = await manager
         .createQueryBuilder()
         .update("Booking")
         .set({ bookingState: BookingState.CANCELLED })
@@ -56,10 +58,16 @@ export async function createOutOfService(
         .andWhere('"booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
         .andWhere('"datetime" < :to', { to: input.toDateTime })
         .andWhere('"datetime" + make_interval(mins => "duration_minutes") > :from', { from: input.fromDateTime })
+        .returning("id")
         .execute();
 
-      return created;
+      const rows: { id: number }[] = cancelled.raw ?? [];
+      return { saved: created, cancelledBookingIds: rows.map((row) => row.id) };
     });
+
+    if (cancelledBookingIds.length > 0) {
+      await notifyCourtUnavailable(cancelledBookingIds);
+    }
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {

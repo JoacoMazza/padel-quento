@@ -1,23 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { MapPin, BarChart3, Users, CalendarClock, Plus, ClipboardList } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
+import {
+  FixedBookingsPanel,
+  type FixedBookingCourtOption,
+  type FixedBookingPlayerOption,
+} from "@/app/admin/fixed-bookings-panel";
 import { OccupancyMetrics } from "@/app/admin/occupancy-metrics";
+import { AttendanceReport } from "@/app/admin/attendance-report";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
+import { getFixedBookingsAdmin, type FixedBookingAdminItem } from "@/src/actions/fixedBooking";
+import { CourtState } from "@/src/domain/enums";
 import type { ActionResult } from "@/src/lib/action-result";
 
 const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Canchas", icon: MapPin, available: true },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true },
+  { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
 ] as const;
 
@@ -81,6 +90,82 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 function CourtsSection() {
   const state = useSectionData(loadCourts);
   return state.status === "ready" ? <CourtsTable courts={state.data} /> : <SectionStatus state={state} />;
+}
+
+type FixedBookingsData = {
+  fixedBookings: FixedBookingAdminItem[];
+  courts: FixedBookingCourtOption[];
+  players: FixedBookingPlayerOption[];
+};
+
+// Junto con los turnos fijos se traen las canchas (sin las dadas de baja) y los
+// jugadores, que el formulario de alta ofrece para elegir.
+async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
+  const [fixedResult, courtsResult, playersResult] = await Promise.all([
+    getFixedBookingsAdmin(),
+    getCourts(),
+    getPlayersAdmin(),
+  ]);
+  if (!fixedResult.success) return fixedResult;
+  if (!courtsResult.success) return courtsResult;
+  if (!playersResult.success) return playersResult;
+
+  return {
+    success: true,
+    data: {
+      fixedBookings: fixedResult.data,
+      courts: courtsResult.data
+        .filter((c) => c.state !== CourtState.CLOSED_DOWN)
+        .map((c) => ({ id: c.id, number: c.number })),
+      players: playersResult.data.map((p) => ({
+        id: p.id,
+        name: `${p.names} ${p.lastnames}`,
+        phoneNumber: p.phoneNumber,
+      })),
+    },
+  };
+}
+
+/**
+ * Turnera Global: la grilla con el botón para registrar un turno fijo junto a
+ * Actualizar y, debajo, el listado de turnos fijos. Al crear, liberar o dar de
+ * baja un turno fijo se refresca la grilla para que se vea el cambio.
+ */
+function ScheduleSection({ isActive }: { isActive: boolean }) {
+  const fixedState = useSectionData(loadFixedBookings);
+  const [isCreatingFixed, setIsCreatingFixed] = useState(false);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
+  const refreshBoard = useCallback(() => setBoardRefreshKey((key) => key + 1), []);
+
+  return (
+    <div className="space-y-10">
+      <ScheduleBoard
+        isActive={isActive}
+        refreshKey={boardRefreshKey}
+        toolbarActions={
+          <button
+            type="button"
+            disabled={fixedState.status !== "ready"}
+            onClick={() => setIsCreatingFixed(true)}
+            className="btn btn-sm btn-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Registrar turno fijo
+          </button>
+        }
+      />
+      {fixedState.status === "ready" ? (
+        <FixedBookingsPanel
+          {...fixedState.data}
+          isCreating={isCreatingFixed}
+          onCloseCreate={() => setIsCreatingFixed(false)}
+          onChanged={refreshBoard}
+        />
+      ) : (
+        <SectionStatus state={fixedState} />
+      )}
+    </div>
+  );
 }
 
 function UsersSection() {
@@ -156,7 +241,7 @@ export function AdminPanel() {
         {/* Las secciones visitadas quedan montadas y solo se ocultan, para no volver a pedir sus datos. */}
         {visitedSections.includes("schedule") ? (
           <div hidden={activeSection !== "schedule"}>
-            <ScheduleBoard isActive={activeSection === "schedule"} />
+            <ScheduleSection isActive={activeSection === "schedule"} />
           </div>
         ) : null}
         {visitedSections.includes("courts") ? (
@@ -167,6 +252,11 @@ export function AdminPanel() {
         {visitedSections.includes("metrics") ? (
           <div hidden={activeSection !== "metrics"}>
             <OccupancyMetrics />
+          </div>
+        ) : null}
+        {visitedSections.includes("attendance") ? (
+          <div hidden={activeSection !== "attendance"}>
+            <AttendanceReport />
           </div>
         ) : null}
         {visitedSections.includes("users") ? (

@@ -1,10 +1,8 @@
-// Prefijo para WhatsApp de los celulares argentinos cargados sin código de país.
-const DEFAULT_COUNTRY_PREFIX = "549";
+import { toWhatsAppNumber } from "@/src/domain/notifications";
 
 /** Enlace para escribirle al jugador por WhatsApp (contacto directo desde su ficha). */
 export function whatsappUrl(phoneNumber: string): string {
-  const digits = phoneNumber.replace(/\D/g, "");
-  return `https://wa.me/${phoneNumber.startsWith("+") ? digits : DEFAULT_COUNTRY_PREFIX + digits}`;
+  return `https://wa.me/${toWhatsAppNumber(phoneNumber)}`;
 }
 
 export function mailtoUrl(email: string): string {

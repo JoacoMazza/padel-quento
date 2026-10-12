@@ -6,19 +6,21 @@ import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
 import { Court } from "@/src/entities/Court";
+import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, FixedBookingDateState } from "@/src/domain/enums";
 import {
   JOIN_MATCH_LOCK_CLASS,
   OPEN_MATCH_MAX_PLAYERS,
   OPEN_MATCH_MIN_HOURS_BEFORE_START,
   PENALTY_POINTS,
 } from "@/src/domain/constants";
-import { isLateCancellation } from "@/src/domain/late-cancellation";
+import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyMatchCancelledByCreator, notifyPlayerJoined } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 export type CreateBookingInput = {
@@ -64,7 +66,7 @@ const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libr
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
 const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
 const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
-const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
+const FIXED_BOOKING_CANCELLATION_MESSAGE = "Es un turno fijo: para liberar esta fecha comunicate con el club.";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
@@ -80,6 +82,7 @@ class BlockedPlayerError extends Error {}
 class BookerNotFoundError extends Error {}
 class NoPlayerAccountError extends Error {}
 class InvalidPriceError extends Error {}
+class FixedBookingCancellationError extends Error {}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
@@ -338,6 +341,8 @@ export async function joinOpenMatch(
       return booking;
     });
 
+    await notifyPlayerJoined(input.bookingId, input.playerId);
+
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (error instanceof BlockedPlayerError) {
@@ -408,6 +413,7 @@ export async function updateBooking(
     const dataSource = await getDataSource();
 
     let lateCancellationPlayerId: number | null = null;
+    let cancelled = false;
 
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
@@ -417,6 +423,19 @@ export async function updateBooking(
       });
       if (!booking) {
         throw new Error("NOT_FOUND");
+      }
+
+      cancelled =
+        input.bookingState === BookingState.CANCELLED && booking.bookingState !== BookingState.CANCELLED;
+
+      // Las fechas de un turno fijo (HU-41) solo las libera el admin desde el panel.
+      if (
+        cancelled &&
+        (await manager
+          .getRepository<FixedBookingDate>("FixedBookingDate")
+          .existsBy({ booking: { id }, state: FixedBookingDateState.BOOKED }))
+      ) {
+        throw new FixedBookingCancellationError();
       }
 
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
@@ -468,6 +487,11 @@ export async function updateBooking(
       await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
     }
 
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    if (cancelled) {
+      await notifyMatchCancelledByCreator(id);
+    }
+
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (error instanceof DoubleBookingError) {
@@ -478,6 +502,9 @@ export async function updateBooking(
     }
     if (error instanceof NoPlayerAccountError) {
       return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
+    }
+    if (error instanceof FixedBookingCancellationError) {
+      return { success: false, error: FIXED_BOOKING_CANCELLATION_MESSAGE };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La reserva no existe." };

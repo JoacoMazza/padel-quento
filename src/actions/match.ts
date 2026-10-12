@@ -6,9 +6,10 @@ import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START, PENALTY_POINTS } from "@/src/domain/constants";
-import { isLateCancellation } from "@/src/domain/late-cancellation";
+import { LATE_LEAVE_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyMatchClosed, notifyMatchesExpired, notifyPlayerLeft } from "@/src/lib/match-notifications";
 import { recordPointsMovement } from "@/src/actions/profile";
 
 const NOT_OPEN_MESSAGE = "Este partido ya no está buscando jugadores.";
@@ -17,7 +18,6 @@ const CANCEL_EXPIRED_MATCHES_ERROR_MESSAGE = "No se pudieron cancelar los partid
 const NOT_A_MATCH_PLAYER_MESSAGE = "No formás parte de este partido.";
 const CREATOR_CANNOT_LEAVE_MESSAGE = "Creaste este partido: para darte de baja tenés que cancelar el turno.";
 const BOOKING_ALREADY_CANCELLED_MESSAGE = "El turno ya fue cancelado.";
-const LATE_LEAVE_REASON = "Baja de un partido con menos de 3 horas de anticipación";
 
 class NotOpenError extends Error {}
 class InvalidPlayersToCloseError extends Error {}
@@ -66,6 +66,8 @@ export async function closeMatch(matchId: number): Promise<ActionResult<Match>> 
       match.needPlayers = false;
       return match;
     });
+
+    await notifyMatchClosed(matchId);
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {
@@ -127,6 +129,8 @@ export async function leaveMatch(matchId: number, playerId: number): Promise<Act
       await recordPointsMovement(playerId, PENALTY_POINTS, "penalty", LATE_LEAVE_REASON);
     }
 
+    await notifyPlayerLeft(matchId, playerId, late);
+
     return { success: true, data: null };
   } catch (error) {
     if (error instanceof NotAMatchPlayerError) {
@@ -185,6 +189,8 @@ export async function cancelExpiredMatches(): Promise<ActionResult<number>> {
         toCancel.map((match) => match.id),
         { needPlayers: false },
       );
+
+      await notifyMatchesExpired(toCancel.map((match) => match.booking.id));
     }
 
     return { success: true, data: toCancel.length };

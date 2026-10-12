@@ -15,6 +15,8 @@ export type MyBookingItem = {
   chatId: number | null;
   /** true si este jugador se sumó a un partido abierto creado por otro (no lo reservó él). */
   joinedAsParticipant: boolean;
+  /** true si es una fecha de un turno fijo (HU-41): solo el club la puede liberar. */
+  isFixed: boolean;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";
