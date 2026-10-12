@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock, ClipboardList } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import { OccupancyMetrics } from "@/app/admin/occupancy-metrics";
+import { AttendanceReport } from "@/app/admin/attendance-report";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
@@ -18,6 +19,7 @@ const SECTIONS = [
   { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
   { id: "courts", label: "Canchas", icon: MapPin, available: true },
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true },
+  { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
 ] as const;
 
@@ -167,6 +169,11 @@ export function AdminPanel() {
         {visitedSections.includes("metrics") ? (
           <div hidden={activeSection !== "metrics"}>
             <OccupancyMetrics />
+          </div>
+        ) : null}
+        {visitedSections.includes("attendance") ? (
+          <div hidden={activeSection !== "attendance"}>
+            <AttendanceReport />
           </div>
         ) : null}
         {visitedSections.includes("users") ? (

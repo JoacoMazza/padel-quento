@@ -2,15 +2,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
-const { getScheduleBoardData, getCourts, getOutOfServices, getPlayersAdmin, getOccupancyReportData } = vi.hoisted(
-  () => ({
-    getScheduleBoardData: vi.fn(),
-    getCourts: vi.fn(),
-    getOutOfServices: vi.fn(),
-    getPlayersAdmin: vi.fn(),
-    getOccupancyReportData: vi.fn(),
-  }),
-);
+const {
+  getScheduleBoardData,
+  getCourts,
+  getOutOfServices,
+  getPlayersAdmin,
+  getOccupancyReportData,
+  getAttendanceReport,
+} = vi.hoisted(() => ({
+  getScheduleBoardData: vi.fn(),
+  getCourts: vi.fn(),
+  getOutOfServices: vi.fn(),
+  getPlayersAdmin: vi.fn(),
+  getOccupancyReportData: vi.fn(),
+  getAttendanceReport: vi.fn(),
+}));
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
@@ -22,6 +28,7 @@ vi.mock("@/src/actions/outOfService", () => ({
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
+vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 
 import { CourtState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
@@ -54,6 +61,10 @@ describe("AdminPanel", () => {
       success: true,
       data: { courts: [], schedules: [], bookings: [], outOfServices: [] },
     });
+    getAttendanceReport.mockResolvedValue({
+      success: true,
+      data: { total: { attended: 0, noShows: 0, lateCancellations: 0, absenteeismRate: 0 }, byPlayer: [] },
+    });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -85,6 +96,7 @@ describe("AdminPanel", () => {
     expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
     expect(getOccupancyReportData).not.toHaveBeenCalled();
+    expect(getAttendanceReport).not.toHaveBeenCalled();
   });
 
   it("pide las métricas de ocupación recién al abrir su sección", async () => {
@@ -96,6 +108,17 @@ describe("AdminPanel", () => {
 
     expect(getOccupancyReportData).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { name: "Métricas del Complejo" })).toBeTruthy();
+  });
+
+  it("pide el reporte de asistencia recién al abrir su sección", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Reportes de Asistencia");
+    await flush();
+
+    expect(getAttendanceReport).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Reportes de Asistencia" })).toBeTruthy();
   });
 
   it("el menú tiene una sola sección de canchas, sin el Bloqueo de Canchas obsoleto", async () => {
