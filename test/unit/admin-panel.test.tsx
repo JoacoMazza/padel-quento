@@ -10,17 +10,17 @@ const {
   getOccupancyReportData,
   getFixedBookingsAdmin,
   createFixedBooking,
-} = vi.hoisted(
-  () => ({
-    createFixedBooking: vi.fn(),
-    getScheduleBoardData: vi.fn(),
-    getCourts: vi.fn(),
-    getOutOfServices: vi.fn(),
-    getPlayersAdmin: vi.fn(),
-    getOccupancyReportData: vi.fn(),
-    getFixedBookingsAdmin: vi.fn(),
-  }),
-);
+  getAttendanceReport,
+} = vi.hoisted(() => ({
+  createFixedBooking: vi.fn(),
+  getScheduleBoardData: vi.fn(),
+  getCourts: vi.fn(),
+  getOutOfServices: vi.fn(),
+  getPlayersAdmin: vi.fn(),
+  getOccupancyReportData: vi.fn(),
+  getFixedBookingsAdmin: vi.fn(),
+  getAttendanceReport: vi.fn(),
+}));
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
@@ -32,6 +32,7 @@ vi.mock("@/src/actions/outOfService", () => ({
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
+vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
@@ -75,6 +76,10 @@ describe("AdminPanel", () => {
       success: true,
       data: { courts: [], schedules: [], bookings: [], outOfServices: [] },
     });
+    getAttendanceReport.mockResolvedValue({
+      success: true,
+      data: { total: { attended: 0, noShows: 0, lateCancellations: 0, absenteeismRate: 0 }, byPlayer: [] },
+    });
     getPlayersAdmin.mockResolvedValue({
       success: true,
       data: [
@@ -108,6 +113,7 @@ describe("AdminPanel", () => {
     expect(getPlayersAdmin).toHaveBeenCalledTimes(1);
     expect(getOutOfServices).not.toHaveBeenCalled();
     expect(getOccupancyReportData).not.toHaveBeenCalled();
+    expect(getAttendanceReport).not.toHaveBeenCalled();
   });
 
   it("los turnos fijos están en la Turnera Global, debajo de la grilla, y no en una sección aparte", async () => {
@@ -157,6 +163,17 @@ describe("AdminPanel", () => {
 
     expect(getOccupancyReportData).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { name: "Métricas del Complejo" })).toBeTruthy();
+  });
+
+  it("pide el reporte de asistencia recién al abrir su sección", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    openSection("Reportes de Asistencia");
+    await flush();
+
+    expect(getAttendanceReport).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: "Reportes de Asistencia" })).toBeTruthy();
   });
 
   it("el menú tiene una sola sección de canchas, sin el Bloqueo de Canchas obsoleto", async () => {

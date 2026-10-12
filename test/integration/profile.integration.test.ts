@@ -178,7 +178,14 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
 
   it("con saldo 0 la penalización no descuenta nada y una bonificación posterior suma completa", async () => {
     expect(await recordPointsMovement(playerId, 20, "penalty", "Inasistencia a turno reservado")).toBe(true);
-    expect((await getProfileData(playerEmail))?.scoring).toBe(0);
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(0);
+    // La penalidad queda registrada igual (por 0 puntos), para el reporte de asistencia.
+    expect(profile?.movements[0]).toMatchObject({
+      amount: 0,
+      type: "penalty",
+      description: "Inasistencia a turno reservado",
+    });
 
     expect(await recordPointsMovement(playerId, 10, "bonus", "Asistencia a turno reservado")).toBe(true);
     expect((await getProfileData(playerEmail))?.scoring).toBe(10);
