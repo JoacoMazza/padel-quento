@@ -109,3 +109,24 @@ export function matchesOpenMatchFilter(start: Date, now: Date, filter: OpenMatch
 
   return start >= startOfToday && start < limit;
 }
+
+// Los visitantes sin sesión ven los partidos abiertos sin datos personales de
+// los jugadores: ni nombres ni el chat del partido (sí la categoría y los cupos).
+const ANONYMOUS_PLAYER_NAME = "Jugador del club";
+
+export function anonymizeOpenMatchItem(item: OpenMatchItem): OpenMatchItem {
+  return { ...item, organizerName: ANONYMOUS_PLAYER_NAME };
+}
+
+export function anonymizeOpenMatch(detail: OpenMatchDetail): OpenMatchDetail {
+  return {
+    ...detail,
+    organizerName: ANONYMOUS_PLAYER_NAME,
+    chatId: null,
+    participants: detail.participants.map((participant) => ({
+      ...participant,
+      name: ANONYMOUS_PLAYER_NAME,
+      initials: "",
+    })),
+  };
+}

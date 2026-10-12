@@ -3,7 +3,7 @@ import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById } from "@/src/actions/booking";
+import { getBookingById } from "@/src/actions/booking";
 import {
   createOutOfService,
   getOutOfServices,
@@ -13,6 +13,7 @@ import {
   endOutOfService,
 } from "@/src/actions/outOfService";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
 const toDateTime = new Date("2026-01-01T12:00:00Z");
@@ -146,7 +147,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
       return date;
     };
     async function book(hours: number, minutes: number, onCourtId: number) {
-      const booking = await createBooking({ fromDateTime: at(hours, minutes), bookerId: playerId, courtId: onCourtId });
+      const booking = await createBookingForPlayer({ fromDateTime: at(hours, minutes), bookerId: playerId, courtId: onCourtId });
       if (!booking.success) throw new Error(`no se pudo crear el turno de prueba: ${booking.error}`);
       return booking.data.id;
     }

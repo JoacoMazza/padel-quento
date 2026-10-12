@@ -35,6 +35,7 @@ Las personas se modelan en tres tablas: `accounts` guarda las credenciales de ac
 ```
 app/                  Rutas y páginas (App Router de Next.js)
   api/auth/           Endpoints de NextAuth
+  landing/            Página de inicio pública: info del complejo y funcionalidades
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
@@ -56,6 +57,14 @@ docs/
   classes/            Diagrama de clases (imagen + fuente editable)
   der/                Diagrama Entidad-Relación (imagen + fuente editable)
 ```
+
+## Acceso sin sesión
+
+La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-matches`) se pueden ver sin iniciar sesión (ver `proxy.ts`). El login se pide recién al reservar o sumarse a un partido: el visitante va a `/login` y, al volver, encuentra elegido el turno que había seleccionado. Las rutas personales (`/my-bookings`, `/profile`, `/chats/*`) y las de admin siguen protegidas, y el admin con sesión sigue encerrado en su panel.
+
+- `createBooking` y `joinOpenMatch` toman el jugador de la sesión, nunca del id que manda el cliente; la lógica que recibe el id vive en [src/lib/bookings.ts](src/lib/bookings.ts) y solo se usa desde el servidor.
+- La grilla pública usa `getPublicBookings` ([src/lib/public-bookings.ts](src/lib/public-bookings.ts)), sin datos de quién reservó ni de quiénes juegan, y los partidos abiertos se muestran a los visitantes sin nombres ni chat.
+- El WhatsApp de contacto de la landing está en [app/components/club-info.ts](app/components/club-info.ts) (`CLUB_WHATSAPP_NUMBER`).
 
 ## Configuración del proyecto
 

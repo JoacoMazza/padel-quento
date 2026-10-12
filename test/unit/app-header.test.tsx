@@ -75,4 +75,22 @@ describe("AppHeader", () => {
 
     expect(screen.queryByRole("link", { name: "Turnos" })).toBeNull();
   });
+
+  describe("visitante sin sesión", () => {
+    it("ofrece iniciar sesión y registrarse en lugar del menú de usuario", () => {
+      render(<AppHeader active="/" guest />);
+
+      expect(screen.getByRole("link", { name: "Iniciar sesión" }).getAttribute("href")).toBe("/login");
+      expect(screen.getByRole("link", { name: "Registrarse" }).getAttribute("href")).toBe("/register");
+      expect(screen.queryByRole("button", { expanded: false })).toBeNull();
+    });
+
+    it("no muestra el link a Mis reservas, pero sí los que se pueden ver sin sesión", () => {
+      render(<AppHeader active="/bookings" guest />);
+
+      expect(screen.queryByRole("link", { name: "Mis reservas" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Turnos" }).getAttribute("href")).toBe("/bookings");
+      expect(screen.getByRole("link", { name: "Partidos abiertos" }).getAttribute("href")).toBe("/open-matches");
+    });
+  });
 });

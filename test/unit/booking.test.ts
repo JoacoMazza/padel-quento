@@ -76,13 +76,12 @@ vi.mock("@/src/actions/profile", () => ({ recordPointsMovement }));
 
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
-  createBooking,
   getBookings,
   getBookingById,
   updateBooking,
   deleteBooking,
-  joinOpenMatch,
 } from "@/src/actions/booking";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
 // Siempre en el futuro: la validación de antelación para partidos abiertos
@@ -113,7 +112,7 @@ describe("booking actions", () => {
 
   describe("createBooking", () => {
     it("crea una reserva con los valores por defecto (tomando el precio de la cancha)", async () => {
-      const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(create).toHaveBeenCalledWith({
         fromDateTime,
@@ -137,7 +136,7 @@ describe("booking actions", () => {
     });
 
     it("permite especificar un precio custom en el input", async () => {
-      await createBooking({ fromDateTime, bookerId: 1, courtId: 2, price: 15000 });
+      await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2, price: 15000 });
 
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({ price: 15000 }),
@@ -147,7 +146,7 @@ describe("booking actions", () => {
     it("falla si la cancha no tiene precio y no se provee en el input", async () => {
       findOne.mockResolvedValueOnce({ id: 2, price: undefined });
 
-      const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(result).toEqual({
         success: false,
@@ -156,7 +155,7 @@ describe("booking actions", () => {
     });
 
     it("respeta la duración y el estado indicados", async () => {
-      await createBooking({
+      await createBookingForPlayer({
         fromDateTime,
         durationMinutes: 60,
         bookingState: BookingState.PAID,
@@ -170,7 +169,7 @@ describe("booking actions", () => {
     });
 
     it("toma un lock por cancha antes de chequear solapamientos", async () => {
-      await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(queryFn).toHaveBeenCalledWith(expect.stringContaining("pg_advisory_xact_lock"), [2]);
     });
@@ -178,7 +177,7 @@ describe("booking actions", () => {
     it("devuelve error y no crea nada si el horario ya está reservado", async () => {
       getOne.mockResolvedValueOnce({ id: 99 });
 
-      const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(result).toEqual({ success: false, error: DOUBLE_BOOKING_MESSAGE });
       expect(create).not.toHaveBeenCalled();
@@ -186,7 +185,7 @@ describe("booking actions", () => {
     });
 
     it("no valida solapamiento cuando la reserva se crea directamente cancelada", async () => {
-      const result = await createBooking({
+      const result = await createBookingForPlayer({
         fromDateTime,
         bookingState: BookingState.CANCELLED,
         bookerId: 1,
@@ -200,13 +199,13 @@ describe("booking actions", () => {
     it("devuelve un error genérico si falla el guardado", async () => {
       save.mockRejectedValueOnce(new Error("boom"));
 
-      const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(result).toEqual({ success: false, error: "No se pudo crear la reserva." });
     });
 
     it("con groupSize menor a 4 crea el turno reservado y el partido abierto con el creador como primer jugador", async () => {
-      const result = await createBooking({
+      const result = await createBookingForPlayer({
         fromDateTime,
         groupSize: 2,
         bookerId: 1,
@@ -229,7 +228,7 @@ describe("booking actions", () => {
     });
 
     it("con groupSize 4 crea una reserva completa (no un partido abierto) y no crea ningún partido", async () => {
-      const result = await createBooking({ fromDateTime, groupSize: 4, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, groupSize: 4, bookerId: 1, courtId: 2 });
 
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({ bookingState: BookingState.RESERVED }),
@@ -239,13 +238,13 @@ describe("booking actions", () => {
     });
 
     it("no crea ningún partido para una reserva sin groupSize", async () => {
-      await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(save).toHaveBeenCalledTimes(1);
     });
 
     it("busca a quien reserva como jugador, junto con su cuenta", async () => {
-      await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(playerFindOne).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -257,7 +256,7 @@ describe("booking actions", () => {
       playerFindOne.mockResolvedValueOnce(null);
       bookerExistsBy.mockResolvedValueOnce(false);
 
-      const result = await createBooking({ fromDateTime, bookerId: 99, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 99, courtId: 2 });
 
       expect(result).toEqual({ success: false, error: "La persona que reserva no existe." });
       expect(save).not.toHaveBeenCalled();
@@ -270,7 +269,7 @@ describe("booking actions", () => {
       playerFindOne.mockResolvedValueOnce(null);
       bookerExistsBy.mockResolvedValueOnce(true);
 
-      const result = await createBooking({ fromDateTime, groupSize, bookerId: 3, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, groupSize, bookerId: 3, courtId: 2 });
 
       expect(result).toEqual({
         success: false,
@@ -282,7 +281,7 @@ describe("booking actions", () => {
     it("rechaza la reserva si el usuario se encuentra bloqueado", async () => {
       playerFindOne.mockResolvedValueOnce(bookingPlayer({ isBlocked: true }));
 
-      const result = await createBooking({ fromDateTime, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId: 1, courtId: 2 });
 
       expect(result).toEqual({
         success: false,
@@ -292,8 +291,8 @@ describe("booking actions", () => {
     });
 
     it("rechaza un groupSize fuera del rango 1 a 4", async () => {
-      const tooLow = await createBooking({ fromDateTime, groupSize: 0, bookerId: 1, courtId: 2 });
-      const tooHigh = await createBooking({ fromDateTime, groupSize: 5, bookerId: 1, courtId: 2 });
+      const tooLow = await createBookingForPlayer({ fromDateTime, groupSize: 0, bookerId: 1, courtId: 2 });
+      const tooHigh = await createBookingForPlayer({ fromDateTime, groupSize: 5, bookerId: 1, courtId: 2 });
 
       expect(tooLow).toEqual({
         success: false,
@@ -309,7 +308,7 @@ describe("booking actions", () => {
     it("rechaza crear un partido abierto con menos de 3 horas de anticipación", async () => {
       const soon = new Date(Date.now() + 2 * 60 * 60_000);
 
-      const result = await createBooking({ fromDateTime: soon, groupSize: 2, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime: soon, groupSize: 2, bookerId: 1, courtId: 2 });
 
       expect(result).toEqual({
         success: false,
@@ -321,7 +320,7 @@ describe("booking actions", () => {
     it("permite crear un partido abierto con más de 3 horas de anticipación", async () => {
       const inTime = new Date(Date.now() + 4 * 60 * 60_000);
 
-      const result = await createBooking({ fromDateTime: inTime, groupSize: 2, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime: inTime, groupSize: 2, bookerId: 1, courtId: 2 });
 
       expect(result.success).toBe(true);
     });
@@ -329,7 +328,7 @@ describe("booking actions", () => {
     it("permite crear una reserva completa (no partido abierto) con menos de 3 horas de anticipación", async () => {
       const soon = new Date(Date.now() + 30 * 60_000);
 
-      const result = await createBooking({ fromDateTime: soon, groupSize: 4, bookerId: 1, courtId: 2 });
+      const result = await createBookingForPlayer({ fromDateTime: soon, groupSize: 4, bookerId: 1, courtId: 2 });
 
       expect(result.success).toBe(true);
     });
@@ -344,7 +343,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(create).toHaveBeenCalledWith({
         match: { id: 20 },
@@ -364,7 +363,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(create).toHaveBeenCalledWith({ match: { id: 20 } });
       expect(save).toHaveBeenCalledTimes(2);
@@ -379,7 +378,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
       });
 
-      await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(create).not.toHaveBeenCalledWith({ match: { id: 20 } });
     });
@@ -392,7 +391,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 2 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5, groupSize: 2 });
 
       expect(create).toHaveBeenCalledWith({
         match: { id: 20 },
@@ -411,7 +410,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 3 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5, groupSize: 3 });
 
       expect(result).toEqual({
         success: false,
@@ -428,7 +427,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5, groupSize: 0 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5, groupSize: 0 });
 
       expect(result).toEqual({
         success: false,
@@ -441,7 +440,7 @@ describe("booking actions", () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [] });
 
-      await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(queryFn).toHaveBeenCalledWith(
         expect.stringContaining("pg_advisory_xact_lock"),
@@ -457,7 +456,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
       expect(save).toHaveBeenCalledTimes(1);
@@ -473,7 +472,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1, playersCount: 4 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({
         success: false,
@@ -485,7 +484,7 @@ describe("booking actions", () => {
     it("rechaza al jugador si se encuentra bloqueado", async () => {
       playerFindOne.mockResolvedValueOnce({ id: 5, account: { isBlocked: true } });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({
         success: false,
@@ -497,7 +496,7 @@ describe("booking actions", () => {
     it("rechaza si el turno no existe", async () => {
       findOne.mockResolvedValueOnce(null);
 
-      const result = await joinOpenMatch({ bookingId: 999, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 999, playerId: 5 });
 
       expect(result).toEqual({ success: false, error: "El turno no existe." });
       expect(create).not.toHaveBeenCalled();
@@ -507,7 +506,7 @@ describe("booking actions", () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce(null);
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
       expect(create).not.toHaveBeenCalled();
@@ -517,7 +516,7 @@ describe("booking actions", () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce({ id: 20, needPlayers: false, matchPlayers: [{ playerId: 1 }] });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({ success: false, error: "Este turno no es un partido abierto." });
       expect(create).not.toHaveBeenCalled();
@@ -527,7 +526,7 @@ describe("booking actions", () => {
       findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED });
       findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [{ playerId: 5 }] });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({ success: false, error: "Ya estás anotado en este partido." });
       expect(create).not.toHaveBeenCalled();
@@ -541,7 +540,7 @@ describe("booking actions", () => {
         matchPlayers: [{ playerId: 1 }, { playerId: 2 }, { playerId: 3 }, { playerId: 4 }],
       });
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({
         success: false,
@@ -555,7 +554,7 @@ describe("booking actions", () => {
       findOne.mockResolvedValueOnce({ id: 20, needPlayers: true, matchPlayers: [] });
       save.mockRejectedValueOnce(new Error("boom"));
 
-      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+      const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result).toEqual({ success: false, error: "No se pudo sumar al partido." });
     });

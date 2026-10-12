@@ -1,45 +1,40 @@
 import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { PageShell } from "@/app/components/page-shell";
 import { PageHeading } from "@/app/components/ui/page-heading";
 import { CLUB_MAPS_URL, CLUB_SHORT_ADDRESS } from "@/app/components/club-info";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
+import { parseInitialSelection } from "@/app/bookings/initial-selection";
 import { authOptions } from "@/src/lib/auth";
-import { getDataSource } from "@/src/lib/db";
-import { Player } from "@/src/entities/Player";
+import { getSessionPlayerId } from "@/src/lib/session-player";
+import { getPublicBookings } from "@/src/lib/public-bookings";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
-import { getBookings } from "@/src/actions/booking";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { pageMetadata } from "@/app/site-metadata";
 
 export const metadata = pageMetadata("Turnos", "/bookings");
 
-export default async function BookingsPage() {
+// Se puede ver sin sesión (issue #55): la sesión se pide recién al reservar o sumarse a un partido.
+export default async function BookingsPage({ searchParams }: PageProps<"/bookings">) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const isGuest = !session?.user?.email;
+  const playerId = isGuest ? null : await getSessionPlayerId();
 
-  const dataSource = await getDataSource();
-  const players = dataSource.getRepository<Player>("Player");
-  const player = await players.findOne({ where: { account: { email: session.user.email } } });
-
-  const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult] = await Promise.all([
+  // Los turnos salen de getPublicBookings: sin datos de quién reservó ni de quiénes juegan.
+  const [courtsResult, schedulesResult, bookings, outOfServicesResult] = await Promise.all([
     getCourts(),
     getSchedules(),
-    getBookings(),
+    getPublicBookings(playerId),
     getOutOfServices(),
   ]);
 
   const courts = courtsResult.success ? courtsResult.data : [];
   const schedules = schedulesResult.success ? schedulesResult.data : [];
-  const bookings = bookingsResult.success ? bookingsResult.data : [];
   const outOfServices = outOfServicesResult.success ? outOfServicesResult.data : [];
 
   return (
-    <PageShell active="/bookings" user={session.user}>
+    <PageShell active="/bookings" user={isGuest ? null : session.user}>
       <PageHeading
         eyebrow="Reservas online"
         title="Disponibilidad de canchas"
@@ -60,8 +55,9 @@ export default async function BookingsPage() {
       />
 
       <BookingsBoard
-        playerId={player?.id ?? null}
-        bookerId={player?.id ?? null}
+        playerId={playerId}
+        isGuest={isGuest}
+        initialSelection={parseInitialSelection(await searchParams)}
         courts={courts.map((c) => ({
           id: c.id,
           number: c.number,
@@ -75,19 +71,10 @@ export default async function BookingsPage() {
           closingTime: String(s.closingTime),
           courtId: s.court?.id,
         }))}
-        bookings={bookings.map((b) => ({
-          id: b.id,
-          fromDateTime: b.fromDateTime,
-          durationMinutes: b.durationMinutes,
-          bookingState: b.bookingState,
-          price: b.price,
-          needPlayers: b.match?.needPlayers ?? false,
-          courtId: b.court?.id,
-          confirmedPlayers: (b.match?.matchPlayers ?? []).reduce(
-            (sum, mp) => sum + (mp.playersCount ?? 1),
-            0,
-          ),
-          matchPlayerIds: (b.match?.matchPlayers ?? []).map((mp) => mp.playerId),
+        bookings={bookings.map(({ joinedByViewer, ...b }) => ({
+          ...b,
+          // La grilla marca "ya estás anotado" con el id de quien mira: nunca viajan los ids de los demás.
+          matchPlayerIds: joinedByViewer && playerId !== null ? [playerId] : [],
         }))}
         outOfServices={outOfServices.map((o) => ({
           id: o.id,

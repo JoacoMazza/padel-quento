@@ -13,6 +13,7 @@ import {
   SLOT_DURATION_MINUTES,
   buildCourtSlots,
   getInitialBoardDate,
+  minutesToTimeLabel,
   parseISODate,
   summarizeSlots,
   toISODate,
@@ -38,6 +39,34 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(".", "");
 }
 
+/** Turno que se había elegido antes de ir a iniciar sesión (llega en la URL de /bookings). */
+export type InitialSelection = { date: string; courtId: number; time: string };
+
+/** Login que, al terminar, vuelve a /bookings con el mismo turno elegido. */
+function loginUrlFor(courtId: number, start: Date) {
+  const time = minutesToTimeLabel(start.getHours() * 60 + start.getMinutes());
+  const bookingsUrl = `/bookings?date=${toISODate(start)}&court=${courtId}&time=${time}`;
+  return `/login?callbackUrl=${encodeURIComponent(bookingsUrl)}`;
+}
+
+function toSelectedSlot(court: CourtProp, slot: Slot): SelectedSlot {
+  return { courtId: court.id, courtNumber: court.number, price: court.price, start: slot.start, end: slot.end };
+}
+
+function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp[]): SelectedOpenMatch {
+  const openBooking = bookings.find((b) => b.id === slot.bookingId);
+  return {
+    bookingId: slot.bookingId!,
+    courtId: court.id,
+    courtNumber: court.number,
+    price: openBooking?.price ?? court.price,
+    start: slot.start,
+    end: slot.end,
+    confirmedPlayers: slot.confirmedPlayers ?? 0,
+    alreadyJoined: slot.alreadyJoined ?? false,
+  };
+}
+
 /** "Mié 14 Oct". */
 function dayLabel(date: Date) {
   return `${capitalize(DAY_LABEL_WEEKDAY_FORMATTER.format(date))} ${date.getDate()} ${capitalize(DAY_LABEL_MONTH_FORMATTER.format(date))}`;
@@ -45,14 +74,17 @@ function dayLabel(date: Date) {
 
 export function BookingsBoard({
   playerId,
-  bookerId,
+  isGuest,
+  initialSelection,
   courts,
   schedules,
   bookings,
   outOfServices,
 }: {
   playerId: number | null;
-  bookerId: number | null;
+  /** Visitante sin sesión: puede ver y elegir turnos, pero reservar lo manda a iniciar sesión. */
+  isGuest: boolean;
+  initialSelection?: InitialSelection;
   courts: CourtProp[];
   schedules: ScheduleProp[];
   bookings: BookingProp[];
@@ -60,14 +92,31 @@ export function BookingsBoard({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [dateInput, setDateInput] = useState(() =>
-    toISODate(getInitialBoardDate(courts, schedules, new Date())),
+  // El turno elegido antes de iniciar sesión vuelve seleccionado, si sigue disponible.
+  const [initialPick] = useState(() => {
+    const court = initialSelection && courts.find((c) => c.id === initialSelection.courtId);
+    if (!initialSelection || !court) return null;
+    const slot = buildCourtSlots({
+      court,
+      schedules,
+      bookings,
+      outOfServices,
+      date: parseISODate(initialSelection.date),
+      now: new Date(),
+      playerId,
+    }).find((s) => minutesToTimeLabel(s.minutesOfDay) === initialSelection.time);
+    if (slot?.status === "available") return { date: initialSelection.date, slot: toSelectedSlot(court, slot) };
+    if (slot?.status === "open") return { date: initialSelection.date, openMatch: toSelectedOpenMatch(court, slot, bookings) };
+    return null;
+  });
+  const [dateInput, setDateInput] = useState(
+    () => initialPick?.date ?? toISODate(getInitialBoardDate(courts, schedules, new Date())),
   );
   const [courtFilter, setCourtFilter] = useState<string>("all");
-  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(initialPick?.slot ?? null);
   const [isOpenMatch, setIsOpenMatch] = useState(false);
   const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
-  const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(null);
+  const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(initialPick?.openMatch ?? null);
   const [joinGroupSize, setJoinGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
@@ -144,17 +193,7 @@ export function BookingsBoard({
       setIsOpenMatch(false);
       setOpenMatchGroupSize(1);
       setJoinGroupSize(1);
-      const openBooking = bookings.find((b) => b.id === slot.bookingId);
-      setSelectedOpenMatch({
-        bookingId: slot.bookingId!,
-        courtId: court.id,
-        courtNumber: court.number,
-        price: openBooking?.price ?? court.price,
-        start: slot.start,
-        end: slot.end,
-        confirmedPlayers: slot.confirmedPlayers ?? 0,
-        alreadyJoined: slot.alreadyJoined ?? false,
-      });
+      setSelectedOpenMatch(toSelectedOpenMatch(court, slot, bookings));
       return;
     }
 
@@ -167,13 +206,7 @@ export function BookingsBoard({
 
     setSelectedOpenMatch(null);
     setJoinGroupSize(1);
-    setSelectedSlot({
-      courtId: court.id,
-      courtNumber: court.number,
-      price: court.price,
-      start: slot.start,
-      end: slot.end,
-    });
+    setSelectedSlot(toSelectedSlot(court, slot));
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
   }
@@ -181,8 +214,8 @@ export function BookingsBoard({
   function handleConfirm() {
     if (!selectedSlot) return;
 
-    if (!bookerId) {
-      setFeedback({ type: "error", message: "Tu cuenta no puede reservar turnos." });
+    if (isGuest) {
+      router.push(loginUrlFor(selectedSlot.courtId, selectedSlot.start));
       return;
     }
 
@@ -195,7 +228,6 @@ export function BookingsBoard({
         durationMinutes: SLOT_DURATION_MINUTES,
         price: selectedSlot.price,
         groupSize,
-        bookerId,
         courtId: selectedSlot.courtId,
       });
 
@@ -211,8 +243,8 @@ export function BookingsBoard({
   function handleJoinConfirm() {
     if (!selectedOpenMatch || selectedOpenMatch.alreadyJoined) return;
 
-    if (!playerId) {
-      setFeedback({ type: "error", message: "Tu cuenta no puede sumarse a partidos." });
+    if (isGuest) {
+      router.push(loginUrlFor(selectedOpenMatch.courtId, selectedOpenMatch.start));
       return;
     }
 
@@ -220,7 +252,6 @@ export function BookingsBoard({
     startTransition(async () => {
       const result = await joinOpenMatch({
         bookingId: selectedOpenMatch.bookingId,
-        playerId,
         groupSize: joinGroupSize,
       });
 
