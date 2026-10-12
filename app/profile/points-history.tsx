@@ -22,7 +22,7 @@ export function PointsHistory({ movements }: PointsHistoryProps) {
       ) : (
         <div className="divide-y divide-line/60 overflow-hidden">
           {movements.map((item) => {
-            const isPositive = item.amount >= 0;
+            const isPositive = item.amount > 0;
             const dateStr = new Date(item.createdAt).toLocaleDateString("es-AR", {
               day: "2-digit",
               month: "short",

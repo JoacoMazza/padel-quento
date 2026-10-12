@@ -4,7 +4,7 @@ import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
 import { BookingState } from "@/src/domain/enums";
 import { PENALTY_POINTS } from "@/src/domain/constants";
-import { isLateCancellation } from "@/src/domain/late-cancellation";
+import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { getSessionPlayerId } from "@/src/lib/session-player";
@@ -13,7 +13,6 @@ import {
   BookerNotFoundError,
   DOUBLE_BOOKING_MESSAGE,
   DoubleBookingError,
-  LATE_CANCELLATION_REASON,
   NO_PLAYER_ACCOUNT_MESSAGE,
   NoPlayerAccountError,
   createBookingForPlayer,

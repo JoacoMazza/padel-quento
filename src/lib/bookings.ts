@@ -60,7 +60,6 @@ const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libr
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
 export const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
 export const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
-export const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;

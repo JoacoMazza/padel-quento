@@ -77,7 +77,8 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
     movements: penalties.map((p) => ({
       id: p.id,
       amount: Number(p.penalizedScoring),
-      type: Number(p.penalizedScoring) >= 0 ? "bonus" : "penalty",
+      // Una penalización sin saldo para descontar se registra por 0 puntos.
+      type: Number(p.penalizedScoring) > 0 ? "bonus" : "penalty",
       description: p.reason,
       createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
     })),
@@ -150,12 +151,13 @@ export async function recordPointsMovement(
 
     // El saldo nunca baja de 0: una penalización solo descuenta lo que el
     // jugador tiene, y se registra ese monto real para que el historial sume
-    // igual que el saldo. Sin saldo no hay nada que descontar ni registrar.
+    // igual que el saldo. Sin saldo se registra igual, por 0 puntos, para que
+    // la falta quede en el historial (la usa el reporte de asistencia).
     if (signedAmount < 0) {
       signedAmount = -Math.min(-signedAmount, Math.max(previousScoring, 0));
     }
 
-    if (signedAmount !== 0) {
+    if (signedAmount !== 0 || type === "penalty") {
       const penaltyRecord = penaltyRepo.create({
         player,
         penalizedScoring: signedAmount,
