@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { CalendarCheck, CalendarDays, Clock, Gauge, Trophy } from "lucide-react";
 import { getOccupancyReportData, type OccupancyReportData } from "@/src/actions/metrics";
 import { DayOfWeek } from "@/src/domain/enums";
 import { WEEK_DAYS, computeOccupancyMetrics, type OccupancyStat } from "@/src/domain/occupancy";
 import { SLOT_DURATION_MINUTES, minutesToTimeLabel } from "@/app/bookings/slot-utils";
 import { formatDuration, formatPercent, formatSlotTime } from "@/app/admin/metrics-format";
+import { CourtTag } from "@/app/components/ui/court-tag";
+import { StatCard } from "@/app/components/ui/stat-card";
 
 const PRESETS = [
   { id: "today", label: "Hoy", fromOffset: 0, toOffset: 0 },
@@ -64,21 +67,10 @@ function mostRequested<T extends OccupancyStat>(items: T[]): T | null {
     .reduce<T | null>((best, item) => (best === null || item.occupancy > best.occupancy ? item : best), null);
 }
 
-function KpiTile({ label, testId, value }: { label: string; testId: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-      <p className="text-xs font-medium text-foreground/60">{label}</p>
-      <p data-testid={testId} className="mt-1 text-xl font-bold tracking-tight text-foreground">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function ChartCard({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="rounded-2xl border border-line bg-card p-5 shadow-sm">
-      <h3 id={id} className="mb-4 text-sm font-bold text-foreground">
+    <section aria-labelledby={id} className="card p-6">
+      <h3 id={id} className="label-caps mb-5">
         {title}
       </h3>
       {children}
@@ -96,7 +88,7 @@ function ColumnChart({ items }: { items: ColumnItem[] }) {
         const hasSchedule = stat.availableMinutes > 0;
         return (
           <div key={key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-            <span className="text-[11px] font-semibold text-foreground/70">
+            <span className="text-[11px] font-semibold text-foreground/70 tabular-nums">
               {hasSchedule ? formatPercent(stat.occupancy) : "—"}
             </span>
             <div className="flex h-36 w-full items-end justify-center">
@@ -104,11 +96,11 @@ function ColumnChart({ items }: { items: ColumnItem[] }) {
                 role="img"
                 aria-label={hasSchedule ? `${name}: ${formatPercent(stat.occupancy)}` : `${name}: sin horarios`}
                 title={hasSchedule ? `${name}: ${statDetail(stat)}` : `${name}: sin horarios`}
-                className="w-full max-w-10 rounded-t bg-occupied"
+                className="w-full max-w-10 rounded-t-lg bg-occupied"
                 style={{ height: `${stat.occupancy * 100}%` }}
               />
             </div>
-            <span className="pb-1 text-[11px] text-foreground/60">{label}</span>
+            <span className="pb-1.5 text-[11px] font-semibold text-foreground/50 tabular-nums">{label}</span>
           </div>
         );
       })}
@@ -159,55 +151,82 @@ export function OccupancyMetrics() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            aria-pressed={preset.id === presetId}
-            onClick={() => selectPreset(preset.id)}
-            className={`cursor-pointer rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
-              preset.id === presetId
-                ? "bg-primary text-white"
-                : "border border-line bg-card text-foreground/70 hover:bg-line/40 hover:text-foreground"
-            }`}
-          >
-            {preset.label}
-          </button>
-        ))}
+      <div className="card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              aria-pressed={preset.id === presetId}
+              onClick={() => selectPreset(preset.id)}
+              className={`chip h-9 ${preset.id === presetId ? "chip-active" : ""}`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         {state.status === "ready" ? (
-          <span className="ml-auto text-xs text-foreground/50">
-            Del {state.range.from.toLocaleDateString("es-AR")} al {state.range.to.toLocaleDateString("es-AR")}
-          </span>
+          <div className="flex shrink-0 items-center gap-3 rounded-xl border border-line bg-background px-4 py-2.5">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            <div className="flex flex-col">
+              <span className="label-caps">Período</span>
+              <span className="text-sm font-semibold text-foreground">
+                Del {state.range.from.toLocaleDateString("es-AR")} al {state.range.to.toLocaleDateString("es-AR")}
+              </span>
+            </div>
+          </div>
         ) : null}
       </div>
 
       {state.status === "loading" ? <p className="text-sm text-foreground/60">Cargando...</p> : null}
-      {state.status === "error" ? (
-        <div className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm font-medium text-danger">
-          {state.error}
-        </div>
-      ) : null}
+      {state.status === "error" ? <div className="alert-error">{state.error}</div> : null}
 
       {metrics ? (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <KpiTile label="Ocupación general" testId="kpi-occupancy" value={formatPercent(metrics.total.occupancy)} />
-            <KpiTile
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard
+              label="Ocupación general"
+              value={<span data-testid="kpi-occupancy">{formatPercent(metrics.total.occupancy)}</span>}
+              icon={<Gauge className="h-4 w-4" />}
+              progress={metrics.total.occupancy}
+              tone="occupied"
+              footer="Sobre el tiempo disponible de todas las canchas"
+            />
+            <StatCard
               label="Horas reservadas"
-              testId="kpi-hours"
-              value={formatDuration(metrics.total.bookedMinutes)}
+              value={<span data-testid="kpi-hours">{formatDuration(metrics.total.bookedMinutes)}</span>}
+              icon={<Clock className="h-4 w-4" />}
+              footer={`De ${formatDuration(metrics.total.availableMinutes)} disponibles`}
             />
-            <KpiTile label="Turnos" testId="kpi-bookings" value={String(metrics.total.bookingsCount)} />
-            <KpiTile
+            <StatCard
+              label="Turnos"
+              value={<span data-testid="kpi-bookings">{metrics.total.bookingsCount}</span>}
+              suffix={metrics.total.bookingsCount === 1 ? "reserva" : "reservas"}
+              icon={<CalendarCheck className="h-4 w-4" />}
+              footer="Reservados en el período"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <StatCard
               label="Horario más solicitado"
-              testId="kpi-top-slot"
-              value={topSlot ? `${minutesToTimeLabel(topSlot.startMinutes)} · ${formatPercent(topSlot.occupancy)}` : "—"}
+              value={
+                <span data-testid="kpi-top-slot">
+                  {topSlot ? `${minutesToTimeLabel(topSlot.startMinutes)} · ${formatPercent(topSlot.occupancy)}` : "—"}
+                </span>
+              }
+              icon={<Trophy className="h-4 w-4" />}
+              footer={topSlot ? `Turno de ${slotLabel(topSlot.startMinutes)}` : "Sin horarios configurados"}
             />
-            <KpiTile
+            <StatCard
               label="Día más solicitado"
-              testId="kpi-top-day"
-              value={topDay ? `${DAY_LABELS[topDay.dayOfWeek]} · ${formatPercent(topDay.occupancy)}` : "—"}
+              value={
+                <span data-testid="kpi-top-day">
+                  {topDay ? `${DAY_LABELS[topDay.dayOfWeek]} · ${formatPercent(topDay.occupancy)}` : "—"}
+                </span>
+              }
+              icon={<Trophy className="h-4 w-4" />}
+              footer={topDay ? statDetail(topDay) : "Sin horarios configurados"}
             />
           </div>
 
@@ -215,20 +234,23 @@ export function OccupancyMetrics() {
             {metrics.byCourt.length === 0 ? (
               <p className="text-sm text-foreground/60">No hay canchas registradas.</p>
             ) : (
-              <ul className="space-y-2.5">
+              <ul className="space-y-3">
                 {metrics.byCourt.map((court) => (
                   <li key={court.courtId} className="flex items-center gap-3 text-sm">
-                    <span className="w-20 shrink-0 font-medium text-foreground/70">Cancha {court.courtNumber}</span>
-                    <div className="h-4 flex-1 rounded-r bg-line/40">
+                    <div className="flex w-32 shrink-0 items-center gap-3">
+                      <CourtTag number={court.courtNumber} size="sm" />
+                      <span className="font-semibold text-foreground">Cancha {court.courtNumber}</span>
+                    </div>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-line/70">
                       <div
                         role="img"
                         aria-label={`Cancha ${court.courtNumber}: ${formatPercent(court.occupancy)}`}
                         title={`Cancha ${court.courtNumber}: ${statDetail(court)}`}
-                        className="h-full rounded-r bg-occupied"
+                        className="h-full rounded-full bg-occupied"
                         style={{ width: `${court.occupancy * 100}%` }}
                       />
                     </div>
-                    <span className="w-16 shrink-0 text-right font-semibold text-foreground">
+                    <span className="w-16 shrink-0 text-right font-extrabold text-foreground tabular-nums">
                       {formatPercent(court.occupancy)}
                     </span>
                   </li>
@@ -275,7 +297,7 @@ export function OccupancyMetrics() {
                     <tr>
                       <th className="w-24" />
                       {heatmapSlots.map((slot) => (
-                        <th key={slot} className="px-1 pb-1 text-center font-medium text-foreground/60">
+                        <th key={slot} className="px-1 pb-1.5 text-center font-semibold text-foreground/50 tabular-nums">
                           {formatSlotTime(slot)}
                         </th>
                       ))}
@@ -284,12 +306,12 @@ export function OccupancyMetrics() {
                   <tbody>
                     {heatmapDays.map((day) => (
                       <tr key={day}>
-                        <th className="pr-2 text-left font-medium text-foreground/70">{DAY_LABELS[day]}</th>
+                        <th className="pr-3 text-left font-semibold text-foreground">{DAY_LABELS[day]}</th>
                         {heatmapSlots.map((slot) => {
                           const cell = metrics.byDayAndSlot.find((c) => c.dayOfWeek === day && c.startMinutes === slot);
                           if (!cell || cell.availableMinutes === 0) {
                             return (
-                              <td key={slot} className="h-8 min-w-14 rounded bg-line/30 text-center text-foreground/30">
+                              <td key={slot} className="h-9 min-w-14 rounded-lg bg-line/30 text-center text-foreground/30">
                                 —
                               </td>
                             );
@@ -301,7 +323,7 @@ export function OccupancyMetrics() {
                               role="img"
                               aria-label={`${name}: ${formatPercent(cell.occupancy)}`}
                               title={`${name}: ${statDetail(cell)}`}
-                              className={`h-8 min-w-14 rounded px-1 text-center font-semibold ${
+                              className={`h-9 min-w-14 rounded-lg px-1 text-center font-semibold tabular-nums ${
                                 cell.occupancy > 0.55 ? "text-white" : "text-foreground/70"
                               }`}
                               style={{ backgroundColor: occupiedShade(cell.occupancy) }}
@@ -314,10 +336,10 @@ export function OccupancyMetrics() {
                     ))}
                   </tbody>
                 </table>
-                <div className="mt-3 flex items-center gap-2 text-[11px] text-foreground/60">
+                <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-foreground/50">
                   0%
                   <span
-                    className="h-2.5 w-32 rounded"
+                    className="h-2.5 w-32 rounded-full"
                     style={{ background: `linear-gradient(to right, ${occupiedShade(0)}, ${occupiedShade(1)})` }}
                   />
                   100%

@@ -8,7 +8,8 @@ function isPublicPath(pathname: string) {
   if (publicPaths.has(pathname)) {
     return true;
   }
-  return pathname.startsWith("/api/auth");
+  // El navegador pide el manifest sin cookies de sesión.
+  return pathname.startsWith("/api/auth") || pathname === "/manifest.webmanifest";
 }
 
 function isAdminPath(pathname: string) {

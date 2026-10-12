@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Banknote, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, Volleyball, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, X } from "lucide-react";
+import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
@@ -20,6 +21,13 @@ import type { MyBookingItem } from "@/app/my-bookings/types";
 
 function timeLabel(date: Date) {
   return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
+}
+
+const SHORT_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short" });
+
+/** "Mié 14". */
+function shortDay(date: Date) {
+  return `${SHORT_WEEKDAY_FORMATTER.format(date).replace(".", "")} ${date.getDate()}`;
 }
 
 const CONFIRM_LABELS = {
@@ -104,62 +112,65 @@ export function BookingRow({
     });
   }
 
+  const isToday = booking.fromDateTime.toDateString() === now.toDateString();
+  const isInactive = tone === "completed" || tone === "cancelled";
+
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-line p-4 sm:flex-row sm:items-center">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-light text-primary">
-        <Volleyball className="h-5 w-5" />
-      </span>
-
-      <div className="flex flex-1 flex-col gap-0.5">
-        <p className="text-sm font-bold text-foreground">Pista de pádel</p>
-        <p className="text-xs text-foreground/60">Nivel estándar</p>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-foreground/60">
-          <Calendar className="h-3.5 w-3.5" />
-          {formatLongDate(booking.fromDateTime)}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-1 sm:w-48">
-        <p className="flex items-center gap-1.5 text-sm text-foreground">
-          <Clock className="h-4 w-4 text-foreground/50 shrink-0" />
-          {timeLabel(booking.fromDateTime)} – {timeLabel(end)}
-        </p>
-        <a
-          href="https://maps.google.com/?q=Cam.+Centenario+8907,+B1894+Villa+Elisa,+Provincia+de+Buenos+Aires"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-sm text-foreground hover:text-primary transition-colors group"
-          title="Ver ubicación en Google Maps"
-        >
-          <MapPin className="h-4 w-4 text-primary shrink-0 group-hover:scale-110 transition-transform" />
-          <span>Cancha {booking.courtNumber}</span>
-          <span className="text-xs text-foreground/40">· Villa Elisa</span>
-        </a>
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-          <Banknote className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-          {formatPrice(booking.price)}
-        </p>
-      </div>
-
-      <div className="flex flex-col items-start gap-1.5">
-        <span
-          className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${getBookingBadgeClasses(tone)}`}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {getBookingStatusLabel(tone)}
+    <div className={`card flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${isInactive ? "opacity-75" : ""}`}>
+      <div
+        className={`flex h-16 w-20 shrink-0 flex-col items-center justify-center rounded-xl ${
+          isInactive ? "bg-line/70 text-foreground/60" : "bg-ink text-white"
+        }`}
+      >
+        <span className="text-[10px] font-semibold tracking-wider uppercase opacity-70" suppressHydrationWarning>
+          {isToday ? "Hoy" : shortDay(booking.fromDateTime)}
         </span>
-        {booking.needPlayers ? (
-          <span className="flex items-center gap-1 text-xs text-foreground/60">
-            <Users className="h-3.5 w-3.5" />
-            {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores
+        <span className="text-lg font-extrabold tabular-nums">{timeLabel(booking.fromDateTime)}</span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-lg font-bold text-foreground">Cancha {booking.courtNumber}</p>
+          <span className={`badge ${getBookingBadgeClasses(tone)}`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            {getBookingStatusLabel(tone)}
           </span>
-        ) : null}
-        {booking.joinedAsParticipant ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-            <UserPlus className="h-3.5 w-3.5" />
-            Te sumaste a este partido
+          {booking.needPlayers ? (
+            <span className="badge badge-neutral">
+              <Users className="h-3 w-3" />
+              {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores
+            </span>
+          ) : null}
+        </div>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            {formatLongDate(booking.fromDateTime)}
           </span>
-        ) : null}
+          <span className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            {timeLabel(booking.fromDateTime)} – {timeLabel(end)}
+          </span>
+          <a
+            href={CLUB_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 transition-colors hover:text-primary"
+            title="Ver ubicación en Google Maps"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            {CLUB_LOCATION}
+          </a>
+        </p>
+        <p className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="font-bold text-foreground">{formatPrice(booking.price)}</span>
+          {booking.joinedAsParticipant ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-primary">
+              <UserPlus className="h-3.5 w-3.5" />
+              Te sumaste a este partido
+            </span>
+          ) : null}
+        </p>
       </div>
 
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
@@ -182,9 +193,7 @@ export function BookingRow({
               onClick={
                 pendingAction === "cancel" ? handleCancel : pendingAction === "leave" ? handleLeave : handleClose
               }
-              className={`h-8 rounded-full px-3 text-xs font-semibold text-white transition-colors disabled:opacity-60 cursor-pointer ${
-                pendingAction === "close" ? "bg-primary hover:bg-primary/90" : "bg-danger hover:bg-danger/90"
-              }`}
+              className={`btn btn-sm ${pendingAction === "close" ? "btn-dark" : "bg-danger text-white hover:bg-danger/90"}`}
             >
               {isPending ? CONFIRM_LABELS[pendingAction].pending : CONFIRM_LABELS[pendingAction].confirm}
             </button>
@@ -192,26 +201,22 @@ export function BookingRow({
               type="button"
               disabled={isPending}
               onClick={() => setPendingAction(null)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-foreground/60 hover:bg-line/40 cursor-pointer"
+              className="icon-btn"
               aria-label="Volver"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary-light cursor-pointer"
-            >
-              <CalendarCheck className="h-4 w-4" />
-              Ver detalle
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {booking.matchId !== null ? (
+              <Link href={`/open-matches/${booking.id}`} className="btn btn-soft btn-sm">
+                <CalendarCheck className="h-4 w-4" />
+                Ver detalle
+              </Link>
+            ) : null}
             {booking.chatId !== null ? (
-              <Link
-                href={`/chats/${booking.chatId}`}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line px-4 text-sm font-semibold text-foreground/70 transition-colors hover:border-primary hover:text-primary"
-              >
+              <Link href={`/chats/${booking.chatId}`} className="btn btn-outline btn-sm">
                 <MessageCircle className="h-4 w-4" />
                 Chat
               </Link>
@@ -220,7 +225,7 @@ export function BookingRow({
               <button
                 type="button"
                 onClick={() => setPendingAction("close")}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-primary hover:text-primary cursor-pointer"
+                className="icon-btn"
                 aria-label="Cerrar búsqueda de jugadores"
                 title="Cerrar búsqueda de jugadores"
               >
@@ -231,7 +236,7 @@ export function BookingRow({
               <button
                 type="button"
                 onClick={() => setPendingAction("leave")}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-danger hover:text-danger cursor-pointer"
+                className="icon-btn hover:border-danger/40 hover:text-danger"
                 aria-label="Darme de baja del partido"
                 title="Darme de baja del partido"
               >
@@ -242,10 +247,11 @@ export function BookingRow({
               <button
                 type="button"
                 onClick={() => setPendingAction("cancel")}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-foreground/60 transition-colors hover:border-danger hover:text-danger cursor-pointer"
+                className="btn btn-sm btn-danger-soft"
                 aria-label="Cancelar turno"
               >
                 <Ban className="h-4 w-4" />
+                Cancelar
               </button>
             ) : null}
           </div>

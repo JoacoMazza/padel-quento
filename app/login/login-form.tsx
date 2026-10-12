@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { PasswordInput } from "@/app/components/ui/password-input";
 
 export function LoginForm() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-4">
       {registered ? (
-        <p className="rounded-lg border border-primary/30 bg-primary-light px-3.5 py-2.5 text-sm font-medium text-primary">
+        <p className="alert-success">
           Cuenta creada con éxito. Iniciá sesión para entrar.
         </p>
       ) : null}
@@ -52,14 +53,14 @@ export function LoginForm() {
       {error ? (
         <p
           role="alert"
-          className="rounded-lg border border-danger/30 bg-danger-light px-3.5 py-2.5 text-sm font-medium text-danger"
+          className="alert-error"
         >
           {error}
         </p>
       ) : null}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-foreground">
+        <label htmlFor="email" className="field-label mb-0">
           Email
         </label>
         <input
@@ -69,29 +70,28 @@ export function LoginForm() {
           autoComplete="email"
           required
           placeholder="tu@email.com"
-          className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="field h-11 bg-card"
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium text-foreground">
+        <label htmlFor="password" className="field-label mb-0">
           Contraseña
         </label>
-        <input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           placeholder="••••••••"
-          className="h-11 rounded-lg border border-line bg-white px-3.5 text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="h-11 bg-card"
         />
       </div>
 
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
+        className="btn btn-primary mt-2 w-full"
       >
         {pending ? "Ingresando…" : "Iniciar sesión"}
       </button>

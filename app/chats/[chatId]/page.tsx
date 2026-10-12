@@ -1,15 +1,22 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock, MapPin, MessageCircle, Users } from "lucide-react";
-import { AppHeader } from "@/app/components/app-header";
+import { ArrowLeft, Lock, MapPin } from "lucide-react";
+import { PageShell } from "@/app/components/page-shell";
+import { Avatar } from "@/app/components/ui/avatar";
+import { CourtTag } from "@/app/components/ui/court-tag";
+import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getChatById, getChatMessages } from "@/src/actions/chat";
+import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { ChatRoom } from "./chat-room";
 import { InvitePanel } from "./invite-panel";
-import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { SLOT_DURATION_MINUTES, formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+
+export const metadata: Metadata = { title: "Chat del partido" };
 
 function initialsOf(names: string, lastnames: string) {
   return `${names.charAt(0)}${lastnames.charAt(0)}`.toUpperCase();
@@ -49,83 +56,82 @@ export default async function ChatPage({
   const booking = chat.booking;
   const messagesResult = await getChatMessages(chat.id);
   const initialMessages = messagesResult.success ? messagesResult.data : [];
+  const startLabel = minutesToTimeLabel(booking.fromDateTime.getHours() * 60 + booking.fromDateTime.getMinutes());
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-background">
-      <AppHeader
-        active="/my-bookings"
-        userName={session.user.name}
-        userEmail={session.user.email}
-        userRole={session.user.role}
-      />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8">
+    <PageShell active="/my-bookings" user={session.user} width="narrow">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/my-bookings"
-          className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground/60 transition-colors hover:text-primary"
+          className="flex items-center gap-1.5 text-sm font-medium text-foreground/60 transition-colors hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver a mis turnos
+          <span className="text-foreground/30">/</span>
+          <span className="font-bold tracking-wide text-primary uppercase">Sala de juego #{chat.id}</span>
         </Link>
+      </div>
 
-        <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
-          {/* Encabezado de la sala */}
-          <div className="flex items-center gap-3 border-b border-line p-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary">
-              <MessageCircle className="h-5 w-5" />
-            </span>
+      <div className="card flex flex-col overflow-hidden">
+        {/* Encabezado de la sala */}
+        <div className="border-b border-line p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            {booking.courtNumber !== null ? <CourtTag number={booking.courtNumber} size="lg" /> : null}
             <div className="flex-1">
-              <h1 className="text-base font-extrabold text-foreground">Chat del partido</h1>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-foreground/60">
-                <a
-                  href="https://maps.google.com/?q=Cam.+Centenario+8907,+B1894+Villa+Elisa,+Provincia+de+Buenos+Aires"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 hover:text-primary transition-colors"
-                  title="Ver en Google Maps"
-                >
-                  <MapPin className="h-3.5 w-3.5 text-primary" />
-                  Cancha {booking.courtNumber} · Villa Elisa
-                </a>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {formatLongDate(booking.fromDateTime)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {minutesToTimeLabel(booking.fromDateTime.getHours() * 60 + booking.fromDateTime.getMinutes())}
-                </span>
+              <a
+                href={CLUB_MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] font-semibold tracking-[0.12em] text-foreground/50 uppercase transition-colors hover:text-primary"
+                title="Ver en Google Maps"
+              >
+                <MapPin className="h-3 w-3" />
+                {CLUB_LOCATION} · Cancha {booking.courtNumber}
+              </a>
+              <h1 className="mt-1 text-xl font-extrabold text-foreground sm:text-2xl">
+                Partido Cancha {booking.courtNumber} — {startLabel} hs
+              </h1>
+              <p className="mt-0.5 text-sm text-foreground/60">
+                {formatLongDate(booking.fromDateTime)} · Duración: {SLOT_DURATION_MINUTES} minutos
               </p>
             </div>
+            <span className="badge badge-success hidden sm:inline-flex">
+              {participants.length} participante{participants.length === 1 ? "" : "s"}
+            </span>
           </div>
 
           {/* Participantes */}
-          <div className="flex items-start gap-2 border-b border-line px-4 py-3">
-            <Users className="mt-1 h-4 w-4 shrink-0 text-foreground/50" />
-            <div className="flex flex-wrap items-center gap-2">
-              {participants.map((participant) => (
-                <span
-                  key={participant.id}
-                  className="flex items-center gap-1.5 rounded-full bg-line/40 px-2.5 py-1 text-xs font-medium text-foreground/80"
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                    {initialsOf(participant.names, participant.lastnames)}
-                  </span>
-                  {participant.names} {participant.lastnames}
-                </span>
-              ))}
-            </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {participants.map((participant) => (
+              <div key={participant.id} className="flex items-center gap-3 rounded-xl border border-line p-3">
+                <Avatar initials={initialsOf(participant.names, participant.lastnames)} size="sm" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {participant.names} {participant.lastnames.charAt(0)}.
+                  </p>
+                  <p className="text-xs text-foreground/50">
+                    {PLAYER_CATEGORY_LABELS[participant.category] ?? participant.category}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-
-          {chat.isClosed ? null : <InvitePanel chatId={chat.id} />}
-
-          <ChatRoom
-            chatId={chat.id}
-            currentPlayerId={player.id}
-            initialMessages={initialMessages}
-            closedReason={chat.closedReason}
-          />
         </div>
-      </main>
-    </div>
+
+        {chat.isClosed ? null : <InvitePanel chatId={chat.id} />}
+
+        <ChatRoom
+          chatId={chat.id}
+          currentPlayerId={player.id}
+          initialMessages={initialMessages}
+          closedReason={chat.closedReason}
+        />
+      </div>
+
+      <p className="mt-4 flex items-center gap-2 text-xs text-foreground/50">
+        <Lock className="h-3.5 w-3.5 text-success" />
+        Chat privado exclusivo para los jugadores anotados al turno. Tu teléfono y tu email no se comparten.
+      </p>
+    </PageShell>
   );
 }
