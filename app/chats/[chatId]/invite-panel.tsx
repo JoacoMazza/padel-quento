@@ -14,12 +14,23 @@ export function InvitePanel({ chatId }: { chatId: number }) {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  function inviteLink() {
+    return `${window.location.origin}/chats/${chatId}/join`;
+  }
+
+  // El portapapeles puede estar bloqueado por permisos o no existir (sitio
+  // servido sin https): en ese caso se muestra el link para copiarlo a mano.
   async function handleCopy() {
-    await navigator.clipboard.writeText(`${window.location.origin}/chats/${chatId}/join`);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(inviteLink());
+      setCopied(true);
+    } catch {
+      setCopyFailed(true);
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +64,19 @@ export function InvitePanel({ chatId }: { chatId: number }) {
           {copied ? "¡Link copiado!" : "Copiar link"}
         </button>
       </div>
+
+      {copyFailed ? (
+        <label className="flex flex-col gap-1 text-xs text-foreground/60">
+          No pudimos copiarlo automáticamente. Copiá el link:
+          <input
+            type="text"
+            readOnly
+            value={inviteLink()}
+            onFocus={(event) => event.target.select()}
+            className="rounded-full border border-line bg-background px-4 py-1.5 text-sm text-foreground"
+          />
+        </label>
+      ) : null}
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input

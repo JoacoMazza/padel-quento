@@ -31,6 +31,25 @@ describe("InvitePanel", () => {
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/chats/12/join`);
   });
 
+  it("shows the link to copy it by hand when the clipboard cannot be written", async () => {
+    writeText.mockRejectedValueOnce(new Error("NotAllowedError"));
+    render(<InvitePanel chatId={12} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Copiar link/ }));
+
+    await waitFor(() => expect(screen.getByDisplayValue(`${window.location.origin}/chats/12/join`)).toBeTruthy());
+    expect(screen.queryByText("¡Link copiado!")).toBeNull();
+  });
+
+  it("shows the link to copy it by hand when the browser has no clipboard API", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    render(<InvitePanel chatId={12} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Copiar link/ }));
+
+    await waitFor(() => expect(screen.getByDisplayValue(`${window.location.origin}/chats/12/join`)).toBeTruthy());
+  });
+
   it("adds a registered player by email or phone and refreshes the room", async () => {
     addPlayerToChat.mockResolvedValueOnce({
       success: true,
