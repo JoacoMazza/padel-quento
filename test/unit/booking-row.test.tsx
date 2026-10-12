@@ -35,6 +35,7 @@ function booking(overrides: Partial<MyBookingItem> = {}): MyBookingItem {
     confirmedPlayers: 4,
     chatId: null,
     joinedAsParticipant: false,
+    isFixed: false,
     ...overrides,
   };
 }
@@ -46,6 +47,16 @@ describe("BookingRow", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("turno fijo", () => {
+    it("lo marca como turno fijo y no permite cancelarlo desde la app", () => {
+      render(<BookingRow booking={booking({ isFixed: true })} now={NOW} />);
+
+      expect(screen.getByText("Turno fijo")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Cancelar turno" })).toBeNull();
+      expect(screen.getByText("Para no ir a esta fecha, avisale al club.")).toBeTruthy();
+    });
   });
 
   describe("cancelar turno", () => {

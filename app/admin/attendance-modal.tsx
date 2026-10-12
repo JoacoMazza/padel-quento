@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, UserCheck, UserX } from "lucide-react";
+import { CalendarX, Repeat, X, UserCheck, UserX } from "lucide-react";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
+import { releaseFixedBookingDate } from "@/src/actions/fixedBooking";
 import type { AdminBookingProp } from "@/app/admin/types";
 import { Avatar, getInitials } from "@/app/components/ui/avatar";
 
@@ -11,18 +12,42 @@ import { Avatar, getInitials } from "@/app/components/ui/avatar";
  * src/actions/attendance.ts). Por defecto todos los participantes figuran
  * presentes: el admin solo interviene para marcar la ausencia, antes de que
  * corra el job que acredita los puntos de fidelidad al finalizar el turno.
+ * Si el turno es una fecha futura de un turno fijo (HU-41), también permite
+ * liberar solo esa fecha.
  */
 export function AttendanceModal({
   booking,
   onClose,
   onUpdated,
+  onReleased,
 }: {
   booking: AdminBookingProp;
   onClose: () => void;
   onUpdated: (booking: AdminBookingProp) => void;
+  onReleased?: () => void;
 }) {
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRelease, setConfirmingRelease] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+
+  // La hora se toma al abrir el modal: alcanza para no ofrecer liberar una fecha que ya pasó.
+  const [openedAt] = useState(() => Date.now());
+  const canRelease = booking.fixedBookingDateId !== null && booking.fromDateTime.getTime() > openedAt;
+
+  async function handleRelease() {
+    if (booking.fixedBookingDateId === null) return;
+    setError(null);
+    setIsReleasing(true);
+    const result = await releaseFixedBookingDate(booking.fixedBookingDateId);
+    setIsReleasing(false);
+    if (!result.success) {
+      setError(result.error);
+      setConfirmingRelease(false);
+      return;
+    }
+    onReleased?.();
+  }
 
   const isOpenMatch = booking.matchPlayers.length > 0;
 
@@ -69,6 +94,13 @@ export function AttendanceModal({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {booking.fixedBookingDateId !== null ? (
+          <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            <Repeat className="h-3.5 w-3.5" />
+            Turno fijo
+          </span>
+        ) : null}
 
         <p className="mb-4 text-xs text-foreground/60">
           Por defecto todos figuran presentes. Marcá como ausente solo a quien no haya asistido; el
@@ -118,6 +150,43 @@ export function AttendanceModal({
             </li>
           )}
         </ul>
+
+        {canRelease ? (
+          <div className="mt-4 border-t border-line pt-4">
+            {confirmingRelease ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="flex-1 text-xs text-foreground/70">
+                  Se libera solo esta fecha; las demás del turno fijo siguen reservadas.
+                </p>
+                <button
+                  type="button"
+                  disabled={isReleasing}
+                  onClick={handleRelease}
+                  className="cursor-pointer rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isReleasing ? "Liberando..." : "Confirmar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={isReleasing}
+                  onClick={() => setConfirmingRelease(false)}
+                  className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-foreground/70 hover:bg-line/40"
+                >
+                  Volver
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRelease(true)}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger/10"
+              >
+                <CalendarX className="h-3.5 w-3.5" />
+                Liberar esta fecha
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {error ? <p className="mt-3 text-sm font-medium text-danger">{error}</p> : null}
       </div>
