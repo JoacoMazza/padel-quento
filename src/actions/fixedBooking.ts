@@ -2,22 +2,28 @@
 
 import "reflect-metadata";
 import { In, type EntityManager } from "typeorm";
-import type { Booker } from "@/src/entities/Booker";
 import type { Booking } from "@/src/entities/Booking";
 import type { Court } from "@/src/entities/Court";
 import type { FixedBooking } from "@/src/entities/FixedBooking";
 import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
-import type { Player } from "@/src/entities/Player";
 import { BookingState, CourtState, FixedBookingDateState, FixedBookingFrequency } from "@/src/domain/enums";
 import { FIXED_BOOKING_HORIZON_DAYS } from "@/src/domain/constants";
-import { addDaysISO, dayOfWeekOfISO, occurrenceDates, occurrenceStart, todayISO } from "@/src/domain/fixed-booking";
+import { addDaysISO, occurrenceDates, occurrenceStart, todayISO } from "@/src/domain/fixed-booking";
 import { getDataSource } from "@/src/lib/db";
 import type { ActionResult } from "@/src/lib/action-result";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
 import { notifyFixedBookingCancelled, notifyFixedDateReleased } from "@/src/lib/match-notifications";
+import {
+  BookingRuleError,
+  isSlotTaken,
+  isWithinSchedule,
+  lockCourt,
+  resolveBookingHolder,
+  type BookingHolder,
+} from "@/src/lib/court-booking";
 
 /** Titular del turno fijo: un jugador registrado, o alguien sin cuenta identificado por su teléfono. */
-export type FixedBookingHolder = { playerId: number } | { names: string; lastnames: string; phoneNumber: string };
+export type FixedBookingHolder = BookingHolder;
 
 export type CreateFixedBookingInput = {
   courtId: number;
@@ -52,42 +58,15 @@ class FixedBookingError extends Error {}
 const UPCOMING_DATES_LIMIT = 10;
 
 function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof FixedBookingError || error instanceof ForbiddenError || error instanceof UnauthorizedError) {
+  if (
+    error instanceof FixedBookingError ||
+    error instanceof BookingRuleError ||
+    error instanceof ForbiddenError ||
+    error instanceof UnauthorizedError
+  ) {
     return error.message;
   }
   return fallback;
-}
-
-function toMinutes(time: string): number {
-  const [hours, minutes] = time.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-// Mismo lock por cancha que createBooking: serializa las reservas de la cancha
-// para que dos altas simultáneas no tomen el mismo horario.
-async function lockCourt(manager: EntityManager, courtId: number) {
-  await manager.query("SELECT pg_advisory_xact_lock($1)", [courtId]);
-}
-
-/** El horario está ocupado si se superpone con un turno no cancelado o con un bloqueo de la cancha. */
-async function isSlotTaken(manager: EntityManager, courtId: number, start: Date, durationMinutes: number) {
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-  const booking = await manager
-    .createQueryBuilder<Booking>("Booking", "booking")
-    .where('booking."court_id" = :courtId', { courtId })
-    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-    .andWhere('booking."datetime" < :end', { end })
-    .andWhere('booking."datetime" + make_interval(mins => booking."duration_minutes") > :start', { start })
-    .getOne();
-  if (booking) return true;
-
-  const block = await manager
-    .createQueryBuilder("OutOfService", "block")
-    .where('block."court_id" = :courtId', { courtId })
-    .andWhere('block."from_datetime" < :end', { end })
-    .andWhere('block."to_datetime" > :start', { start })
-    .getOne();
-  return block !== null;
 }
 
 /** Reserva para el titular la fecha indicada; devuelve null si el horario está ocupado. */
@@ -146,26 +125,6 @@ async function generateDates(manager: EntityManager, fixed: FixedBooking, now: D
   return { conflicts, created };
 }
 
-async function resolveHolder(manager: EntityManager, holder: FixedBookingHolder): Promise<Booker> {
-  if ("playerId" in holder) {
-    const player = await manager.getRepository<Player>("Player").findOne({ where: { id: holder.playerId } });
-    if (!player) throw new FixedBookingError("El jugador no existe.");
-    return player;
-  }
-
-  const names = holder.names.trim();
-  const lastnames = holder.lastnames.trim();
-  const phoneNumber = holder.phoneNumber.trim();
-  if (!names || !lastnames || !phoneNumber) {
-    throw new FixedBookingError("Completá el nombre, el apellido y el teléfono del titular.");
-  }
-
-  // Si ya existe alguien con ese teléfono (jugador o no), el turno queda a su nombre.
-  const bookers = manager.getRepository<Booker>("Booker");
-  const existing = await bookers.findOne({ where: { phoneNumber } });
-  return existing ?? bookers.save(bookers.create({ names, lastnames, phoneNumber }));
-}
-
 /**
  * Alta de un turno fijo (HU-41), solo para administradores. Reserva sus fechas
  * de los próximos 6 meses; las que ya estaban ocupadas se saltean y se devuelven
@@ -193,17 +152,11 @@ export async function createFixedBooking(
       if (court.state === CourtState.CLOSED_DOWN) throw new FixedBookingError("La cancha está dada de baja.");
 
       const durationMinutes = input.durationMinutes ?? 90;
-      const schedule = court.schedules.find((s) => s.dayOfWeek === dayOfWeekOfISO(input.startDate));
-      const start = toMinutes(input.startTime);
-      if (
-        !schedule ||
-        start < toMinutes(String(schedule.openingTime)) ||
-        start + durationMinutes > toMinutes(String(schedule.closingTime))
-      ) {
+      if (!isWithinSchedule(court.schedules, input.startDate, input.startTime, durationMinutes)) {
         throw new FixedBookingError("La cancha no está abierta en ese horario ese día.");
       }
 
-      const booker = await resolveHolder(manager, input.holder);
+      const booker = await resolveBookingHolder(manager, input.holder);
 
       const fixedBookings = manager.getRepository<FixedBooking>("FixedBooking");
       const fixed = await fixedBookings.save(
@@ -227,7 +180,9 @@ export async function createFixedBooking(
 
     return { success: true, data };
   } catch (error) {
-    if (!(error instanceof FixedBookingError)) console.error("createFixedBooking", error);
+    if (!(error instanceof FixedBookingError || error instanceof BookingRuleError)) {
+      console.error("createFixedBooking", error);
+    }
     return { success: false, error: errorMessage(error, "No se pudo crear el turno fijo.") };
   }
 }

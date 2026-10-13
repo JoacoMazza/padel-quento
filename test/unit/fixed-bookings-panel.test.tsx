@@ -232,6 +232,16 @@ describe("FixedBookingsPanel", () => {
       expect(onCloseCreate).not.toHaveBeenCalled();
     });
 
+    it("muestra las fechas como día/mes/año", () => {
+      renderPanel(undefined, { isCreating: true });
+
+      fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+      fireEvent.change(screen.getByLabelText("Fecha de fin (opcional)"), { target: { value: "2026-12-31" } });
+
+      expect(screen.getByText("20/10/2026")).toBeTruthy();
+      expect(screen.getByText("31/12/2026")).toBeTruthy();
+    });
+
     it("cierra el alta con Cancelar sin crear nada", () => {
       renderPanel(undefined, { isCreating: true });
 
