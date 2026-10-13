@@ -5,15 +5,17 @@ import bcrypt from "bcrypt";
 import { Account } from "@/src/entities/Account";
 import { Admin } from "@/src/entities/Admin";
 import { getDataSource } from "@/src/lib/db";
-import { DUPLICATE_EMAIL_MESSAGE, isUniqueViolation } from "@/src/lib/db-errors";
+import { duplicateAdminMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { validateDni } from "@/src/domain/dni";
 
 export type CreateAdminInput = {
   email: string;
   password: string;
   names: string;
   lastnames: string;
-  dni?: number | null;
+  /** Obligatorio, de 7 u 8 dígitos y sin repetirse entre administradores (UQ_admins_dni). */
+  dni: number;
 };
 
 export type UpdateAdminInput = Partial<Omit<CreateAdminInput, "password">> & {
@@ -24,6 +26,11 @@ export type UpdateAdminInput = Partial<Omit<CreateAdminInput, "password">> & {
 export async function createAdmin(
   input: CreateAdminInput,
 ): Promise<ActionResult<Admin>> {
+  const dniError = validateDni(input.dni);
+  if (dniError) {
+    return { success: false, error: dniError };
+  }
+
   try {
     const dataSource = await getDataSource();
     const passwordHash = await bcrypt.hash(input.password, 12);
@@ -43,7 +50,7 @@ export async function createAdmin(
           account,
           names: input.names,
           lastnames: input.lastnames,
-          dni: input.dni ?? null,
+          dni: input.dni,
         }),
       );
     });
@@ -51,7 +58,7 @@ export async function createAdmin(
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { success: false, error: DUPLICATE_EMAIL_MESSAGE };
+      return { success: false, error: duplicateAdminMessage(error) };
     }
     console.error("createAdmin", error);
     return { success: false, error: "No se pudo crear el administrador." };
@@ -84,7 +91,11 @@ export async function getAdminById(
   }
 }
 
-/** Reparte los campos a actualizar entre la cuenta y el administrador. */
+/**
+ * Reparte los campos a actualizar entre la cuenta y el administrador. El DNI no
+ * se puede borrar, y a un administrador anterior a que fuera obligatorio se le
+ * pide cargarlo al editarlo.
+ */
 export async function updateAdmin(
   id: number,
   input: UpdateAdminInput,
@@ -92,14 +103,18 @@ export async function updateAdmin(
   try {
     const dataSource = await getDataSource();
 
-    const saved = await dataSource.transaction(async (manager) => {
+    const saved = await dataSource.transaction(async (manager): Promise<{ admin: Admin } | { error: string }> => {
       const admins = manager.getRepository<Admin>("Admin");
       const admin = await admins.findOne({ where: { id }, relations: { account: true } });
       if (!admin) {
-        return null;
+        return { error: "El administrador no existe." };
       }
 
       const { email, password, names, lastnames, dni } = input;
+      const dniError = validateDni(dni !== undefined ? dni : admin.dni);
+      if (dniError) {
+        return { error: dniError };
+      }
 
       if (email !== undefined) admin.account.email = email;
       if (password) admin.account.passwordHash = await bcrypt.hash(password, 12);
@@ -108,16 +123,16 @@ export async function updateAdmin(
       if (dni !== undefined) admin.dni = dni;
 
       admin.account = await manager.getRepository<Account>("Account").save(admin.account);
-      return admins.save(admin);
+      return { admin: await admins.save(admin) };
     });
 
-    if (!saved) {
-      return { success: false, error: "El administrador no existe." };
+    if ("error" in saved) {
+      return { success: false, error: saved.error };
     }
-    return { success: true, data: toPlain(saved) };
+    return { success: true, data: toPlain(saved.admin) };
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { success: false, error: DUPLICATE_EMAIL_MESSAGE };
+      return { success: false, error: duplicateAdminMessage(error) };
     }
     console.error("updateAdmin", error);
     return { success: false, error: "No se pudo actualizar el administrador." };

@@ -11,11 +11,19 @@ import {
   releaseFixedBookingDate,
   restoreFixedBookingDate,
   type FixedBookingAdminItem,
-  type FixedBookingHolder,
 } from "@/src/actions/fixedBooking";
+import {
+  EMPTY_HOLDER,
+  HolderFields,
+  INPUT_CLASS,
+  LABEL_CLASS,
+  toBookingHolder,
+  type HolderPlayerOption,
+} from "@/app/admin/holder-fields";
+import { DateField } from "@/app/admin/date-field";
 
 export type FixedBookingCourtOption = { id: number; number: number };
-export type FixedBookingPlayerOption = { id: number; name: string; phoneNumber: string };
+export type FixedBookingPlayerOption = HolderPlayerOption;
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   [DayOfWeek.MONDAY]: "Lunes",
@@ -37,10 +45,6 @@ const DATE_STATE_LABELS: Record<FixedBookingDateState, { label: string; style: s
   [FixedBookingDateState.RELEASED]: { label: "Liberada", style: "bg-line/60 text-foreground/70" },
   [FixedBookingDateState.CONFLICT]: { label: "Ocupada por otro turno", style: "bg-amber-500/10 text-amber-600" },
 };
-
-const INPUT_CLASS =
-  "w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
-const LABEL_CLASS = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70";
 
 function formatDate(iso: string): string {
   const [, month, day] = iso.split("-");
@@ -303,11 +307,7 @@ function CreateFixedBookingModal({
   const [startTime, setStartTime] = useState("18:00");
   const [frequency, setFrequency] = useState(FixedBookingFrequency.WEEKLY);
   const [endDate, setEndDate] = useState("");
-  const [holderType, setHolderType] = useState<"player" | "guest">("player");
-  const [playerId, setPlayerId] = useState("");
-  const [names, setNames] = useState("");
-  const [lastnames, setLastnames] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [holder, setHolder] = useState(EMPTY_HOLDER);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -316,15 +316,13 @@ function CreateFixedBookingModal({
     setError(null);
     setIsSaving(true);
 
-    const holder: FixedBookingHolder =
-      holderType === "player" ? { playerId: Number(playerId) } : { names, lastnames, phoneNumber };
     const result = await createFixedBooking({
       courtId,
       startDate,
       startTime,
       frequency,
       endDate: endDate || null,
-      holder,
+      holder: toBookingHolder(holder),
     });
 
     setIsSaving(false);
@@ -370,19 +368,7 @@ function CreateFixedBookingModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="fixed-start-date" className={LABEL_CLASS}>
-                Fecha de inicio
-              </label>
-              <input
-                id="fixed-start-date"
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <DateField id="fixed-start-date" label="Fecha de inicio" required value={startDate} onChange={setStartDate} />
             <div>
               <label htmlFor="fixed-start-time" className={LABEL_CLASS}>
                 Hora
@@ -419,107 +405,10 @@ function CreateFixedBookingModal({
                 <option value={FixedBookingFrequency.BIWEEKLY}>Quincenal (cada 2 semanas)</option>
               </select>
             </div>
-            <div>
-              <label htmlFor="fixed-end-date" className={LABEL_CLASS}>
-                Fecha de fin (opcional)
-              </label>
-              <input
-                id="fixed-end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <DateField id="fixed-end-date" label="Fecha de fin (opcional)" value={endDate} onChange={setEndDate} />
           </div>
 
-          <fieldset>
-            <legend className={LABEL_CLASS}>Titular</legend>
-            <div className="mb-3 flex gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="holder-type"
-                  checked={holderType === "player"}
-                  onChange={() => setHolderType("player")}
-                />
-                Jugador registrado
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="holder-type"
-                  checked={holderType === "guest"}
-                  onChange={() => setHolderType("guest")}
-                />
-                Sin cuenta
-              </label>
-            </div>
-
-            {holderType === "player" ? (
-              <div>
-                <label htmlFor="fixed-player" className={LABEL_CLASS}>
-                  Jugador
-                </label>
-                <select
-                  id="fixed-player"
-                  required
-                  value={playerId}
-                  onChange={(e) => setPlayerId(e.target.value)}
-                  className={INPUT_CLASS}
-                >
-                  <option value="">Elegí un jugador</option>
-                  {players.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name} ({player.phoneNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="fixed-names" className={LABEL_CLASS}>
-                      Nombre
-                    </label>
-                    <input
-                      id="fixed-names"
-                      required
-                      value={names}
-                      onChange={(e) => setNames(e.target.value)}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="fixed-lastnames" className={LABEL_CLASS}>
-                      Apellido
-                    </label>
-                    <input
-                      id="fixed-lastnames"
-                      required
-                      value={lastnames}
-                      onChange={(e) => setLastnames(e.target.value)}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="fixed-phone" className={LABEL_CLASS}>
-                    Teléfono
-                  </label>
-                  <input
-                    id="fixed-phone"
-                    type="tel"
-                    required
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className={INPUT_CLASS}
-                  />
-                </div>
-              </div>
-            )}
-          </fieldset>
+          <HolderFields idPrefix="fixed" players={players} value={holder} onChange={setHolder} />
 
           {error ? <p className="text-sm font-medium text-danger">{error}</p> : null}
 

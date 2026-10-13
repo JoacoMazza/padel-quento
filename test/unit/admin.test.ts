@@ -26,11 +26,11 @@ vi.mock("@/src/lib/db", () => ({ getDataSource }));
 import bcrypt from "bcrypt";
 import { createAdmin, getAdmins, getAdminById, updateAdmin, deleteAdmin } from "@/src/actions/admin";
 
-function duplicateError() {
-  return new QueryFailedError("insert into accounts...", [], { code: "23505", constraint: "UQ_accounts_email" } as never);
+function duplicateError(constraint = "UQ_accounts_email") {
+  return new QueryFailedError("insert into accounts...", [], { code: "23505", constraint } as never);
 }
 
-const input = { email: "admin@test.com", password: "secreto123", names: "Admin", lastnames: "Uno" };
+const input = { email: "admin@test.com", password: "secreto123", names: "Admin", lastnames: "Uno", dni: 30111222 };
 
 function storedAdmin() {
   return {
@@ -54,7 +54,7 @@ describe("admin actions", () => {
 
   describe("createAdmin", () => {
     it("crea la cuenta y el administrador con el hash de contraseña", async () => {
-      const result = await createAdmin({ ...input, dni: 30111222 });
+      const result = await createAdmin(input);
 
       expect(bcrypt.hash).toHaveBeenCalledWith("secreto123", 12);
       expect(repos.Account.create).toHaveBeenCalledWith({
@@ -85,6 +85,34 @@ describe("admin actions", () => {
 
       expect(result).toEqual({ success: false, error: "No se pudo crear el administrador." });
     });
+
+    it("exige el DNI", async () => {
+      const result = await createAdmin({ ...input, dni: null as unknown as number });
+
+      expect(result).toEqual({ success: false, error: "El DNI es obligatorio." });
+      expect(repos.Account.save).not.toHaveBeenCalled();
+    });
+
+    it.each([123456, 123456789, 30111222.5, -30111222])("rechaza el DNI inválido %s", async (dni) => {
+      const result = await createAdmin({ ...input, dni });
+
+      expect(result).toEqual({ success: false, error: "Ingresá un DNI válido (7 u 8 dígitos)." });
+      expect(repos.Account.save).not.toHaveBeenCalled();
+    });
+
+    it("acepta DNI de 7 dígitos", async () => {
+      const result = await createAdmin({ ...input, dni: 9876543 });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("devuelve un mensaje de DNI repetido si ya hay un administrador con ese DNI", async () => {
+      repos.Admin.save.mockRejectedValueOnce(duplicateError("UQ_admins_dni"));
+
+      const result = await createAdmin(input);
+
+      expect(result).toEqual({ success: false, error: "Ya hay un administrador con ese DNI." });
+    });
   });
 
   describe("getAdmins / getAdminById", () => {
@@ -108,7 +136,7 @@ describe("admin actions", () => {
 
   describe("updateAdmin", () => {
     it("actualiza los datos del administrador y rehashea la contraseña de la cuenta", async () => {
-      repos.Admin.findOne.mockResolvedValueOnce(storedAdmin());
+      repos.Admin.findOne.mockResolvedValueOnce({ ...storedAdmin(), dni: 30111222 });
 
       const result = await updateAdmin(1, { names: "Administrador", password: "nuevaClave123" });
 
@@ -128,6 +156,50 @@ describe("admin actions", () => {
       const result = await updateAdmin(999, { names: "Nadie" });
 
       expect(result).toEqual({ success: false, error: "El administrador no existe." });
+    });
+
+    it("no permite borrar el DNI", async () => {
+      repos.Admin.findOne.mockResolvedValueOnce({ ...storedAdmin(), dni: 30111222 });
+
+      const result = await updateAdmin(1, { dni: null as unknown as number });
+
+      expect(result).toEqual({ success: false, error: "El DNI es obligatorio." });
+      expect(repos.Admin.save).not.toHaveBeenCalled();
+    });
+
+    it("rechaza un DNI inválido", async () => {
+      repos.Admin.findOne.mockResolvedValueOnce({ ...storedAdmin(), dni: 30111222 });
+
+      const result = await updateAdmin(1, { dni: 12 });
+
+      expect(result).toEqual({ success: false, error: "Ingresá un DNI válido (7 u 8 dígitos)." });
+      expect(repos.Admin.save).not.toHaveBeenCalled();
+    });
+
+    it("a un administrador sin DNI (anterior a que fuera obligatorio) le pide cargarlo al editarlo", async () => {
+      repos.Admin.findOne.mockResolvedValueOnce(storedAdmin());
+
+      const result = await updateAdmin(1, { names: "Administrador" });
+
+      expect(result).toEqual({ success: false, error: "El DNI es obligatorio." });
+      expect(repos.Admin.save).not.toHaveBeenCalled();
+    });
+
+    it("a un administrador sin DNI le permite cargarlo", async () => {
+      repos.Admin.findOne.mockResolvedValueOnce(storedAdmin());
+
+      const result = await updateAdmin(1, { dni: 30111222 });
+
+      expect(result).toEqual({ success: true, data: expect.objectContaining({ dni: 30111222 }) });
+    });
+
+    it("devuelve un mensaje de DNI repetido si otro administrador ya lo tiene", async () => {
+      repos.Admin.findOne.mockResolvedValueOnce({ ...storedAdmin(), dni: 30111222 });
+      repos.Admin.save.mockRejectedValueOnce(duplicateError("UQ_admins_dni"));
+
+      const result = await updateAdmin(1, { dni: 30111223 });
+
+      expect(result).toEqual({ success: false, error: "Ya hay un administrador con ese DNI." });
     });
   });
 

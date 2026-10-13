@@ -19,6 +19,7 @@ import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/t
 import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
 import { AttendanceModal } from "@/app/admin/attendance-modal";
 import { getNextSlotChange } from "@/app/admin/schedule-refresh";
+import { dateToClockLabel } from "@/src/domain/time-format";
 
 type CellState = "available" | "reserved" | "fixed" | "pending" | "blocked" | "closed";
 
@@ -53,16 +54,20 @@ const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfS
  * solo cuando cambia de turno (ver getNextSlotChange) o cuando el admin hace
  * click en Actualizar: oculta en el panel conserva lo último obtenido sin seguir consultando.
  * También se refresca cuando cambia refreshKey (por ejemplo, al crear o liberar
- * un turno fijo). toolbarActions se muestra junto al botón Actualizar.
+ * un turno fijo). toolbarActions se muestra junto al botón Actualizar. Con
+ * onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
+ * pueden clickear para agendar un turno en esa cancha, día y hora.
  */
 export function ScheduleBoard({
   isActive = true,
   refreshKey = 0,
   toolbarActions,
+  onAvailableSlotClick,
 }: {
   isActive?: boolean;
   refreshKey?: number;
   toolbarActions?: ReactNode;
+  onAvailableSlotClick?: (slot: { courtId: number; date: string; startTime: string }) => void;
 }) {
   const [data, setData] = useState<BoardData>(EMPTY_BOARD);
   const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
@@ -254,7 +259,7 @@ export function ScheduleBoard({
             />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          En vivo{lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-AR")}` : null}
+          En vivo{lastUpdated ? ` · actualizado ${dateToClockLabel(lastUpdated)}` : null}
           <button
             type="button"
             aria-label="Actualizar turnera"
@@ -311,18 +316,42 @@ export function ScheduleBoard({
                   </td>
                   {courtSchedules.map(({ court, openMinutes, closeMinutes }) => {
                     const { state, booking } = cellInfo(court, openMinutes, closeMinutes, minutesOfDay);
-                    const isClickable = booking !== undefined;
+                    const canSchedule =
+                      state === "available" &&
+                      onAvailableSlotClick !== undefined &&
+                      buildSlotDate(selectedDate, minutesOfDay).getTime() > Date.now();
+                    const isClickable = booking !== undefined || canSchedule;
+                    const handleClick = booking
+                      ? () => setSelectedBooking(booking)
+                      : canSchedule
+                        ? () =>
+                            onAvailableSlotClick({
+                              courtId: court.id,
+                              date: dateInput,
+                              startTime: minutesToTimeLabel(minutesOfDay),
+                            })
+                        : undefined;
                     return (
                       <td key={court.id} className="px-2 py-1.5 text-center">
                         <span
                           role={isClickable ? "button" : undefined}
                           tabIndex={isClickable ? 0 : undefined}
                           data-state={state}
-                          onClick={isClickable ? () => setSelectedBooking(booking) : undefined}
-                          title={isClickable ? "Ver y marcar asistencia" : undefined}
-                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""}`}
+                          onClick={handleClick}
+                          title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
+                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
-                          {state === "closed" ? "—" : LEGEND.find((l) => l.state === state)?.label}
+                          {state === "closed" ? (
+                            "—"
+                          ) : canSchedule ? (
+                            // Al pasar el mouse, la celda libre indica que se puede agendar ahí.
+                            <>
+                              <span className="group-hover:hidden">Disponible</span>
+                              <span className="hidden group-hover:inline">+ Agendar</span>
+                            </>
+                          ) : (
+                            LEGEND.find((l) => l.state === state)?.label
+                          )}
                         </span>
                       </td>
                     );

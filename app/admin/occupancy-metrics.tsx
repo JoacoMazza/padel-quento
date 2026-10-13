@@ -6,7 +6,7 @@ import { getOccupancyReportData, type OccupancyReportData } from "@/src/actions/
 import { DayOfWeek } from "@/src/domain/enums";
 import { WEEK_DAYS, computeOccupancyMetrics, type OccupancyStat } from "@/src/domain/occupancy";
 import { SLOT_DURATION_MINUTES, minutesToTimeLabel } from "@/app/bookings/slot-utils";
-import { formatDuration, formatPercent, formatSlotTime } from "@/app/admin/metrics-format";
+import { formatDuration, formatPercent } from "@/app/admin/metrics-format";
 import { CourtTag } from "@/app/components/ui/court-tag";
 import { StatCard } from "@/app/components/ui/stat-card";
 
@@ -53,7 +53,7 @@ function presetRange(id: PresetId, now: Date): { from: Date; to: Date } {
 
 /** Turno de inicio a fin, por ejemplo "9 a 10:30". */
 function slotLabel(startMinutes: number): string {
-  return `${formatSlotTime(startMinutes)} a ${formatSlotTime(startMinutes + SLOT_DURATION_MINUTES)}`;
+  return `${minutesToTimeLabel(startMinutes)} a ${minutesToTimeLabel(startMinutes + SLOT_DURATION_MINUTES)}`;
 }
 
 function statDetail(stat: OccupancyStat): string {
@@ -278,7 +278,7 @@ export function OccupancyMetrics() {
                 <ColumnChart
                   items={metrics.bySlot.map((slot) => ({
                     key: String(slot.startMinutes),
-                    label: formatSlotTime(slot.startMinutes),
+                    label: minutesToTimeLabel(slot.startMinutes),
                     name: slotLabel(slot.startMinutes),
                     stat: slot,
                   }))}
@@ -298,7 +298,7 @@ export function OccupancyMetrics() {
                       <th className="w-24" />
                       {heatmapSlots.map((slot) => (
                         <th key={slot} className="px-1 pb-1.5 text-center font-semibold text-foreground/50 tabular-nums">
-                          {formatSlotTime(slot)}
+                          {minutesToTimeLabel(slot)}
                         </th>
                       ))}
                     </tr>

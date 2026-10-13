@@ -100,6 +100,13 @@ describe("ScheduleBoard - refresco", () => {
     expect(getScheduleBoardData).toHaveBeenCalledTimes(1);
   });
 
+  it("muestra la hora de la última actualización con el cero adelante", async () => {
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(screen.getByText(/actualizado 09:00:00/)).toBeTruthy();
+  });
+
   it("si falla el refresco no reintenta hasta el próximo cambio de turno", async () => {
     render(<ScheduleBoard />);
     await advance(0);
@@ -194,5 +201,60 @@ describe("ScheduleBoard - turnos fijos", () => {
     await advance(0);
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ScheduleBoard - agendar desde una celda libre", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    // Lunes 9:00: el turno de las 8:00 ya empezó y el de las 9:30 todavía no.
+    vi.setSystemTime(new Date(2026, 9, 12, 9, 0));
+    getScheduleBoardData.mockResolvedValue(BOARD);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  function cellAt(time: string) {
+    const row = screen.getByText(time).closest("tr")!;
+    return row.querySelector("[data-state]") as HTMLElement;
+  }
+
+  it("al hacer click en una celda disponible futura avisa la cancha, el día y la hora", async () => {
+    const onAvailableSlotClick = vi.fn();
+    render(<ScheduleBoard onAvailableSlotClick={onAvailableSlotClick} />);
+    await advance(0);
+
+    const cell = cellAt("09:30");
+    expect(cell.getAttribute("role")).toBe("button");
+    expect(cell.title).toBe("Agendar turno");
+    // Al pasar el mouse, la celda indica que se puede agendar ahí.
+    expect(cell.textContent).toContain("Agendar");
+    fireEvent.click(cell);
+
+    expect(onAvailableSlotClick).toHaveBeenCalledWith({ courtId: 1, date: "2026-10-12", startTime: "09:30" });
+  });
+
+  it("las celdas de horarios que ya empezaron no se pueden agendar", async () => {
+    const onAvailableSlotClick = vi.fn();
+    render(<ScheduleBoard onAvailableSlotClick={onAvailableSlotClick} />);
+    await advance(0);
+
+    const cell = cellAt("08:00");
+    expect(cell.dataset.state).toBe("available");
+    expect(cell.getAttribute("role")).toBeNull();
+    expect(cell.textContent).toBe("Disponible");
+    fireEvent.click(cell);
+    expect(onAvailableSlotClick).not.toHaveBeenCalled();
+  });
+
+  it("sin onAvailableSlotClick las celdas disponibles no son clickeables", async () => {
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(cellAt("09:30").getAttribute("role")).toBeNull();
   });
 });
