@@ -16,6 +16,7 @@ import { BookingState } from "@/src/domain/enums";
 import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyPlayerJoined } from "@/src/lib/match-notifications";
 
 export type CreateBookingInput = {
   fromDateTime: Date;
@@ -336,6 +337,8 @@ export async function joinOpenMatchForPlayer(
 
       return booking;
     });
+
+    await notifyPlayerJoined(input.bookingId, input.playerId);
 
     return { success: true, data: toPlain(saved) };
   } catch (error) {

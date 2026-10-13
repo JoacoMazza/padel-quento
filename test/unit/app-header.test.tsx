@@ -5,13 +5,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
-    <a href={href} {...props}>
+    <a href={href} data-next-link="" {...props}>
       {children}
     </a>
   ),
 }));
 
 import { AppHeader } from "@/app/components/app-header";
+import { Role } from "@/src/domain/enums";
 
 describe("AppHeader", () => {
   afterEach(() => {
@@ -68,6 +69,23 @@ describe("AppHeader", () => {
     const { container } = render(<AppHeader active="/" />);
 
     expect(container.querySelector("header > div")!.className).toContain("max-w-7xl");
+  });
+
+  it("el logo lleva al inicio", () => {
+    render(<AppHeader active="/bookings" userRole={Role.PLAYER} />);
+
+    const logo = screen.getByRole("link", { name: "Ir al inicio" });
+    expect(logo.getAttribute("href")).toBe("/");
+    expect(logo.textContent).toContain("Quento Club");
+  });
+
+  it("en el panel de administración el logo vuelve al panel desde el principio (Turnera Global)", () => {
+    render(<AppHeader active="/admin" userRole={Role.ADMIN} showNav={false} />);
+
+    const logo = screen.getByRole("link", { name: "Ir al inicio" });
+    expect(logo.getAttribute("href")).toBe("/admin");
+    // Link común y no next/link: una navegación del cliente a la misma ruta conservaría la sección abierta.
+    expect(logo.hasAttribute("data-next-link")).toBe(false);
   });
 
   it("oculta la navegación en el panel de administración", () => {

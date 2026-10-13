@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, ClipboardList } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
+import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/fixed-bookings-panel";
+import { CreateBookingModal, type BookingCourtOption, type BookingDraft } from "@/app/admin/create-booking-modal";
 import { OccupancyMetrics } from "@/app/admin/occupancy-metrics";
 import { AttendanceReport } from "@/app/admin/attendance-report";
 import type { CourtItem } from "@/app/admin/court-status";
@@ -13,6 +15,8 @@ import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
+import { getFixedBookingsAdmin, type FixedBookingAdminItem } from "@/src/actions/fixedBooking";
+import { CourtState } from "@/src/domain/enums";
 import type { ActionResult } from "@/src/lib/action-result";
 
 const SECTIONS = [
@@ -83,6 +87,121 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 function CourtsSection() {
   const state = useSectionData(loadCourts);
   return state.status === "ready" ? <CourtsTable courts={state.data} /> : <SectionStatus state={state} />;
+}
+
+type FixedBookingsData = {
+  fixedBookings: FixedBookingAdminItem[];
+  courts: BookingCourtOption[];
+  players: FixedBookingPlayerOption[];
+};
+
+// Junto con los turnos fijos se traen las canchas (sin las dadas de baja) y los
+// jugadores, que los formularios de alta (turno común y turno fijo) ofrecen para elegir.
+async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
+  const [fixedResult, courtsResult, playersResult] = await Promise.all([
+    getFixedBookingsAdmin(),
+    getCourts(),
+    getPlayersAdmin(),
+  ]);
+  if (!fixedResult.success) return fixedResult;
+  if (!courtsResult.success) return courtsResult;
+  if (!playersResult.success) return playersResult;
+
+  return {
+    success: true,
+    data: {
+      fixedBookings: fixedResult.data,
+      courts: courtsResult.data
+        .filter((c) => c.state !== CourtState.CLOSED_DOWN)
+        .map((c) => ({ id: c.id, number: c.number, price: c.price })),
+      players: playersResult.data.map((p) => ({
+        id: p.id,
+        name: `${p.names} ${p.lastnames}`,
+        phoneNumber: p.phoneNumber,
+      })),
+    },
+  };
+}
+
+/**
+ * Turnera Global: la grilla con los botones para agendar un turno común y para
+ * registrar un turno fijo junto a Actualizar y, debajo, el listado de turnos
+ * fijos. Un turno común también se agenda haciendo click en una celda libre.
+ * Después de cada alta o cambio se refresca la grilla para que se vea.
+ */
+function ScheduleSection({ isActive }: { isActive: boolean }) {
+  const fixedState = useSectionData(loadFixedBookings);
+  const [isCreatingFixed, setIsCreatingFixed] = useState(false);
+  const [bookingDraft, setBookingDraft] = useState<BookingDraft | null>(null);
+  const [bookingNotice, setBookingNotice] = useState<string | null>(null);
+  const [boardRefreshKey, setBoardRefreshKey] = useState(0);
+  const refreshBoard = useCallback(() => setBoardRefreshKey((key) => key + 1), []);
+  const isReady = fixedState.status === "ready";
+
+  function openBooking(draft: BookingDraft) {
+    setBookingNotice(null);
+    setBookingDraft(draft);
+  }
+
+  function handleBookingCreated() {
+    setBookingDraft(null);
+    setBookingNotice("Turno agendado.");
+    refreshBoard();
+  }
+
+  return (
+    <div className="space-y-10">
+      <div className="space-y-3">
+        {bookingNotice ? <p className="text-sm font-medium text-success">{bookingNotice}</p> : null}
+        <ScheduleBoard
+          isActive={isActive}
+          refreshKey={boardRefreshKey}
+          onAvailableSlotClick={isReady ? openBooking : undefined}
+          toolbarActions={
+            <>
+              <button
+                type="button"
+                disabled={!isReady}
+                onClick={() => openBooking({})}
+                className="btn btn-sm btn-primary"
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Agendar turno
+              </button>
+              <button
+                type="button"
+                disabled={!isReady}
+                onClick={() => setIsCreatingFixed(true)}
+                className="btn btn-sm btn-outline"
+              >
+                <Repeat className="h-3.5 w-3.5" />
+                Registrar turno fijo
+              </button>
+            </>
+          }
+        />
+      </div>
+      {isReady && bookingDraft ? (
+        <CreateBookingModal
+          courts={fixedState.data.courts}
+          players={fixedState.data.players}
+          initial={bookingDraft}
+          onClose={() => setBookingDraft(null)}
+          onCreated={handleBookingCreated}
+        />
+      ) : null}
+      {fixedState.status === "ready" ? (
+        <FixedBookingsPanel
+          {...fixedState.data}
+          isCreating={isCreatingFixed}
+          onCloseCreate={() => setIsCreatingFixed(false)}
+          onChanged={refreshBoard}
+        />
+      ) : (
+        <SectionStatus state={fixedState} />
+      )}
+    </div>
+  );
 }
 
 function UsersSection() {
@@ -158,7 +277,7 @@ export function AdminPanel() {
         {/* Las secciones visitadas quedan montadas y solo se ocultan, para no volver a pedir sus datos. */}
         {visitedSections.includes("schedule") ? (
           <div hidden={activeSection !== "schedule"}>
-            <ScheduleBoard isActive={activeSection === "schedule"} />
+            <ScheduleSection isActive={activeSection === "schedule"} />
           </div>
         ) : null}
         {visitedSections.includes("courts") ? (

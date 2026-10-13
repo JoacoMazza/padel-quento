@@ -18,6 +18,20 @@ const NAV_ITEMS = [
   { href: "/my-bookings", label: "Mis reservas", guest: false },
 ];
 
+const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
+
+/** Logo del encabezado: lleva al inicio (la home de los jugadores o el panel del admin). */
+function LogoContent() {
+  return (
+    <>
+      <QuentoLogo size="sm" variant="icon" />
+      <span className="hidden text-base font-extrabold tracking-wide text-foreground uppercase sm:inline">
+        Quento Club
+      </span>
+    </>
+  );
+}
+
 export function AppHeader({
   active,
   userName,
@@ -42,12 +56,17 @@ export function AppHeader({
       <div
         className={`grid w-full grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-x-4 px-6 py-3 ${showNav ? "mx-auto max-w-7xl" : ""}`}
       >
-        <div className="flex items-center gap-2.5">
-          <QuentoLogo size="sm" variant="icon" />
-          <span className="hidden text-base font-extrabold tracking-wide text-foreground uppercase sm:inline">
-            Quento Club
-          </span>
-        </div>
+        {userRole === Role.ADMIN ? (
+          // Link común: el panel es una sola ruta, y una navegación del cliente a /admin
+          // conservaría la sección abierta en vez de volver a la Turnera Global.
+          <a href="/admin" aria-label="Ir al inicio" className={LOGO_LINK_CLASS}>
+            <LogoContent />
+          </a>
+        ) : (
+          <Link href="/" aria-label="Ir al inicio" className={LOGO_LINK_CLASS}>
+            <LogoContent />
+          </Link>
+        )}
         {showNav ? (
           // Si no entra en pantallas chicas, scrollea en horizontal.
           <nav className="flex min-w-0 gap-1 overflow-x-auto">

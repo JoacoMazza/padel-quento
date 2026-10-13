@@ -28,14 +28,21 @@ describe("Landing", () => {
   });
 
   describe("visitante sin sesión", () => {
-    it("muestra el club y lo invita a ver los turnos, iniciar sesión o registrarse", () => {
+    it("muestra el club y lo invita a ver los turnos", () => {
       renderLanding();
 
       expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Quento Club");
       const hero = screen.getByRole("region", { name: "Bienvenida" });
       expect(within(hero).getByRole("link", { name: "Ver turnos disponibles" }).getAttribute("href")).toBe("/bookings");
-      expect(within(hero).getByRole("link", { name: "Iniciar sesión" }).getAttribute("href")).toBe("/login");
-      expect(within(hero).getByRole("link", { name: "Registrarse" }).getAttribute("href")).toBe("/register");
+    });
+
+    it("no repite los accesos de sesión: Iniciar sesión y Registrarse están en el encabezado", () => {
+      renderLanding();
+
+      // Tampoco hay links ocultos a secciones que piden sesión (un lector de pantalla los anunciaría igual).
+      for (const name of ["Iniciar sesión", "Registrarse", "Mis reservas", "Mi perfil"]) {
+        expect(screen.queryByRole("link", { name })).toBeNull();
+      }
     });
 
     it("informa ubicación con mapa, canchas, horarios y contacto", () => {
@@ -51,6 +58,14 @@ describe("Landing", () => {
       expect(within(club).getByRole("link", { name: /WhatsApp/ }).getAttribute("href")).toBe(CLUB_WHATSAPP_URL);
     });
 
+    it("el botón de WhatsApp abre el chat con el número del complejo y lo muestra", () => {
+      renderLanding();
+
+      const whatsapp = within(screen.getByRole("region", { name: "El complejo" })).getByRole("link", { name: /WhatsApp/ });
+      expect(whatsapp.getAttribute("href")).toBe("https://wa.me/5492215380806");
+      expect(whatsapp.textContent).toContain("0221 538-0806");
+    });
+
     it("cuenta qué se puede hacer en la plataforma", () => {
       renderLanding();
 
@@ -62,16 +77,12 @@ describe("Landing", () => {
   });
 
   describe("jugador con sesión", () => {
-    it("lo saluda y le muestra sus accesos en lugar de iniciar sesión o registrarse", () => {
+    it("le muestra la misma landing, con los turnos a un click (sus accesos están en el encabezado)", () => {
       renderLanding("Ana");
 
       const hero = screen.getByRole("region", { name: "Bienvenida" });
-      expect(within(hero).getByText(/Bienvenido, Ana/)).toBeTruthy();
-      expect(within(hero).queryByRole("link", { name: "Iniciar sesión" })).toBeNull();
-      expect(within(hero).queryByRole("link", { name: "Registrarse" })).toBeNull();
-
-      const links = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
-      expect(links).toEqual(expect.arrayContaining(["/bookings", "/open-matches", "/my-bookings", "/profile"]));
+      expect(within(hero).getByRole("link", { name: "Ver turnos disponibles" }).getAttribute("href")).toBe("/bookings");
+      expect(screen.queryByRole("link", { name: "Iniciar sesión" })).toBeNull();
     });
   });
 

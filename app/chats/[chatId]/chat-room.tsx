@@ -6,6 +6,7 @@ import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { getChatMessages, sendMessage, type ChatMessage } from "@/src/actions/chat";
 import type { ChatClosureReason } from "@/src/domain/chat-closure";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 /** Cada cuántos milisegundos se buscan mensajes nuevos de los otros jugadores. */
 const POLL_INTERVAL_MS = 5000;
@@ -16,7 +17,7 @@ const CLOSED_REASON_LABELS: Record<ChatClosureReason, string> = {
 };
 
 function formatTime(date: Date) {
-  return new Date(date).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return dateToTimeLabel(new Date(date));
 }
 
 export function ChatRoom({

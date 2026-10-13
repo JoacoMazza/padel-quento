@@ -3,14 +3,10 @@ import Image from "next/image";
 import {
   ArrowRight,
   ArrowUpRight,
-  CalendarCheck,
   CalendarPlus,
   Clock,
   MapPin,
   MessageCircle,
-  Phone,
-  Sparkles,
-  Trophy,
   Users,
 } from "lucide-react";
 import {
@@ -19,6 +15,7 @@ import {
   CLUB_MAPS_URL,
   CLUB_NAME,
   CLUB_SHORT_ADDRESS,
+  CLUB_PHONE_LABEL,
   CLUB_WHATSAPP_URL,
 } from "@/app/components/club-info";
 import type { ClubHoursRow } from "@/app/landing/club-hours";
@@ -33,7 +30,6 @@ import { HeroVideo } from "@/app/landing/hero-video";
  * - 100% Optimizada para dispositivos móviles.
  */
 export function Landing({
-  userName,
   courtCount,
   hours,
 }: {
@@ -45,15 +41,6 @@ export function Landing({
 }) {
   return (
     <div className="w-full bg-[#fbfaf7] text-[#141518] font-sans antialiased selection:bg-primary selection:text-white">
-      {/* Enlaces requeridos por la suite de accesibilidad */}
-      <div className="sr-only">
-        <Link href="/login">Iniciar sesión</Link>
-        <Link href="/register">Registrarse</Link>
-        <Link href="/my-bookings">Mis reservas</Link>
-        <Link href="/profile">Mi perfil</Link>
-        {userName ? <span>Bienvenido, {userName}</span> : null}
-      </div>
-
       {/* =========================================================================
           1. HERO SPLIT ORIGINAL (Con Video en Vivo y Logo GIF Discreto)
           ========================================================================= */}
@@ -499,6 +486,7 @@ export function Landing({
                 >
                   <MessageCircle className="h-4 w-4 text-white" />
                   <span>Escribinos por WhatsApp</span>
+                  <span className="font-mono text-white/70">{CLUB_PHONE_LABEL}</span>
                   <ArrowRight className="h-4 w-4 ml-0.5 text-white/70" />
                 </a>
               </div>

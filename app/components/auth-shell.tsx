@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CalendarCheck, Trophy, Users } from "lucide-react";
 import { QuentoLogo } from "@/app/components/quento-logo";
 import { CLUB_ADDRESS } from "@/app/components/club-info";
@@ -21,9 +22,9 @@ export function AuthShell({
     <div className="flex min-h-screen flex-1 bg-background">
       <aside className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-panel p-12 text-white lg:flex">
         <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/20 blur-3xl" />
-        <p className="text-base font-extrabold tracking-wide uppercase">
+        <Link href="/" aria-label="Ir al inicio" className="relative w-fit text-base font-extrabold tracking-wide uppercase">
           Quento Club <span className="font-semibold text-white/40">· Villa Elisa</span>
-        </p>
+        </Link>
         <div className="relative">
           <h2 className="text-5xl leading-tight font-extrabold tracking-tight">
             Tu próximo partido empieza acá<span className="text-primary">.</span>
@@ -44,9 +45,9 @@ export function AuthShell({
 
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="card w-full max-w-md p-8 shadow-lg">
-          <div className="mb-6 flex flex-col items-center justify-center">
+          <Link href="/" aria-label="Ir al inicio" className="mx-auto mb-6 flex w-fit flex-col items-center justify-center">
             <QuentoLogo size="md" variant="full" />
-          </div>
+          </Link>
           <h1 className="text-center text-2xl font-extrabold tracking-tight text-foreground">{title}</h1>
           <p className="mt-1.5 mb-6 text-center text-sm leading-relaxed text-foreground/60">{subtitle}</p>
           {children}

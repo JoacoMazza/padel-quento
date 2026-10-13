@@ -72,7 +72,7 @@ async function main() {
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash("admin123", 12);
     const account = await accounts.save(accounts.create({ email: adminEmail, passwordHash }));
-    await admins.save(admins.create({ account, names: "Administrador", lastnames: "Quento" }));
+    await admins.save(admins.create({ account, names: "Administrador", lastnames: "Quento", dni: 30111222 }));
     console.log("Usuario Administrador creado: admin@quento.com / admin123");
   }
 

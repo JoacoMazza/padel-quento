@@ -75,6 +75,7 @@ describe("OccupancyMetrics", () => {
     // El horario más solicitado se muestra por la hora en que empieza el turno.
     expect(screen.getByText("Horario más solicitado")).toBeTruthy();
     expect(screen.getByTestId("kpi-top-slot").textContent).toBe("08:00 · 100,00%");
+    expect(screen.getByText("Turno de 08:00 a 09:30")).toBeTruthy();
     expect(screen.getByText("Día más solicitado")).toBeTruthy();
     expect(screen.getByTestId("kpi-top-day").textContent).toBe("Lunes · 62,50%");
     expect(screen.queryByText(/pico/i)).toBeNull();
@@ -104,18 +105,19 @@ describe("OccupancyMetrics", () => {
     expect(within(byDay).getByRole("img", { name: "Lunes: 62,50%" })).toBeTruthy();
     expect(within(byDay).getByRole("img", { name: "Martes: sin horarios" })).toBeTruthy();
 
-    // Las columnas siguen la grilla de turnos de 90 minutos: 8, 9:30, 11.
+    // Las columnas siguen la grilla de turnos de 90 minutos: 08:00, 09:30, 11:00.
     const bySlot = screen.getByRole("region", { name: "Ocupación por turno" });
-    expect(within(bySlot).getByRole("img", { name: "9:30 a 11: 50,00%" })).toBeTruthy();
-    expect(within(bySlot).getByText("9:30")).toBeTruthy();
-    expect(within(bySlot).getByText("11")).toBeTruthy();
+    expect(within(bySlot).getByRole("img", { name: "09:30 a 11:00: 50,00%" })).toBeTruthy();
+    expect(within(bySlot).getByText("09:30")).toBeTruthy();
+    expect(within(bySlot).getByText("11:00")).toBeTruthy();
   });
 
   it("muestra el mapa de los turnos más solicitados por día y turno", async () => {
     await renderLastWeek();
 
     const heatmap = await screen.findByRole("region", { name: "Turnos más solicitados" });
-    expect(within(heatmap).getByRole("img", { name: "Lunes 11 a 12:30: 50,00%" })).toBeTruthy();
+    expect(within(heatmap).getByRole("img", { name: "Lunes 11:00 a 12:30: 50,00%" })).toBeTruthy();
+    expect(within(heatmap).getByText("11:00")).toBeTruthy();
   });
 
   it("al elegir otro período vuelve a pedir los datos para ese rango", async () => {

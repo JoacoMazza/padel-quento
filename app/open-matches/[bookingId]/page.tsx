@@ -8,7 +8,8 @@ import { Avatar } from "@/app/components/ui/avatar";
 import { CLUB_LOCATION } from "@/app/components/club-info";
 import { JoinMatchCard } from "@/app/open-matches/[bookingId]/join-match-card";
 import { anonymizeOpenMatch, toOpenMatchDetail } from "@/app/open-matches/open-matches";
-import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
 import { getSessionPlayerId } from "@/src/lib/session-player";
 import { getBookingById } from "@/src/actions/booking";
@@ -16,10 +17,6 @@ import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from 
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 
 export const metadata: Metadata = { title: "Partido abierto" };
-
-function timeLabel(date: Date) {
-  return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
-}
 
 export default async function OpenMatchDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
   // Se puede ver sin sesión (issue #55), pero sin los nombres de los jugadores ni el chat.
@@ -38,7 +35,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
   }
   const detail = isGuest ? anonymizeOpenMatch(fullDetail) : fullDetail;
 
-  const timeRange = `${timeLabel(detail.start)} – ${timeLabel(detail.end)}`;
+  const timeRange = `${dateToTimeLabel(detail.start)} – ${dateToTimeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
   const emptySpots = detail.status === "open" ? detail.remainingSpots : 0;
 

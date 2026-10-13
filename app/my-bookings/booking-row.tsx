@@ -3,14 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, UserPlus, Users, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, UserPlus, Users, X } from "lucide-react";
 import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { updateBooking } from "@/src/actions/booking";
 import { closeMatch, leaveMatch } from "@/src/actions/match";
-import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 import {
   getBookingBadgeClasses,
   getBookingEnd,
@@ -18,10 +19,6 @@ import {
   getBookingTone,
 } from "@/app/my-bookings/booking-status";
 import type { MyBookingItem } from "@/app/my-bookings/types";
-
-function timeLabel(date: Date) {
-  return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
-}
 
 const SHORT_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short" });
 
@@ -54,7 +51,7 @@ export function BookingRow({
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
   // Quien se sumó a un partido de otro jugador no puede cancelar el turno completo.
-  const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant;
+  const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant && !booking.isFixed;
   // En cambio, sí puede darse de baja del partido y liberar su lugar.
   const canLeave =
     (tone === "confirmed" || tone === "pending") &&
@@ -125,7 +122,7 @@ export function BookingRow({
         <span className="text-[10px] font-semibold tracking-wider uppercase opacity-70" suppressHydrationWarning>
           {isToday ? "Hoy" : shortDay(booking.fromDateTime)}
         </span>
-        <span className="text-lg font-extrabold tabular-nums">{timeLabel(booking.fromDateTime)}</span>
+        <span className="text-lg font-extrabold tabular-nums">{dateToTimeLabel(booking.fromDateTime)}</span>
       </div>
 
       <div className="flex flex-1 flex-col gap-1">
@@ -141,6 +138,12 @@ export function BookingRow({
               {booking.confirmedPlayers}/{OPEN_MATCH_MAX_PLAYERS} jugadores
             </span>
           ) : null}
+          {booking.isFixed ? (
+            <span className="badge badge-neutral">
+              <Repeat className="h-3 w-3" />
+              Turno fijo
+            </span>
+          ) : null}
         </div>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
           <span className="flex items-center gap-1.5">
@@ -149,7 +152,7 @@ export function BookingRow({
           </span>
           <span className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />
-            {timeLabel(booking.fromDateTime)} – {timeLabel(end)}
+            {dateToTimeLabel(booking.fromDateTime)} – {dateToTimeLabel(end)}
           </span>
           <a
             href={CLUB_MAPS_URL}
@@ -175,6 +178,9 @@ export function BookingRow({
 
       <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
         {error ? <p className="text-xs font-medium text-danger">{error}</p> : null}
+        {booking.isFixed && (tone === "confirmed" || tone === "pending") ? (
+          <p className="max-w-xs text-xs text-foreground/60">Para no ir a esta fecha, avisale al club.</p>
+        ) : null}
 
         {(pendingAction === "cancel" || pendingAction === "leave") && isLateCancellation(booking.fromDateTime, now) ? (
           <p role="alert" className="max-w-xs text-xs font-medium text-amber-600">

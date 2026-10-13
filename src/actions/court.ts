@@ -2,10 +2,11 @@
 
 import "reflect-metadata";
 import { Court } from "@/src/entities/Court";
-import { CourtState } from "@/src/domain/enums";
+import { BookingState, CourtState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
 import { requireAdmin } from "@/src/lib/rbac";
 
 export type CreateCourtInput = {
@@ -88,8 +89,33 @@ export async function updateCourt(
       return { success: false, error: "La cancha no existe." };
     }
 
+    const closingDown = input.state === CourtState.CLOSED_DOWN && court.state !== CourtState.CLOSED_DOWN;
     courts.merge(court, input);
-    const saved = await courts.save(court);
+    if (!closingDown) {
+      const saved = await courts.save(court);
+      return { success: true, data: toPlain(saved) };
+    }
+
+    // Una cancha dada de baja no se puede usar: en la misma transacción se
+    // cancelan sus turnos futuros, sin penalizar a nadie, y después se avisa.
+    const { saved, cancelledBookingIds } = await dataSource.transaction(async (manager) => {
+      const savedCourt = await manager.getRepository<Court>("Court").save(court);
+      const cancelled = await manager
+        .createQueryBuilder()
+        .update("Booking")
+        .set({ bookingState: BookingState.CANCELLED })
+        .where('"court_id" = :courtId', { courtId: id })
+        .andWhere('"booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+        .andWhere('"datetime" > :now', { now: new Date() })
+        .returning("id")
+        .execute();
+      const rows: { id: number }[] = cancelled.raw ?? [];
+      return { saved: savedCourt, cancelledBookingIds: rows.map((row) => row.id) };
+    });
+
+    if (cancelledBookingIds.length > 0) {
+      await notifyCourtUnavailable(cancelledBookingIds);
+    }
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (isUniqueViolation(error)) {

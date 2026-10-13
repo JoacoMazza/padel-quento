@@ -2,9 +2,11 @@ import { QueryFailedError } from "typeorm";
 
 const UNIQUE_VIOLATION_CODE = "23505";
 const BOOKER_PHONE_NUMBER_CONSTRAINT = "UQ_bookers_phone_number";
+const ADMIN_DNI_CONSTRAINT = "UQ_admins_dni";
 
 export const DUPLICATE_EMAIL_MESSAGE = "El correo ya está en uso.";
 export const DUPLICATE_PHONE_NUMBER_MESSAGE = "El teléfono ya está en uso.";
+export const DUPLICATE_ADMIN_DNI_MESSAGE = "Ya hay un administrador con ese DNI.";
 
 export function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof QueryFailedError)) {
@@ -18,6 +20,15 @@ export function isUniqueViolation(error: unknown): boolean {
  * Mensaje para una violación de unicidad al crear o editar una cuenta: el
  * teléfono del booker (UQ_bookers_phone_number) o, si no, el email de la cuenta.
  */
+/**
+ * Mensaje para una violación de unicidad al crear o editar un administrador: el
+ * DNI (UQ_admins_dni) o, si no, el email de la cuenta.
+ */
+export function duplicateAdminMessage(error: unknown): string {
+  const driverError = error instanceof QueryFailedError ? (error.driverError as { constraint?: string }) : {};
+  return driverError.constraint === ADMIN_DNI_CONSTRAINT ? DUPLICATE_ADMIN_DNI_MESSAGE : DUPLICATE_EMAIL_MESSAGE;
+}
+
 export function duplicateAccountMessage(error: unknown): string {
   const driverError = error instanceof QueryFailedError ? (error.driverError as { constraint?: string }) : {};
   return driverError.constraint === BOOKER_PHONE_NUMBER_CONSTRAINT

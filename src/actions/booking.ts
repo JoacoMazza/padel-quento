@@ -2,12 +2,14 @@
 
 import "reflect-metadata";
 import { Booking } from "@/src/entities/Booking";
-import { BookingState } from "@/src/domain/enums";
+import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
+import { BookingState, FixedBookingDateState } from "@/src/domain/enums";
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { getSessionPlayerId } from "@/src/lib/session-player";
+import { notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
 import {
   BOOKER_NOT_FOUND_MESSAGE,
   BookerNotFoundError,
@@ -28,6 +30,9 @@ import { recordPointsMovement } from "@/src/actions/profile";
 export type { CreateBookingInput, JoinOpenMatchInput, UpdateBookingInput };
 
 const LOGIN_REQUIRED_MESSAGE = "Tenés que iniciar sesión para reservar.";
+const FIXED_BOOKING_CANCELLATION_MESSAGE = "Es un turno fijo: para liberar esta fecha comunicate con el club.";
+
+class FixedBookingCancellationError extends Error {}
 
 /**
  * Reserva un turno a nombre del jugador de la sesión. El cliente no elige a
@@ -99,6 +104,7 @@ export async function updateBooking(
     const dataSource = await getDataSource();
 
     let lateCancellationPlayerId: number | null = null;
+    let cancelled = false;
 
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
@@ -108,6 +114,19 @@ export async function updateBooking(
       });
       if (!booking) {
         throw new Error("NOT_FOUND");
+      }
+
+      cancelled =
+        input.bookingState === BookingState.CANCELLED && booking.bookingState !== BookingState.CANCELLED;
+
+      // Las fechas de un turno fijo (HU-41) solo las libera el admin desde el panel.
+      if (
+        cancelled &&
+        (await manager
+          .getRepository<FixedBookingDate>("FixedBookingDate")
+          .existsBy({ booking: { id }, state: FixedBookingDateState.BOOKED }))
+      ) {
+        throw new FixedBookingCancellationError();
       }
 
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
@@ -159,6 +178,11 @@ export async function updateBooking(
       await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
     }
 
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    if (cancelled) {
+      await notifyMatchCancelledByCreator(id);
+    }
+
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (error instanceof DoubleBookingError) {
@@ -169,6 +193,9 @@ export async function updateBooking(
     }
     if (error instanceof NoPlayerAccountError) {
       return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
+    }
+    if (error instanceof FixedBookingCancellationError) {
+      return { success: false, error: FIXED_BOOKING_CANCELLATION_MESSAGE };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La reserva no existe." };

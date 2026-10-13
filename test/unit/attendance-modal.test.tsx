@@ -9,6 +9,9 @@ const { setBookingAttendance, setMatchPlayerAttendance } = vi.hoisted(() => ({
 
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance, setMatchPlayerAttendance }));
 
+const { releaseFixedBookingDate } = vi.hoisted(() => ({ releaseFixedBookingDate: vi.fn() }));
+vi.mock("@/src/actions/fixedBooking", () => ({ releaseFixedBookingDate }));
+
 import { AttendanceModal } from "@/app/admin/attendance-modal";
 import { BookingState } from "@/src/domain/enums";
 import type { AdminBookingProp } from "@/app/admin/types";
@@ -27,6 +30,7 @@ function simpleBooking(overrides: Partial<AdminBookingProp> = {}): AdminBookingP
     bookerName: "Ana Gomez",
     attended: true,
     matchPlayers: [],
+    fixedBookingDateId: null,
     ...overrides,
   };
 }
@@ -115,5 +119,65 @@ describe("AttendanceModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  describe("turno fijo", () => {
+    const tomorrow = () => new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    it("en una fecha futura de un turno fijo permite liberar solo esa fecha, con confirmación", async () => {
+      releaseFixedBookingDate.mockResolvedValue({ success: true, data: null });
+      const onReleased = vi.fn();
+      render(
+        <AttendanceModal
+          booking={simpleBooking({ fixedBookingDateId: 7, fromDateTime: tomorrow() })}
+          onClose={vi.fn()}
+          onUpdated={vi.fn()}
+          onReleased={onReleased}
+        />,
+      );
+
+      expect(screen.getByText("Turno fijo")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Liberar esta fecha" }));
+      expect(releaseFixedBookingDate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+
+      await waitFor(() => expect(onReleased).toHaveBeenCalled());
+      expect(releaseFixedBookingDate).toHaveBeenCalledWith(7);
+    });
+
+    it("muestra el error si no se pudo liberar la fecha", async () => {
+      releaseFixedBookingDate.mockResolvedValue({ success: false, error: "Esa fecha ya pasó." });
+      const onReleased = vi.fn();
+      render(
+        <AttendanceModal
+          booking={simpleBooking({ fixedBookingDateId: 7, fromDateTime: tomorrow() })}
+          onClose={vi.fn()}
+          onUpdated={vi.fn()}
+          onReleased={onReleased}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Liberar esta fecha" }));
+      fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+
+      expect(await screen.findByText("Esa fecha ya pasó.")).toBeTruthy();
+      expect(onReleased).not.toHaveBeenCalled();
+    });
+
+    it("no ofrece liberar un turno común ni una fecha que ya pasó", () => {
+      const { rerender } = render(
+        <AttendanceModal booking={simpleBooking({ fromDateTime: tomorrow() })} onClose={vi.fn()} onUpdated={vi.fn()} />,
+      );
+      expect(screen.queryByRole("button", { name: "Liberar esta fecha" })).toBeNull();
+
+      rerender(
+        <AttendanceModal
+          booking={simpleBooking({ fixedBookingDateId: 7, fromDateTime: new Date(Date.now() - 60_000) })}
+          onClose={vi.fn()}
+          onUpdated={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Liberar esta fecha" })).toBeNull();
+    });
   });
 });

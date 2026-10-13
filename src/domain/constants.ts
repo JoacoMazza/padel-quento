@@ -32,3 +32,9 @@ export const ATTENDANCE_POINTS = 10;
  * usuario y asistir, para incentivar el armado colaborativo de partidos.
  */
 export const OPEN_MATCH_JOIN_BONUS_POINTS = 5;
+
+/**
+ * Días hacia adelante (unos 6 meses) que quedan reservados los turnos fijos
+ * (HU-41). Un proceso en segundo plano va generando las fechas nuevas.
+ */
+export const FIXED_BOOKING_HORIZON_DAYS = 182;
