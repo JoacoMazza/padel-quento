@@ -18,7 +18,7 @@ function renderCard(overrides: Partial<Props> = {}) {
   return render(
     <JoinMatchCard
       bookingId={10}
-      playerId={7}
+      isGuest={false}
       courtNumber={2}
       timeRange="19:30 – 21:00"
       dateLabel="Lunes 12 de octubre"
@@ -49,7 +49,7 @@ describe("JoinMatchCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sumarme al partido" }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/my-bookings"));
-    expect(joinOpenMatch).toHaveBeenCalledWith({ bookingId: 10, playerId: 7, groupSize: 2 });
+    expect(joinOpenMatch).toHaveBeenCalledWith({ bookingId: 10, groupSize: 2 });
   });
 
   it("no ofrece elegir la cantidad si queda un solo lugar", () => {
@@ -71,12 +71,12 @@ describe("JoinMatchCard", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("avisa si la cuenta no puede sumarse a partidos", () => {
-    renderCard({ playerId: null });
+  it("a un visitante sin sesión lo manda a iniciar sesión y a volver a este partido", () => {
+    renderCard({ isGuest: true });
 
     fireEvent.click(screen.getByRole("button", { name: "Sumarme al partido" }));
 
-    expect(screen.getByRole("alert").textContent).toBe("Tu cuenta no puede sumarse a partidos.");
+    expect(push).toHaveBeenCalledWith("/login?callbackUrl=%2Fopen-matches%2F10");
     expect(joinOpenMatch).not.toHaveBeenCalled();
   });
 

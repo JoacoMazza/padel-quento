@@ -37,10 +37,10 @@
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-panel: var(--panel);
-  --font-sans: var(--font-jakarta);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), var(--font-jakarta), sans-serif;
   --color-occupied: var(--occupied);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {

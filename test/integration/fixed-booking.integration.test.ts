@@ -14,7 +14,8 @@ import { FixedBookingDate } from "@/src/entities/FixedBookingDate";
 import { createCourt, updateCourt } from "@/src/actions/court";
 import { createSchedule } from "@/src/actions/schedule";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, updateBooking } from "@/src/actions/booking";
+import { updateBooking } from "@/src/actions/booking";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 import {
   cancelFixedBooking,
   createFixedBooking,
@@ -186,7 +187,7 @@ describe("turnos fijos (integración con Postgres real)", () => {
     it("si una fecha ya estaba reservada la saltea y la informa, sin frenar el resto", async () => {
       const court = await newCourt();
       const busyDate = addDaysISO(startDate, 7);
-      const busy = await createBooking({
+      const busy = await createBookingForPlayer({
         fromDateTime: occurrenceStart(busyDate, "18:00"),
         bookerId: other.id,
         courtId: court.id,
@@ -304,7 +305,7 @@ describe("turnos fijos (integración con Postgres real)", () => {
         fixedDateReleasedNotice("Fede", { fromDateTime: occurrenceStart(second.date, "18:00"), courtNumber: court.number }),
       );
 
-      const someoneElse = await createBooking({
+      const someoneElse = await createBookingForPlayer({
         fromDateTime: occurrenceStart(second.date, "18:00"),
         bookerId: other.id,
         courtId: court.id,
@@ -346,7 +347,7 @@ describe("turnos fijos (integración con Postgres real)", () => {
       const created = await createWeekly(court.id, { endDate: startDate });
       const [date] = await datesOf(created.id);
       await releaseFixedBookingDate(date.id);
-      await createBooking({
+      await createBookingForPlayer({
         fromDateTime: occurrenceStart(date.date, "18:00"),
         bookerId: other.id,
         courtId: court.id,

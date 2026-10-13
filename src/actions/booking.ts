@@ -1,371 +1,62 @@
 "use server";
 
 import "reflect-metadata";
-import { EntityManager } from "typeorm";
-import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
-import { Chat } from "@/src/entities/Chat";
-import { Court } from "@/src/entities/Court";
 import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
-import { Match } from "@/src/entities/Match";
-import { MatchPlayer } from "@/src/entities/MatchPlayer";
-import { Player } from "@/src/entities/Player";
 import { BookingState, FixedBookingDateState } from "@/src/domain/enums";
-import {
-  JOIN_MATCH_LOCK_CLASS,
-  OPEN_MATCH_MAX_PLAYERS,
-  OPEN_MATCH_MIN_HOURS_BEFORE_START,
-  PENALTY_POINTS,
-} from "@/src/domain/constants";
+import { PENALTY_POINTS } from "@/src/domain/constants";
 import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { notifyMatchCancelledByCreator, notifyPlayerJoined } from "@/src/lib/match-notifications";
+import { getSessionPlayerId } from "@/src/lib/session-player";
+import { notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
+import {
+  BOOKER_NOT_FOUND_MESSAGE,
+  BookerNotFoundError,
+  DOUBLE_BOOKING_MESSAGE,
+  DoubleBookingError,
+  NO_PLAYER_ACCOUNT_MESSAGE,
+  NoPlayerAccountError,
+  createBookingForPlayer,
+  findBookingPlayer,
+  hasOverlappingBooking,
+  joinOpenMatchForPlayer,
+  type CreateBookingInput,
+  type JoinOpenMatchInput,
+  type UpdateBookingInput,
+} from "@/src/lib/bookings";
 import { recordPointsMovement } from "@/src/actions/profile";
 
-export type CreateBookingInput = {
-  fromDateTime: Date;
-  durationMinutes?: number;
-  bookingState?: BookingState;
-  price?: number;
-  /**
-   * Cantidad de jugadores con la que reserva quien crea el turno (1 a 4, contando
-   * a los acompañantes que trae y no tienen cuenta propia). Menos de 4 y sin un
-   * bookingState explícito crea además un partido abierto para ese turno.
-   */
-  groupSize?: number;
-  /** Quien reserva el turno: debe ser un jugador registrado (Player hereda de Booker). */
-  bookerId: number;
-  courtId: number;
-};
+export type { CreateBookingInput, JoinOpenMatchInput, UpdateBookingInput };
 
-export type UpdateBookingInput = Partial<
-  Omit<CreateBookingInput, "bookerId" | "courtId">
-> & {
-  bookerId?: number;
-  courtId?: number;
-};
-
-export type JoinOpenMatchInput = {
-  bookingId: number;
-  playerId: number;
-  /**
-   * Cantidad de jugadores con la que se suma (1 a los lugares libres, contando
-   * a los acompañantes que trae y no tienen cuenta propia). Por defecto 1.
-   */
-  groupSize?: number;
-};
-
-const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
-const INVALID_GROUP_SIZE_MESSAGE = `La cantidad de jugadores debe ser entre 1 y ${OPEN_MATCH_MAX_PLAYERS}.`;
-const OPEN_MATCH_TOO_SOON_MESSAGE = `No se puede crear un partido abierto con menos de ${OPEN_MATCH_MIN_HOURS_BEFORE_START} horas de anticipación.`;
-const BOOKING_NOT_FOUND_MESSAGE = "El turno no existe.";
-const NOT_OPEN_MATCH_MESSAGE = "Este turno no es un partido abierto.";
-const ALREADY_JOINED_MESSAGE = "Ya estás anotado en este partido.";
-const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libres.";
-const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
-const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
-const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
+const LOGIN_REQUIRED_MESSAGE = "Tenés que iniciar sesión para reservar.";
 const FIXED_BOOKING_CANCELLATION_MESSAGE = "Es un turno fijo: para liberar esta fecha comunicate con el club.";
-const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
-const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
-  `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
 
-class DoubleBookingError extends Error {}
-class InvalidGroupSizeError extends Error {}
-class OpenMatchTooSoonError extends Error {}
-class BookingNotFoundError extends Error {}
-class NotOpenMatchError extends Error {}
-class AlreadyJoinedError extends Error {}
-class MatchFullError extends Error {}
-class BlockedPlayerError extends Error {}
-class BookerNotFoundError extends Error {}
-class NoPlayerAccountError extends Error {}
-class InvalidPriceError extends Error {}
 class FixedBookingCancellationError extends Error {}
-class InvalidJoinGroupSizeError extends Error {
-  constructor(public remainingSpots: number) {
-    super();
-  }
-}
 
 /**
- * Busca al jugador que reserva. Player hereda de Booker, así que el id del
- * booker es el del jugador: si no hay jugador con ese id, se distingue entre un
- * booker sin cuenta (no puede reservar) y uno inexistente.
+ * Reserva un turno a nombre del jugador de la sesión. El cliente no elige a
+ * nombre de quién reserva: sin sesión, devuelve el error para iniciar sesión.
  */
-async function findBookingPlayer(manager: EntityManager, bookerId: number): Promise<Player> {
-  const player = await manager
-    .getRepository<Player>("Player")
-    .findOne({ where: { id: bookerId }, relations: { account: true } });
-  if (player) {
-    return player;
-  }
-  const bookerExists = await manager.getRepository<Booker>("Booker").existsBy({ id: bookerId });
-  throw bookerExists ? new NoPlayerAccountError() : new BookerNotFoundError();
-}
-
-/**
- * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
- * bookingState = CANCELLED al buscar solapamientos, sin importar el resto de los estados.
- */
-async function hasOverlappingBooking(
-  manager: EntityManager,
-  params: { courtId: number; start: Date; durationMinutes: number; excludeBookingId?: number },
-): Promise<boolean> {
-  const qb = manager
-    // Entity by name, not by class: avoids EntityMetadataNotFoundError when
-    // Next's dev server hot-reloads this module and the cached DataSource
-    // (globalThis, see src/lib/db.ts) ends up holding a stale class identity.
-    .createQueryBuilder<Booking>("Booking", "booking")
-    .where('booking."court_id" = :courtId', { courtId: params.courtId })
-    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-    .andWhere('booking."datetime" < :end', {
-      end: new Date(params.start.getTime() + params.durationMinutes * 60_000),
-    })
-    .andWhere(
-      'booking."datetime" + make_interval(mins => booking."duration_minutes") > :start',
-      { start: params.start },
-    );
-
-  if (params.excludeBookingId) {
-    qb.andWhere('booking."id" != :excludeId', { excludeId: params.excludeBookingId });
-  }
-
-  const overlapping = await qb.getOne();
-  return overlapping !== null;
-}
-
 export async function createBooking(
-  input: CreateBookingInput,
+  input: Omit<CreateBookingInput, "bookerId">,
 ): Promise<ActionResult<Booking>> {
-  try {
-    const dataSource = await getDataSource();
-
-    const saved = await dataSource.transaction(async (manager) => {
-      // Solo reservan los jugadores registrados: un booker sin cuenta no puede hacer nada.
-      const player = await findBookingPlayer(manager, input.bookerId);
-      if (player.account?.isBlocked) {
-        throw new BlockedPlayerError();
-      }
-
-      // Serializa los intentos de reserva para la misma cancha: el lock se toma y
-      // libera automáticamente con la transacción, así el chequeo de abajo nunca
-      // corre en paralelo con otro para la misma cancha.
-      await manager.query("SELECT pg_advisory_xact_lock($1)", [input.courtId]);
-
-      const durationMinutes = input.durationMinutes ?? 90;
-      // Sin groupSize explícito no es un partido abierto: se asume completo (comportamiento previo).
-      const groupSize = input.groupSize ?? (input.bookingState ? 1 : OPEN_MATCH_MAX_PLAYERS);
-      if (groupSize < 1 || groupSize > OPEN_MATCH_MAX_PLAYERS) {
-        throw new InvalidGroupSizeError();
-      }
-      const isOpenMatch = !input.bookingState && groupSize < OPEN_MATCH_MAX_PLAYERS;
-      const bookingState = input.bookingState ?? BookingState.RESERVED;
-
-      if (isOpenMatch) {
-        const hoursUntilStart = (input.fromDateTime.getTime() - Date.now()) / (60 * 60_000);
-        if (hoursUntilStart < OPEN_MATCH_MIN_HOURS_BEFORE_START) {
-          throw new OpenMatchTooSoonError();
-        }
-      }
-
-      if (bookingState !== BookingState.CANCELLED) {
-        const overlaps = await hasOverlappingBooking(manager, {
-          courtId: input.courtId,
-          start: input.fromDateTime,
-          durationMinutes,
-        });
-        if (overlaps) {
-          throw new DoubleBookingError();
-        }
-      }
-
-      const courts = manager.getRepository<Court>("Court");
-      const court = await courts.findOne({ where: { id: input.courtId } });
-      const price = input.price ?? court?.price;
-      if (price === undefined || price === null || typeof price !== "number" || isNaN(price) || price <= 0) {
-        throw new InvalidPriceError();
-      }
-
-      const bookings = manager.getRepository<Booking>("Booking");
-      const booking = bookings.create({
-        fromDateTime: input.fromDateTime,
-        durationMinutes,
-        bookingState,
-        price,
-        // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
-        booker: { id: player.id, phoneNumber: player.phoneNumber },
-        court: { id: input.courtId },
-      });
-
-      const saved = await bookings.save(booking);
-
-      // Partido abierto: el turno queda reservado y, además, se crea el partido
-      // asociado con quien lo creó como primer jugador confirmado.
-      if (isOpenMatch) {
-        const matches = manager.getRepository<Match>("Match");
-        const match = await matches.save(
-          matches.create({ booking: { id: saved.id }, needPlayers: true }),
-        );
-
-        const matchPlayers = manager.getRepository<MatchPlayer>("MatchPlayer");
-        await matchPlayers.save(
-          matchPlayers.create({
-            match: { id: match.id },
-            player: { id: player.id },
-            playersCount: groupSize,
-          }),
-        );
-      }
-
-      return saved;
-    });
-
-    return { success: true, data: toPlain(saved) };
-  } catch (error) {
-    if (error instanceof BookerNotFoundError) {
-      return { success: false, error: BOOKER_NOT_FOUND_MESSAGE };
-    }
-    if (error instanceof BlockedPlayerError) {
-      return { success: false, error: BLOCKED_PLAYER_MESSAGE };
-    }
-    if (error instanceof NoPlayerAccountError) {
-      return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
-    }
-    if (error instanceof DoubleBookingError) {
-      return { success: false, error: DOUBLE_BOOKING_MESSAGE };
-    }
-    if (error instanceof InvalidGroupSizeError) {
-      return { success: false, error: INVALID_GROUP_SIZE_MESSAGE };
-    }
-    if (error instanceof OpenMatchTooSoonError) {
-      return { success: false, error: OPEN_MATCH_TOO_SOON_MESSAGE };
-    }
-    if (error instanceof InvalidPriceError) {
-      return { success: false, error: INVALID_PRICE_MESSAGE };
-    }
-    console.error("createBooking", error);
-    return { success: false, error: "No se pudo crear la reserva." };
+  const playerId = await getSessionPlayerId();
+  if (playerId === null) {
+    return { success: false, error: LOGIN_REQUIRED_MESSAGE };
   }
+  return createBookingForPlayer({ ...input, bookerId: playerId });
 }
 
-/**
- * Suma a un jugador a un partido abierto (Match.needPlayers = true) hasta
- * completar el cupo máximo de OPEN_MATCH_MAX_PLAYERS jugadores. El jugador
- * puede sumarse con acompañantes sin cuenta propia indicando groupSize
- * (limitado a los lugares libres). Si con esta suma se completa el cupo, el
- * partido deja de necesitar jugadores (el turno ya estaba reservado desde su
- * creación, así que su estado no cambia acá).
- */
+/** Suma al jugador de la sesión a un partido abierto (nunca al que indique el cliente). */
 export async function joinOpenMatch(
-  input: JoinOpenMatchInput,
+  input: Omit<JoinOpenMatchInput, "playerId">,
 ): Promise<ActionResult<Booking>> {
-  try {
-    const dataSource = await getDataSource();
-
-    const saved = await dataSource.transaction(async (manager) => {
-      const players = manager.getRepository<Player>("Player");
-      const player = await players.findOne({ where: { id: input.playerId }, relations: { account: true } });
-      if (player?.account?.isBlocked) {
-        throw new BlockedPlayerError();
-      }
-
-      // Serializa los intentos de sumarse al mismo partido para no pasarse del cupo máximo.
-      await manager.query("SELECT pg_advisory_xact_lock($1, $2)", [
-        JOIN_MATCH_LOCK_CLASS,
-        input.bookingId,
-      ]);
-
-      const bookings = manager.getRepository<Booking>("Booking");
-      const booking = await bookings.findOne({ where: { id: input.bookingId } });
-      if (!booking) {
-        throw new BookingNotFoundError();
-      }
-
-      const matches = manager.getRepository<Match>("Match");
-      const match = await matches.findOne({
-        where: { booking: { id: booking.id } },
-        relations: { matchPlayers: true },
-      });
-      if (!match || !match.needPlayers) {
-        throw new NotOpenMatchError();
-      }
-
-      const alreadyJoined = match.matchPlayers.some((mp) => mp.playerId === input.playerId);
-      if (alreadyJoined) {
-        throw new AlreadyJoinedError();
-      }
-
-      const confirmedPlayers = match.matchPlayers.reduce(
-        (sum, mp) => sum + (mp.playersCount ?? 1),
-        0,
-      );
-      const remainingSpots = OPEN_MATCH_MAX_PLAYERS - confirmedPlayers;
-      if (remainingSpots <= 0) {
-        throw new MatchFullError();
-      }
-
-      const groupSize = input.groupSize ?? 1;
-      if (groupSize < 1 || groupSize > remainingSpots) {
-        throw new InvalidJoinGroupSizeError(remainingSpots);
-      }
-
-      const matchPlayers = manager.getRepository<MatchPlayer>("MatchPlayer");
-      await matchPlayers.save(
-        matchPlayers.create({
-          match: { id: match.id },
-          player: { id: input.playerId },
-          playersCount: groupSize,
-        }),
-      );
-
-      // La sala de chat temporal se crea la primera vez que se suma un segundo
-      // jugador con cuenta propia: antes de esto (match.matchPlayers.length === 1,
-      // solo quien creó el partido) no habría con quién hablar. match.matchPlayers
-      // todavía no incluye la fila recién insertada arriba, así que el chequeo se
-      // hace contra la cantidad previa a esta suma.
-      if (match.matchPlayers.length === 1) {
-        const chats = manager.getRepository<Chat>("Chat");
-        await chats.save(chats.create({ match: { id: match.id } }));
-      }
-
-      if (confirmedPlayers + groupSize >= OPEN_MATCH_MAX_PLAYERS) {
-        // Update() en vez de save(match): el match tiene precargado el array
-        // matchPlayers de ANTES de insertar la fila de arriba, así que guardar
-        // el objeto completo haría que TypeORM borre esa fila recién creada
-        // por no figurar en ese array. update() solo toca la columna indicada.
-        await matches.update(match.id, { needPlayers: false });
-      }
-
-      return booking;
-    });
-
-    await notifyPlayerJoined(input.bookingId, input.playerId);
-
-    return { success: true, data: toPlain(saved) };
-  } catch (error) {
-    if (error instanceof BlockedPlayerError) {
-      return { success: false, error: BLOCKED_PLAYER_MESSAGE };
-    }
-    if (error instanceof BookingNotFoundError) {
-      return { success: false, error: BOOKING_NOT_FOUND_MESSAGE };
-    }
-    if (error instanceof NotOpenMatchError) {
-      return { success: false, error: NOT_OPEN_MATCH_MESSAGE };
-    }
-    if (error instanceof AlreadyJoinedError) {
-      return { success: false, error: ALREADY_JOINED_MESSAGE };
-    }
-    if (error instanceof MatchFullError) {
-      return { success: false, error: MATCH_FULL_MESSAGE };
-    }
-    if (error instanceof InvalidJoinGroupSizeError) {
-      return { success: false, error: invalidJoinGroupSizeMessage(error.remainingSpots) };
-    }
-    console.error("joinOpenMatch", error);
-    return { success: false, error: "No se pudo sumar al partido." };
+  const playerId = await getSessionPlayerId();
+  if (playerId === null) {
+    return { success: false, error: LOGIN_REQUIRED_MESSAGE };
   }
+  return joinOpenMatchForPlayer({ ...input, playerId });
 }
 
 const BOOKING_RELATIONS = {

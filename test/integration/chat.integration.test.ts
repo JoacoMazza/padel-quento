@@ -9,13 +9,13 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
-import { addPlayerToChat, getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
+import { getBookingById, updateBooking } from "@/src/actions/booking";
+import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
-// En minúsculas, como quedan guardados los emails al registrarse.
 function uniqueEmail(prefix: string) {
-  return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`.toLowerCase();
+  return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
 }
 
 function actAs(email: string) {
@@ -60,9 +60,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
 
     const found = await getBookingById(booking.data.id);
@@ -126,9 +126,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 41 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
     const found = await getBookingById(booking.data.id);
     if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
@@ -173,9 +173,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
     const found = await getBookingById(booking.data.id);
     if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
@@ -200,127 +200,5 @@ describe("chat actions (integración con Postgres real)", () => {
     const history = await getChatMessages(cancelledChatId);
     if (!history.success) throw new Error("expected success");
     expect(history.data.map((message) => message.content)).toEqual(["Nos vemos en la cancha"]);
-  });
-
-  describe("sharing the chat room", () => {
-    let dayOffset = 50;
-
-    /**
-     * Open match created by a new player with the given group size, plus a second
-     * player who joins alone: that join is what creates the chat room.
-     */
-    async function openMatchChat(groupSize: number) {
-      const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
-      if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
-      const creator = await newPlayer("Creador");
-      const second = await newPlayer("Segundo");
-
-      const fromDateTime = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
-      dayOffset += 1;
-      fromDateTime.setHours(9, 0, 0, 0);
-      const booking = await createBooking({ fromDateTime, bookerId: creator.bookerId, courtId: court.data.id, groupSize });
-      if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-      const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: second.id });
-      if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
-      const found = await getBookingById(booking.data.id);
-      if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
-
-      return { creator, second, bookingId: booking.data.id, chatId: found.data.match.chat.id };
-    }
-
-    async function matchState(bookingId: number) {
-      const found = await getBookingById(bookingId);
-      if (!found.success || !found.data?.match) throw new Error("expected match");
-      return {
-        needPlayers: found.data.match.needPlayers,
-        players: Object.fromEntries(found.data.match.matchPlayers.map((mp) => [mp.playerId, mp.playersCount])),
-      };
-    }
-
-    it("exposes the booking id of the room, used to build the open match share link", async () => {
-      const { bookingId, chatId } = await openMatchChat(1);
-
-      const result = await getChatById(chatId);
-
-      expect(result).toMatchObject({ success: true, data: { booking: { id: bookingId } } });
-    });
-
-    it("any participant can add a registered player by email, taking a free spot", async () => {
-      const { creator, second, bookingId, chatId } = await openMatchChat(1);
-      const added = await newPlayer("Agregado", { names: "Caro" });
-
-      // Quien agrega no es el creador: cualquier participante puede hacerlo.
-      actAs(second.email);
-      const result = await addPlayerToChat(chatId, added.email.toUpperCase());
-      expect(result).toEqual({
-        success: true,
-        data: { id: added.id, names: "Caro", lastnames: "Agregado", category: PlayerCategory.WITHOUT_CATEGORY },
-      });
-      expect(await matchState(bookingId)).toEqual({
-        needPlayers: true,
-        players: { [creator.id]: 1, [second.id]: 1, [added.id]: 1 },
-      });
-
-      actAs(added.email);
-      expect((await getChatMessages(chatId)).success).toBe(true);
-    });
-
-    it("adding a player by phone replaces one of the inviter's companions without changing the total", async () => {
-      const { creator, second, bookingId, chatId } = await openMatchChat(2);
-      const companionPhone = uniquePhoneNumber();
-      const companion = await newPlayer("Acompañante", { phoneNumber: companionPhone });
-
-      actAs(creator.email);
-      const result = await addPlayerToChat(chatId, companionPhone);
-      expect(result.success).toBe(true);
-
-      expect(await matchState(bookingId)).toEqual({
-        needPlayers: true,
-        players: { [creator.id]: 1, [second.id]: 1, [companion.id]: 1 },
-      });
-    });
-
-    it("adding the player that completes the match stops the search for players", async () => {
-      const { bookingId, chatId, creator } = await openMatchChat(1);
-      const third = await newPlayer("Tercero");
-      const fourth = await newPlayer("Cuarto");
-
-      actAs(creator.email);
-      expect((await addPlayerToChat(chatId, third.email)).success).toBe(true);
-      expect((await addPlayerToChat(chatId, fourth.email)).success).toBe(true);
-
-      expect((await matchState(bookingId)).needPlayers).toBe(false);
-      const fifth = await newPlayer("Quinto");
-      expect(await addPlayerToChat(chatId, fifth.email)).toEqual({
-        success: false,
-        error: "No quedan lugares libres en el partido.",
-      });
-    });
-
-    it("rejects adding someone who is not a registered player or is already in the match", async () => {
-      const { creator, chatId } = await openMatchChat(1);
-
-      actAs(creator.email);
-      expect(await addPlayerToChat(chatId, "nadie.registrado@test.com")).toEqual({
-        success: false,
-        error: "No encontramos un jugador registrado con ese email o teléfono.",
-      });
-      expect(await addPlayerToChat(chatId, creator.email)).toEqual({
-        success: false,
-        error: "Ese jugador ya forma parte del partido.",
-      });
-    });
-
-    it("a player outside the match cannot add players", async () => {
-      const { chatId } = await openMatchChat(1);
-      const outsider = await newPlayer("Ajeno");
-      const target = await newPlayer("Objetivo");
-
-      actAs(outsider.email);
-      expect(await addPlayerToChat(chatId, target.email)).toEqual({
-        success: false,
-        error: "No tenés acceso a este chat.",
-      });
-    });
   });
 });

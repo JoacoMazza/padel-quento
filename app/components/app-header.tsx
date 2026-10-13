@@ -12,10 +12,10 @@ export type HeaderActiveTab =
   | "/admin";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Inicio" },
-  { href: "/bookings", label: "Turnos" },
-  { href: "/open-matches", label: "Partidos abiertos" },
-  { href: "/my-bookings", label: "Mis reservas" },
+  { href: "/", label: "Inicio", guest: true },
+  { href: "/bookings", label: "Turnos", guest: true },
+  { href: "/open-matches", label: "Partidos abiertos", guest: true },
+  { href: "/my-bookings", label: "Mis reservas", guest: false },
 ];
 
 const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
@@ -38,6 +38,7 @@ export function AppHeader({
   userEmail,
   userRole,
   showNav = true,
+  guest = false,
 }: {
   active: HeaderActiveTab;
   userName?: string | null;
@@ -45,6 +46,8 @@ export function AppHeader({
   userRole?: Role | string | null;
   /** Cuando es `false`, oculta los links de navegación principal (usado en el panel de administración). */
   showNav?: boolean;
+  /** Visitante sin sesión: ve solo las secciones públicas y los accesos para entrar o registrarse. */
+  guest?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">
@@ -67,7 +70,7 @@ export function AppHeader({
         {showNav ? (
           // Si no entra en pantallas chicas, scrollea en horizontal.
           <nav className="flex min-w-0 gap-1 overflow-x-auto">
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS.filter((item) => !guest || item.guest).map((item) => {
               const isActive = item.href === active;
               return (
                 <Link
@@ -83,7 +86,19 @@ export function AppHeader({
           </nav>
         ) : null}
         <div className="col-start-3 justify-self-end">
-          <UserMenu name={userName} email={userEmail} role={userRole} />
+          {guest ? (
+            <div className="flex items-center gap-2">
+              <Link href="/login" className="btn btn-outline btn-sm">
+                Iniciar sesión
+              </Link>
+              {/* En pantallas chicas no entra: registrarse queda en la landing y en el login. */}
+              <Link href="/register" className="btn btn-primary btn-sm hidden sm:inline-flex">
+                Registrarse
+              </Link>
+            </div>
+          ) : (
+            <UserMenu name={userName} email={userEmail} role={userRole} />
+          )}
         </div>
       </div>
     </header>

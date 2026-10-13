@@ -13,10 +13,11 @@ import { BookingState, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, deleteBooking, updateBooking } from "@/src/actions/booking";
+import { deleteBooking, updateBooking } from "@/src/actions/booking";
 import { setBookingAttendance } from "@/src/actions/attendance";
 import { getAttendanceReport } from "@/src/actions/reports";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 
 function mockAdminSession() {
   vi.mocked(getServerSession).mockResolvedValue({
@@ -54,7 +55,7 @@ describe("getAttendanceReport (integración con Postgres real)", () => {
     absentId = await createTestPlayer("Falta");
 
     const create = async (bookerId: number, fromDateTime: Date) => {
-      const result = await createBooking({ fromDateTime, bookerId, courtId, bookingState: BookingState.PAID });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId, courtId, bookingState: BookingState.PAID });
       if (!result.success) throw new Error(`no se pudo crear el turno: ${result.error}`);
       bookingIds.push(result.data.id);
       return result.data.id;
