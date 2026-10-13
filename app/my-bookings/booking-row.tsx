@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, UserPlus, Users, X } from "lucide-react";
 import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
+import { ShareLinkButton } from "@/app/components/share-link-button";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
@@ -61,6 +62,9 @@ export function BookingRow({
     booking.joinedAsParticipant &&
     booking.matchId !== null &&
     playerId !== null;
+  // El link del partido abierto se comparte desde que se crea y mientras busque
+  // jugadores, aunque todavía no exista la sala de chat (HU-40).
+  const canShare = tone === "pending" && booking.matchId !== null;
   // El cierre manual es una acción del creador del partido, no de quien se sumó.
   const canCloseManually =
     booking.needPlayers &&
@@ -224,6 +228,7 @@ export function BookingRow({
                 Ver detalle
               </Link>
             ) : null}
+            {canShare ? <ShareLinkButton path={`/open-matches/${booking.id}`} /> : null}
             {booking.chatId !== null ? (
               <Link href={`/chats/${booking.chatId}`} className="btn btn-outline btn-sm">
                 <MessageCircle className="h-4 w-4" />

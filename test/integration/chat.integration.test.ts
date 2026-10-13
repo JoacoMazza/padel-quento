@@ -10,7 +10,7 @@ import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
-import { addPlayerToChat, getChatById, getChatMessages, joinChatMatch, sendMessage } from "@/src/actions/chat";
+import { addPlayerToChat, getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 // En minúsculas, como quedan guardados los emails al registrarse.
@@ -237,33 +237,12 @@ describe("chat actions (integración con Postgres real)", () => {
       };
     }
 
-    it("a registered player who opens the shared link joins the match and gets access to the chat", async () => {
-      const { creator, second, bookingId, chatId } = await openMatchChat(1);
-      const guest = await newPlayer("Invitado");
+    it("exposes the booking id of the room, used to build the open match share link", async () => {
+      const { bookingId, chatId } = await openMatchChat(1);
 
-      actAs(guest.email);
-      expect(await getChatMessages(chatId)).toEqual({ success: false, error: "No tenés acceso a este chat." });
+      const result = await getChatById(chatId);
 
-      expect(await joinChatMatch(chatId)).toEqual({ success: true, data: null });
-
-      expect((await sendMessage(chatId, "¡Me sumo!")).success).toBe(true);
-      expect(await matchState(bookingId)).toEqual({
-        needPlayers: true,
-        players: { [creator.id]: 1, [second.id]: 1, [guest.id]: 1 },
-      });
-    });
-
-    it("joining through the link fails once the match is full", async () => {
-      const { chatId } = await openMatchChat(2);
-      const fourth = await newPlayer("Cuarto");
-      const fifth = await newPlayer("Quinto");
-
-      actAs(fourth.email);
-      expect((await joinChatMatch(chatId)).success).toBe(true);
-
-      actAs(fifth.email);
-      const result = await joinChatMatch(chatId);
-      expect(result.success).toBe(false);
+      expect(result).toMatchObject({ success: true, data: { booking: { id: bookingId } } });
     });
 
     it("any participant can add a registered player by email, taking a free spot", async () => {

@@ -48,9 +48,9 @@ export default async function ChatPage({
   if (!player || !chat) {
     redirect("/my-bookings");
   }
-  // Quien llega por el link compartido sin participar todavía puede sumarse (HU-40).
+  // Quien no participa todavía puede ver el partido abierto y sumarse desde ahí (HU-40).
   if (!isParticipant) {
-    redirect(`/chats/${chat.id}/join`);
+    redirect(`/open-matches/${chat.booking.id}`);
   }
 
   const booking = chat.booking;
@@ -118,7 +118,7 @@ export default async function ChatPage({
           </div>
         </div>
 
-        {chat.isClosed ? null : <InvitePanel chatId={chat.id} />}
+        {chat.isClosed ? null : <InvitePanel chatId={chat.id} bookingId={chat.booking.id} />}
 
         <ChatRoom
           chatId={chat.id}

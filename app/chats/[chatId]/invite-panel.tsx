@@ -2,36 +2,20 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Link2, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
+import { ShareLinkButton } from "@/app/components/share-link-button";
 import { addPlayerToChat } from "@/src/actions/chat";
 
 /**
- * Invitar a la sala (HU-40): copiar el link para que otro jugador registrado se
- * sume al partido, o agregar directamente a un jugador registrado por su email
- * o teléfono.
+ * Invitar desde la sala (HU-40): compartir el link del partido abierto, el mismo
+ * que se ofrece en Mis reservas desde que se crea el partido, o agregar
+ * directamente a un jugador registrado por su email o teléfono.
  */
-export function InvitePanel({ chatId }: { chatId: number }) {
+export function InvitePanel({ chatId, bookingId }: { chatId: number; bookingId: number }) {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  function inviteLink() {
-    return `${window.location.origin}/chats/${chatId}/join`;
-  }
-
-  // El portapapeles puede estar bloqueado por permisos o no existir (sitio
-  // servido sin https): en ese caso se muestra el link para copiarlo a mano.
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(inviteLink());
-      setCopied(true);
-    } catch {
-      setCopyFailed(true);
-    }
-  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,32 +35,12 @@ export function InvitePanel({ chatId }: { chatId: number }) {
 
   return (
     <div className="flex flex-col gap-3 border-b border-line px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-foreground/60">
-          Invitá a otros jugadores registrados: con el link se suman al partido y al chat.
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="pt-1.5 text-xs text-foreground/60">
+          Invitá a otros jugadores registrados: con el link ven el partido y se pueden sumar.
         </p>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-foreground/70 transition-colors hover:border-primary hover:text-primary"
-        >
-          <Link2 className="h-3.5 w-3.5" />
-          {copied ? "¡Link copiado!" : "Copiar link"}
-        </button>
+        <ShareLinkButton path={`/open-matches/${bookingId}`} />
       </div>
-
-      {copyFailed ? (
-        <label className="flex flex-col gap-1 text-xs text-foreground/60">
-          No pudimos copiarlo automáticamente. Copiá el link:
-          <input
-            type="text"
-            readOnly
-            value={inviteLink()}
-            onFocus={(event) => event.target.select()}
-            className="rounded-full border border-line bg-background px-4 py-1.5 text-sm text-foreground"
-          />
-        </label>
-      ) : null}
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input

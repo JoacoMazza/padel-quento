@@ -22,32 +22,12 @@ describe("InvitePanel", () => {
     cleanup();
   });
 
-  it("copies the invitation link of the chat to the clipboard", async () => {
-    render(<InvitePanel chatId={12} />);
+  it("shares the link of the open match page (the same one shown since the match was created)", async () => {
+    render(<InvitePanel chatId={12} bookingId={34} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Copiar link/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Compartir link/ }));
 
-    await waitFor(() => expect(screen.getByText("¡Link copiado!")).toBeTruthy());
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/chats/12/join`);
-  });
-
-  it("shows the link to copy it by hand when the clipboard cannot be written", async () => {
-    writeText.mockRejectedValueOnce(new Error("NotAllowedError"));
-    render(<InvitePanel chatId={12} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Copiar link/ }));
-
-    await waitFor(() => expect(screen.getByDisplayValue(`${window.location.origin}/chats/12/join`)).toBeTruthy());
-    expect(screen.queryByText("¡Link copiado!")).toBeNull();
-  });
-
-  it("shows the link to copy it by hand when the browser has no clipboard API", async () => {
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-    render(<InvitePanel chatId={12} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Copiar link/ }));
-
-    await waitFor(() => expect(screen.getByDisplayValue(`${window.location.origin}/chats/12/join`)).toBeTruthy());
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open-matches/34`));
   });
 
   it("adds a registered player by email or phone and refreshes the room", async () => {
@@ -55,7 +35,7 @@ describe("InvitePanel", () => {
       success: true,
       data: { id: 9, names: "Caro", lastnames: "Gómez", category: PlayerCategory.FOURTH },
     });
-    render(<InvitePanel chatId={12} />);
+    render(<InvitePanel chatId={12} bookingId={34} />);
 
     fireEvent.change(screen.getByLabelText("Email o teléfono del jugador"), { target: { value: "caro@test.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
@@ -70,7 +50,7 @@ describe("InvitePanel", () => {
       success: false,
       error: "No encontramos un jugador registrado con ese email o teléfono.",
     });
-    render(<InvitePanel chatId={12} />);
+    render(<InvitePanel chatId={12} bookingId={34} />);
 
     fireEvent.change(screen.getByLabelText("Email o teléfono del jugador"), { target: { value: "nadie@test.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));

@@ -13,7 +13,7 @@ import { CHAT_MESSAGE_MAX_LENGTH, JOIN_MATCH_LOCK_CLASS, OPEN_MATCH_MAX_PLAYERS 
 import { getChatClosureReason, type ChatClosureReason } from "@/src/domain/chat-closure";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { joinOpenMatch } from "@/src/actions/booking";
+import { notifyPlayerJoined } from "@/src/lib/match-notifications";
 
 /**
  * Único dato de un jugador que sale del chat hacia la UI (privacidad y anonimato):
@@ -37,10 +37,9 @@ export type ChatMessage = {
 
 export type ChatRoom = {
   id: number;
-  booking: { fromDateTime: Date; courtNumber: number | null };
+  /** id del turno: arma el link del partido abierto para compartir (HU-40). */
+  booking: { id: number; fromDateTime: Date; courtNumber: number | null };
   participants: ChatParticipant[];
-  /** Jugadores confirmados del partido, contando los acompañantes sin cuenta propia. */
-  confirmedPlayers: number;
   /** true cuando el turno ya finalizó o fue cancelado: la sala queda en solo lectura. */
   isClosed: boolean;
   closedReason: ChatClosureReason | null;
@@ -58,8 +57,6 @@ const CHAT_CLOSED_MESSAGES: Record<ChatClosureReason, string> = {
 };
 const EMPTY_MESSAGE_MESSAGE = "Escribí un mensaje para enviarlo.";
 const MESSAGE_TOO_LONG_MESSAGE = `El mensaje no puede superar los ${CHAT_MESSAGE_MAX_LENGTH} caracteres.`;
-const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para sumarte a un partido.";
-const CHAT_NOT_FOUND_MESSAGE = "El chat no existe.";
 const CHAT_CLOSED_FOR_JOINING_MESSAGE = "El chat está cerrado: ya no se pueden sumar jugadores.";
 const EMPTY_IDENTIFIER_MESSAGE = "Ingresá el email o el teléfono del jugador.";
 const BLOCKED_INVITER_MESSAGE = "El usuario se encuentra bloqueado y no puede sumar jugadores.";
@@ -129,11 +126,11 @@ export async function getChatById(id: number): Promise<ActionResult<ChatRoom | n
     const room: ChatRoom = {
       id: chat.id,
       booking: {
+        id: chat.match.booking.id,
         fromDateTime: chat.match.booking.fromDateTime,
         courtNumber: chat.match.booking.court?.number ?? null,
       },
       participants: chat.match.matchPlayers.map((matchPlayer) => toParticipant(matchPlayer.player)),
-      confirmedPlayers: chat.match.matchPlayers.reduce((sum, mp) => sum + (mp.playersCount ?? 1), 0),
       isClosed: closedReason !== null,
       closedReason,
     };
@@ -221,49 +218,6 @@ export async function sendMessage(chatId: number, content: string): Promise<Acti
   } catch (error) {
     console.error("sendMessage", error);
     return { success: false, error: "No se pudo enviar el mensaje." };
-  }
-}
-
-/**
- * Suma al jugador de la sesión al partido de la sala, al entrar por el link que
- * compartió otro participante (HU-40). Ocupa un lugar libre con las mismas reglas
- * que sumarse desde la grilla de turnos (ver joinOpenMatch), y con eso gana
- * acceso al chat, que se deriva de match_players.
- */
-export async function joinChatMatch(chatId: number): Promise<ActionResult<null>> {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return { success: false, error: NOT_AUTHENTICATED_MESSAGE };
-    }
-
-    const dataSource = await getDataSource();
-    const player = await dataSource
-      .getRepository<Player>("Player")
-      .findOne({ where: { account: { email: session.user.email } } });
-    if (!player) {
-      return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
-    }
-
-    const chat = await dataSource.getRepository<Chat>("Chat").findOne({
-      where: { id: chatId },
-      relations: { match: { booking: true } },
-    });
-    if (!chat) {
-      return { success: false, error: CHAT_NOT_FOUND_MESSAGE };
-    }
-    if (getChatClosureReason(chat.match.booking)) {
-      return { success: false, error: CHAT_CLOSED_FOR_JOINING_MESSAGE };
-    }
-
-    const joined = await joinOpenMatch({ bookingId: chat.match.booking.id, playerId: player.id });
-    if (!joined.success) {
-      return { success: false, error: joined.error };
-    }
-    return { success: true, data: null };
-  } catch (error) {
-    console.error("joinChatMatch", error);
-    return { success: false, error: "No se pudo sumar al partido." };
   }
 }
 
@@ -357,6 +311,9 @@ export async function addPlayerToChat(
         matchPlayers.create({ match: { id: match.id }, player: { id: target.id }, playersCount: 1 }),
       );
     });
+
+    // Fuera de la transacción, igual que en joinOpenMatch: solo se avisa si el alta se guardó.
+    await notifyPlayerJoined(chat.match.booking.id, target.id);
 
     return { success: true, data: toPlain(toParticipant(target)) };
   } catch (error) {

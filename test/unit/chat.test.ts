@@ -35,14 +35,14 @@ const { chats, players, matches, matchPlayers, messages, getDataSource } = vi.ho
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
-const { joinOpenMatch } = vi.hoisted(() => ({ joinOpenMatch: vi.fn() }));
+const { notifyPlayerJoined } = vi.hoisted(() => ({ notifyPlayerJoined: vi.fn(async () => {}) }));
 
-vi.mock("@/src/actions/booking", () => ({ joinOpenMatch }));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined }));
 
 import { getServerSession } from "next-auth/next";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { CHAT_MESSAGE_MAX_LENGTH } from "@/src/domain/constants";
-import { addPlayerToChat, getChatById, getChatMessages, joinChatMatch, sendMessage } from "@/src/actions/chat";
+import { addPlayerToChat, getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 
 // Jugador tal como lo devuelve la base: con su teléfono (heredado de Booker) y
 // su cuenta, que traen todos sus datos de contacto y privados.
@@ -83,7 +83,7 @@ const BEFORE_BOOKING_END = new Date("2026-10-01T19:29:59");
 const AT_BOOKING_END = new Date("2026-10-01T19:30:00");
 
 function chatWithBooking(bookingState: BookingState = BookingState.RESERVED) {
-  return { id: 1, match: { id: 2, booking: { fromDateTime: BOOKING_START, durationMinutes: 90, bookingState } } };
+  return { id: 1, match: { id: 2, booking: { id: 3, fromDateTime: BOOKING_START, durationMinutes: 90, bookingState } } };
 }
 
 describe("chat actions", () => {
@@ -106,7 +106,7 @@ describe("chat actions", () => {
         id: 1,
         match: {
           id: 2,
-          booking: { fromDateTime, durationMinutes: 90, bookingState: BookingState.RESERVED, court: { number: 3 } },
+          booking: { id: 4, fromDateTime, durationMinutes: 90, bookingState: BookingState.RESERVED, court: { number: 3 } },
           matchPlayers: [{ player: fullPlayer() }],
         },
       });
@@ -123,9 +123,8 @@ describe("chat actions", () => {
         success: true,
         data: {
           id: 1,
-          booking: { fromDateTime, courtNumber: 3 },
+          booking: { id: 4, fromDateTime, courtNumber: 3 },
           participants: [{ id: 7, names: "Ana", lastnames: "Gómez", category: PlayerCategory.FOURTH }],
-          confirmedPlayers: 1,
           isClosed: false,
           closedReason: null,
         },
@@ -360,75 +359,6 @@ describe("chat actions", () => {
     });
   });
 
-  describe("joinChatMatch", () => {
-    it("joins the session player to the chat's match through joinOpenMatch", async () => {
-      mockSession("ana@test.com");
-      players.findOne.mockResolvedValueOnce(fullPlayer());
-      const chat = chatWithBooking();
-      chats.findOne.mockResolvedValueOnce({ ...chat, match: { ...chat.match, booking: { ...chat.match.booking, id: 3 } } });
-      joinOpenMatch.mockResolvedValueOnce({ success: true, data: { id: 3 } });
-
-      const result = await joinChatMatch(1);
-
-      expect(joinOpenMatch).toHaveBeenCalledWith({ bookingId: 3, playerId: 7 });
-      expect(result).toEqual({ success: true, data: null });
-    });
-
-    it("returns the joinOpenMatch error (e.g. full match)", async () => {
-      mockSession("ana@test.com");
-      players.findOne.mockResolvedValueOnce(fullPlayer());
-      chats.findOne.mockResolvedValueOnce(chatWithBooking());
-      joinOpenMatch.mockResolvedValueOnce({
-        success: false,
-        error: "El partido ya está completo, no quedan lugares libres.",
-      });
-
-      const result = await joinChatMatch(1);
-
-      expect(result).toEqual({ success: false, error: "El partido ya está completo, no quedan lugares libres." });
-    });
-
-    it("rejects unauthenticated users", async () => {
-      mockSession(null);
-
-      const result = await joinChatMatch(1);
-
-      expect(result).toEqual({ success: false, error: "No estás autenticado." });
-      expect(joinOpenMatch).not.toHaveBeenCalled();
-    });
-
-    it("rejects accounts without a player profile", async () => {
-      mockSession("admin@test.com");
-      players.findOne.mockResolvedValueOnce(null);
-
-      const result = await joinChatMatch(1);
-
-      expect(result).toEqual({ success: false, error: "Necesitás una cuenta de jugador para sumarte a un partido." });
-      expect(joinOpenMatch).not.toHaveBeenCalled();
-    });
-
-    it("rejects a chat that does not exist", async () => {
-      mockSession("ana@test.com");
-      players.findOne.mockResolvedValueOnce(fullPlayer());
-      chats.findOne.mockResolvedValueOnce(null);
-
-      const result = await joinChatMatch(999);
-
-      expect(result).toEqual({ success: false, error: "El chat no existe." });
-    });
-
-    it("rejects joining once the chat is closed", async () => {
-      mockSession("ana@test.com");
-      players.findOne.mockResolvedValueOnce(fullPlayer());
-      chats.findOne.mockResolvedValueOnce(chatWithBooking(BookingState.CANCELLED));
-
-      const result = await joinChatMatch(1);
-
-      expect(result).toEqual({ success: false, error: "El chat está cerrado: ya no se pueden sumar jugadores." });
-      expect(joinOpenMatch).not.toHaveBeenCalled();
-    });
-  });
-
   describe("addPlayerToChat", () => {
     const CARO = { id: 9, names: "Caro" };
 
@@ -463,6 +393,8 @@ describe("chat actions", () => {
       expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1 });
       expect(matchPlayers.save).toHaveBeenCalledTimes(1);
       expect(matches.update).not.toHaveBeenCalled();
+      // Same notice as joining from the grid: the other players learn who joined.
+      expect(notifyPlayerJoined).toHaveBeenCalledWith(3, 9);
       // Only name and category of the added player: never their email or phone.
       expect(result).toEqual({
         success: true,
@@ -518,6 +450,7 @@ describe("chat actions", () => {
 
       expect(result).toEqual({ success: false, error: "No quedan lugares libres en el partido." });
       expect(matchPlayers.save).not.toHaveBeenCalled();
+      expect(notifyPlayerJoined).not.toHaveBeenCalled();
     });
 
     it("rejects a player who is already in the match", async () => {

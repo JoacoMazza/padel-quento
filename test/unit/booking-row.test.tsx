@@ -196,4 +196,45 @@ describe("BookingRow", () => {
       expect(screen.queryByRole("button", { name: "Darme de baja del partido" })).toBeNull();
     });
   });
+
+  describe("share link (HU-40)", () => {
+    /** Open match just created: only its creator, no chat room yet. */
+    function newOpenMatch(overrides: Partial<MyBookingItem> = {}) {
+      return booking({ matchId: 5, needPlayers: true, confirmedPlayers: 1, chatId: null, ...overrides });
+    }
+
+    it("offers the open match link right after creating it, before the chat room exists", async () => {
+      const writeText = vi.fn(async () => undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      render(<BookingRow booking={newOpenMatch()} now={NOW} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /Compartir link/ }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open-matches/10`));
+    });
+
+    it("also offers it to players who joined someone else's open match", () => {
+      render(<BookingRow booking={newOpenMatch({ joinedAsParticipant: true, chatId: 3 })} now={NOW} playerId={5} />);
+
+      expect(screen.getByRole("button", { name: /Compartir link/ })).toBeTruthy();
+    });
+
+    it("does not offer it once the match stops looking for players", () => {
+      render(<BookingRow booking={newOpenMatch({ needPlayers: false, confirmedPlayers: 4 })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: /Compartir link/ })).toBeNull();
+    });
+
+    it("does not offer it for a cancelled match", () => {
+      render(<BookingRow booking={newOpenMatch({ bookingState: BookingState.CANCELLED })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: /Compartir link/ })).toBeNull();
+    });
+
+    it("does not offer it for a regular booking without an open match", () => {
+      render(<BookingRow booking={booking()} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: /Compartir link/ })).toBeNull();
+    });
+  });
 });
