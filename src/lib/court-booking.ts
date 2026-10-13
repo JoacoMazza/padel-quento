@@ -24,6 +24,11 @@ export function toMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+/** Minutos desde las 00:00 a "HH:MM" (por ejemplo 570 → "09:30"). */
+export function toTimeLabel(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
 /** El turno empieza y termina dentro del horario de la cancha para el día de `date` ("YYYY-MM-DD"). */
 export function isWithinSchedule(schedules: Schedule[], date: string, startTime: string, durationMinutes: number) {
   const schedule = schedules.find((s) => s.dayOfWeek === dayOfWeekOfISO(date));

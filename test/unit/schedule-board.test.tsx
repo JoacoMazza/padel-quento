@@ -224,6 +224,8 @@ describe("ScheduleBoard - agendar desde una celda libre", () => {
     const cell = cellAt("09:30");
     expect(cell.getAttribute("role")).toBe("button");
     expect(cell.title).toBe("Agendar turno");
+    // Al pasar el mouse, la celda indica que se puede agendar ahí.
+    expect(cell.textContent).toContain("Agendar");
     fireEvent.click(cell);
 
     expect(onAvailableSlotClick).toHaveBeenCalledWith({ courtId: 1, date: "2026-10-12", startTime: "09:30" });
@@ -237,6 +239,7 @@ describe("ScheduleBoard - agendar desde una celda libre", () => {
     const cell = cellAt("08:00");
     expect(cell.dataset.state).toBe("available");
     expect(cell.getAttribute("role")).toBeNull();
+    expect(cell.textContent).toBe("Disponible");
     fireEvent.click(cell);
     expect(onAvailableSlotClick).not.toHaveBeenCalled();
   });

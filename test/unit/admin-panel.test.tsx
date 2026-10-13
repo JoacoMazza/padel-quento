@@ -12,8 +12,10 @@ const {
   createFixedBooking,
   getAttendanceReport,
   createBookingAdmin,
+  getAvailableSlotsAdmin,
 } = vi.hoisted(() => ({
   createBookingAdmin: vi.fn(),
+  getAvailableSlotsAdmin: vi.fn(),
   createFixedBooking: vi.fn(),
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
@@ -36,7 +38,7 @@ vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), 
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
-vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin }));
+vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin, getAvailableSlotsAdmin }));
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
   createFixedBooking,
@@ -47,6 +49,7 @@ vi.mock("@/src/actions/fixedBooking", () => ({
 
 import { CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
+import { formatPrice } from "@/app/bookings/slot-utils";
 
 const EMPTY_BOARD = {
   success: true,
@@ -75,6 +78,7 @@ describe("AdminPanel", () => {
     });
     getOutOfServices.mockResolvedValue({ success: true, data: [] });
     getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [] });
+    getAvailableSlotsAdmin.mockResolvedValue({ success: true, data: ["09:30", "18:00"] });
     getOccupancyReportData.mockResolvedValue({
       success: true,
       data: { courts: [], schedules: [], bookings: [], outOfServices: [] },
@@ -158,7 +162,7 @@ describe("AdminPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
 
     expect(screen.getByRole("heading", { name: "Nuevo turno" })).toBeTruthy();
-    expect((screen.getByLabelText("Precio") as HTMLInputElement).value).toBe("10000");
+    expect((screen.getByLabelText("Precio") as HTMLInputElement).value).toBe(formatPrice(10000));
   });
 
   it("al agendar un turno cierra el alta, actualiza la grilla y avisa", async () => {
@@ -167,6 +171,8 @@ describe("AdminPanel", () => {
     await flush();
 
     fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
+    await flush();
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "18:00" } });
     fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirmar turno" }));
     await flush();
@@ -193,6 +199,7 @@ describe("AdminPanel", () => {
     await flush();
 
     fireEvent.click(screen.getAllByTitle("Agendar turno")[0]);
+    await flush();
 
     expect(screen.getByRole("heading", { name: "Nuevo turno" })).toBeTruthy();
     expect((screen.getByLabelText("Cancha") as HTMLSelectElement).value).toBe("1");

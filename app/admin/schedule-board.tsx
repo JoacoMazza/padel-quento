@@ -338,9 +338,19 @@ export function ScheduleBoard({
                           data-state={state}
                           onClick={handleClick}
                           title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
-                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "hover:border-success" : ""}`}
+                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
-                          {state === "closed" ? "—" : LEGEND.find((l) => l.state === state)?.label}
+                          {state === "closed" ? (
+                            "—"
+                          ) : canSchedule ? (
+                            // Al pasar el mouse, la celda libre indica que se puede agendar ahí.
+                            <>
+                              <span className="group-hover:hidden">Disponible</span>
+                              <span className="hidden group-hover:inline">+ Agendar</span>
+                            </>
+                          ) : (
+                            LEGEND.find((l) => l.state === state)?.label
+                          )}
                         </span>
                       </td>
                     );

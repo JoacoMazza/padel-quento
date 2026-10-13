@@ -9,7 +9,7 @@ import { createSchedule } from "@/src/actions/schedule";
 import { blockPlayer, createPlayer } from "@/src/actions/player";
 import { createBooking } from "@/src/actions/booking";
 import { createOutOfService } from "@/src/actions/outOfService";
-import { createBookingAdmin } from "@/src/actions/adminBooking";
+import { createBookingAdmin, getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("@/src/lib/notifications", () => ({ notify: vi.fn(async () => {}) }));
@@ -98,21 +98,6 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     expect(booking.match).toBeNull();
   });
 
-  it("respeta el precio que cargó el admin", async () => {
-    const courtId = await newCourt(25000);
-
-    const result = await createBookingAdmin({
-      courtId,
-      date,
-      startTime: "18:00",
-      price: 18000,
-      holder: { playerId: player.id },
-    });
-
-    if (!result.success) throw new Error(result.error);
-    expect((await bookingById(result.data.id)).price).toBe(18000);
-  });
-
   it("agenda a nombre de alguien sin cuenta, creando su registro por teléfono", async () => {
     const courtId = await newCourt();
     const phoneNumber = uniquePhoneNumber();
@@ -195,20 +180,6 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     expect(result).toEqual({ success: false, error: "No se puede agendar un turno en un horario que ya pasó." });
   });
 
-  it("rechaza un precio que no sea mayor a 0", async () => {
-    const courtId = await newCourt();
-
-    const result = await createBookingAdmin({
-      courtId,
-      date,
-      startTime: "18:00",
-      price: 0,
-      holder: { playerId: player.id },
-    });
-
-    expect(result).toEqual({ success: false, error: "El precio debe ser mayor a 0." });
-  });
-
   it("no agenda en una cancha dada de baja", async () => {
     const courtId = await newCourt();
     await updateCourt(courtId, { state: CourtState.CLOSED_DOWN });
@@ -261,5 +232,67 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     expect(anonymous.success).toBe(false);
     const dataSource = await getDataSource();
     expect(await dataSource.getRepository<Booking>("Booking").count({ where: { court: { id: courtId } } })).toBe(0);
+  });
+
+  describe("horarios libres para el formulario", () => {
+    // Cancha abierta de 09:00 a 23:00: turnos de 90 minutos desde la apertura.
+    const ALL_SLOTS = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"];
+
+    it("ofrece los turnos de la grilla dentro del horario de la cancha", async () => {
+      const courtId = await newCourt();
+
+      expect(await getAvailableSlotsAdmin({ courtId, date })).toEqual({ success: true, data: ALL_SLOTS });
+    });
+
+    it("no ofrece los turnos ocupados ni los que se pisan con un bloqueo", async () => {
+      const courtId = await newCourt();
+      await createBooking({ fromDateTime: occurrenceStart(date, "10:30"), bookerId: player.id, courtId });
+      await createOutOfService({
+        courtId,
+        fromDateTime: occurrenceStart(date, "17:00"),
+        toDateTime: occurrenceStart(date, "20:00"),
+        reason: OutOfServiceReason.MAINTENANCE,
+      });
+
+      const result = await getAvailableSlotsAdmin({ courtId, date });
+
+      expect(result).toEqual({ success: true, data: ["09:00", "12:00", "13:30", "15:00", "21:00"] });
+    });
+
+    it("un turno cancelado deja el horario libre", async () => {
+      const courtId = await newCourt();
+      await createBooking({
+        fromDateTime: occurrenceStart(date, "10:30"),
+        bookerId: player.id,
+        courtId,
+        bookingState: BookingState.CANCELLED,
+      });
+
+      expect(await getAvailableSlotsAdmin({ courtId, date })).toEqual({ success: true, data: ALL_SLOTS });
+    });
+
+    it("no ofrece horarios de días que ya pasaron", async () => {
+      const courtId = await newCourt();
+
+      const result = await getAvailableSlotsAdmin({ courtId, date: addDaysISO(todayISO(), -1) });
+
+      expect(result).toEqual({ success: true, data: [] });
+    });
+
+    it("no ofrece horarios en una cancha dada de baja", async () => {
+      const courtId = await newCourt();
+      await updateCourt(courtId, { state: CourtState.CLOSED_DOWN });
+
+      expect(await getAvailableSlotsAdmin({ courtId, date })).toEqual({ success: true, data: [] });
+    });
+
+    it("solo puede usarlo un administrador", async () => {
+      const courtId = await newCourt();
+      mockSession(Role.PLAYER);
+
+      const result = await getAvailableSlotsAdmin({ courtId, date });
+
+      expect(result.success).toBe(false);
+    });
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { createBookingAdmin } from "@/src/actions/adminBooking";
+import { createBookingAdmin, getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
+import { formatPrice } from "@/app/bookings/slot-utils";
 import { todayISO } from "@/src/domain/fixed-booking";
 import {
   EMPTY_HOLDER,
@@ -21,7 +22,8 @@ export type BookingDraft = { courtId?: number; date?: string; startTime?: string
 /**
  * Alta de un turno común por el admin (por ejemplo, alguien que llama o se
  * acerca al mostrador): queda reservado completo a nombre de un jugador o de
- * alguien sin cuenta, con el precio de la cancha salvo que el admin lo cambie.
+ * alguien sin cuenta, con el precio de la cancha (no se puede cambiar). Solo
+ * ofrece los horarios libres de la cancha y el día elegidos.
  */
 export function CreateBookingModal({
   courts,
@@ -39,19 +41,33 @@ export function CreateBookingModal({
   const initialCourt = courts.find((c) => c.id === initial.courtId) ?? courts[0];
   const [courtId, setCourtId] = useState(initialCourt?.id ?? 0);
   const [date, setDate] = useState(initial.date ?? todayISO());
-  const [startTime, setStartTime] = useState(initial.startTime ?? "18:00");
-  const [price, setPrice] = useState(String(initialCourt?.price ?? ""));
-  const [priceEdited, setPriceEdited] = useState(false);
+  const [startTime, setStartTime] = useState(initial.startTime ?? "");
+  // Horarios libres de la última cancha y día consultados.
+  const [loadedSlots, setLoadedSlots] = useState<{ key: string; slots: string[] } | null>(null);
   const [holder, setHolder] = useState(EMPTY_HOLDER);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  function handleCourtChange(id: number) {
-    setCourtId(id);
-    // Mientras el admin no lo cambie, el precio sigue al de la cancha elegida.
-    const court = courts.find((c) => c.id === id);
-    if (court && !priceEdited) setPrice(String(court.price));
-  }
+  const price = courts.find((c) => c.id === courtId)?.price;
+  const slotsKey = `${courtId}|${date}`;
+  // null mientras se consultan los de la cancha y el día elegidos.
+  const slots = loadedSlots?.key === slotsKey ? loadedSlots.slots : null;
+
+  // Al cambiar la cancha o el día se vuelven a pedir los horarios libres; si el
+  // horario elegido ya no está libre, hay que elegir otro.
+  useEffect(() => {
+    let cancelled = false;
+    getAvailableSlotsAdmin({ courtId, date }).then((result) => {
+      if (cancelled) return;
+      const free = result.success ? result.data : [];
+      if (!result.success) setError(result.error);
+      setLoadedSlots({ key: `${courtId}|${date}`, slots: free });
+      setStartTime((current) => (free.includes(current) ? current : ""));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [courtId, date]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +78,6 @@ export function CreateBookingModal({
       courtId,
       date,
       startTime,
-      price: Number(price),
       holder: toBookingHolder(holder),
     });
 
@@ -98,7 +113,7 @@ export function CreateBookingModal({
               <select
                 id="booking-court"
                 value={courtId}
-                onChange={(e) => handleCourtChange(Number(e.target.value))}
+                onChange={(e) => setCourtId(Number(e.target.value))}
                 className={INPUT_CLASS}
               >
                 {courts.map((court) => (
@@ -112,17 +127,12 @@ export function CreateBookingModal({
               <label htmlFor="booking-price" className={LABEL_CLASS}>
                 Precio
               </label>
+              {/* El precio sale de la cancha: se muestra, pero no se puede cambiar. */}
               <input
                 id="booking-price"
-                type="number"
-                min={1}
-                required
-                value={price}
-                onChange={(e) => {
-                  setPrice(e.target.value);
-                  setPriceEdited(true);
-                }}
-                className={INPUT_CLASS}
+                readOnly
+                value={price !== undefined ? formatPrice(price) : ""}
+                className={`${INPUT_CLASS} cursor-not-allowed bg-line/30 text-foreground/70`}
               />
             </div>
           </div>
@@ -145,17 +155,26 @@ export function CreateBookingModal({
               <label htmlFor="booking-time" className={LABEL_CLASS}>
                 Hora
               </label>
-              <input
+              <select
                 id="booking-time"
-                type="time"
-                step={1800}
                 required
+                disabled={!slots || slots.length === 0}
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className={INPUT_CLASS}
-              />
+              >
+                <option value="">{slots ? "Elegí un horario" : "Cargando horarios…"}</option>
+                {slots?.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {slot}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+          {slots && slots.length === 0 ? (
+            <p className="-mt-2 text-xs font-medium text-danger">No hay horarios libres en esa cancha ese día.</p>
+          ) : null}
 
           <HolderFields idPrefix="booking" players={players} value={holder} onChange={setHolder} />
 
@@ -171,7 +190,7 @@ export function CreateBookingModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || !slots || slots.length === 0}
               className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? "Agendando..." : "Confirmar turno"}
