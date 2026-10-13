@@ -11,7 +11,9 @@ const {
   getFixedBookingsAdmin,
   createFixedBooking,
   getAttendanceReport,
+  createBookingAdmin,
 } = vi.hoisted(() => ({
+  createBookingAdmin: vi.fn(),
   createFixedBooking: vi.fn(),
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), 
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
+vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin }));
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
   createFixedBooking,
@@ -42,7 +45,7 @@ vi.mock("@/src/actions/fixedBooking", () => ({
   cancelFixedBooking: vi.fn(),
 }));
 
-import { CourtState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
+import { CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
 
 const EMPTY_BOARD = {
@@ -136,6 +139,65 @@ describe("AdminPanel", () => {
 
     fireEvent.click(registerButton);
     expect(screen.getByRole("heading", { name: "Nuevo turno fijo" })).toBeTruthy();
+  });
+
+  it("los botones de la turnera van en orden: Actualizar, Agendar turno y Registrar turno fijo", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    const refreshButton = screen.getByRole("button", { name: "Actualizar turnera" });
+    const toolbar = within(refreshButton.parentElement!);
+    const names = toolbar.getAllByRole("button").map((b) => b.textContent?.trim() || b.getAttribute("aria-label"));
+    expect(names).toEqual(["Actualizar", "Agendar turno", "Registrar turno fijo"]);
+  });
+
+  it("Agendar turno abre el alta de un turno común", async () => {
+    render(<AdminPanel />);
+    await flush();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
+
+    expect(screen.getByRole("heading", { name: "Nuevo turno" })).toBeTruthy();
+    expect((screen.getByLabelText("Precio") as HTMLInputElement).value).toBe("10000");
+  });
+
+  it("al agendar un turno cierra el alta, actualiza la grilla y avisa", async () => {
+    createBookingAdmin.mockResolvedValue({ success: true, data: { id: 9 } });
+    render(<AdminPanel />);
+    await flush();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
+    fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar turno" }));
+    await flush();
+
+    expect(createBookingAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("heading", { name: "Nuevo turno" })).toBeNull();
+    expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Turno agendado.")).toBeTruthy();
+  });
+
+  it("click en una celda libre de la grilla abre el alta con esa cancha, día y hora", async () => {
+    vi.setSystemTime(new Date(2026, 9, 12, 9, 0));
+    getScheduleBoardData.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_BOARD.data,
+        courts: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
+        schedules: [
+          { id: 1, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "23:00:00", court: { id: 1 } },
+        ],
+      },
+    });
+    render(<AdminPanel />);
+    await flush();
+
+    fireEvent.click(screen.getAllByTitle("Agendar turno")[0]);
+
+    expect(screen.getByRole("heading", { name: "Nuevo turno" })).toBeTruthy();
+    expect((screen.getByLabelText("Cancha") as HTMLSelectElement).value).toBe("1");
+    expect((screen.getByLabelText("Fecha") as HTMLInputElement).value).toBe("2026-10-12");
+    expect((screen.getByLabelText("Hora") as HTMLInputElement).value).toBe("09:30");
   });
 
   it("al crear un turno fijo actualiza la grilla para que aparezcan sus fechas", async () => {
