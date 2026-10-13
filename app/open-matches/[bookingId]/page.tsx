@@ -8,7 +8,8 @@ import { Avatar } from "@/app/components/ui/avatar";
 import { CLUB_LOCATION } from "@/app/components/club-info";
 import { JoinMatchCard } from "@/app/open-matches/[bookingId]/join-match-card";
 import { toOpenMatchDetail } from "@/app/open-matches/open-matches";
-import { formatLongDate, formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
@@ -19,10 +20,6 @@ import { getReputations } from "@/src/lib/player-reviews";
 import { ReputationBadge } from "@/app/components/reputation-badge";
 
 export const metadata: Metadata = { title: "Partido abierto" };
-
-function timeLabel(date: Date) {
-  return minutesToTimeLabel(date.getHours() * 60 + date.getMinutes());
-}
 
 export default async function OpenMatchDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -47,7 +44,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
   // Reputación de cada jugador según sus compañeros de partidos anteriores (HU-36).
   const reputations = await getReputations(detail.participants.map((participant) => participant.playerId));
 
-  const timeRange = `${timeLabel(detail.start)} – ${timeLabel(detail.end)}`;
+  const timeRange = `${dateToTimeLabel(detail.start)} – ${dateToTimeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
   const emptySpots = detail.status === "open" ? detail.remainingSpots : 0;
 

@@ -3,7 +3,6 @@ import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/co
 import {
   SLOT_DURATION_MINUTES,
   formatLongDate,
-  minutesToTimeLabel,
 } from "@/app/bookings/slot-utils";
 import {
   GroupSizePicker,
@@ -15,6 +14,7 @@ import {
   SummaryTotal,
 } from "@/app/bookings/summary-parts";
 import type { SelectedSlot } from "@/app/bookings/types";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 export function BookingSummary({
   selectedDate,
@@ -56,7 +56,7 @@ export function BookingSummary({
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />
         <SummaryField
           label="Horario"
-          value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} · ${SLOT_DURATION_MINUTES} min`}
+          value={`${dateToTimeLabel(selectedSlot.start)} · ${SLOT_DURATION_MINUTES} min`}
         />
       </div>
 

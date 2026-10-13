@@ -10,7 +10,7 @@ import type { Player } from "@/src/entities/Player";
  * puntos de fidelidad no se tocan.
  */
 @Entity({ name: "player_reviews" })
-@Unique(["match", "reviewer", "reviewed"])
+@Unique("UQ_player_reviews_match_reviewer_reviewed", ["match", "reviewer", "reviewed"])
 export class PlayerReview {
   @PrimaryGeneratedColumn()
   id!: number;

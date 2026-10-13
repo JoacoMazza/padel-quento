@@ -8,6 +8,8 @@ import { Booker } from "../../src/entities/Booker";
 import { Booking } from "../../src/entities/Booking";
 import { Chat } from "../../src/entities/Chat";
 import { Court } from "../../src/entities/Court";
+import { FixedBooking } from "../../src/entities/FixedBooking";
+import { FixedBookingDate } from "../../src/entities/FixedBookingDate";
 import { Match } from "../../src/entities/Match";
 import { MatchPlayer } from "../../src/entities/MatchPlayer";
 import { Message } from "../../src/entities/Message";
@@ -30,7 +32,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [Account, Admin, Booker, Player, Penalty, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, PlayerReview],
+    entities: [Account, Admin, Booker, Player, Penalty, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, FixedBooking, FixedBookingDate, PlayerReview],
     synchronize: true,
     dropSchema: true,
   });

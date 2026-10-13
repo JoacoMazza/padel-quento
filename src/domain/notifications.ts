@@ -1,4 +1,5 @@
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 /** Persona a la que se le avisa: cada canal usa el dato de contacto que le corresponde. */
 export type NotificationRecipient = {
@@ -37,9 +38,7 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "
 // Los turnos se guardan como hora de pared del club, así que se formatean con la hora local.
 function describeBooking(booking: NoticeBooking) {
   const day = DAY_FORMATTER.format(booking.fromDateTime).replace(",", "");
-  const hours = String(booking.fromDateTime.getHours()).padStart(2, "0");
-  const minutes = String(booking.fromDateTime.getMinutes()).padStart(2, "0");
-  return { day, time: `${hours}:${minutes}`, court: String(booking.courtNumber) };
+  return { day, time: dateToTimeLabel(booking.fromDateTime), court: String(booking.courtNumber) };
 }
 
 /** Turno cancelado porque la cancha quedó fuera de servicio. */
@@ -166,5 +165,33 @@ export function reviewInviteNotice(recipientName: string, booking: NoticeBooking
     subject: "¡Ya podés calificar a tus compañeros!",
     text: `Hola ${recipientName}, ¡gracias por venir a jugar con nosotros! Ya podés calificar a tus compañeros del partido del ${day} en la cancha ${court} desde Mis turnos. Tenés 48 horas.`,
     whatsappTemplate: { name: "quento_calificar_companeros", parameters: [recipientName, day, court] },
+  };
+}
+
+/** El admin liberó una sola fecha de un turno fijo (HU-41): las demás siguen reservadas. */
+export function fixedDateReleasedNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Liberamos tu turno fijo del ${day}`,
+    text: `Hola ${recipientName}, liberamos tu turno fijo del ${day} a las ${time} en la cancha ${court}. Tus próximos turnos fijos siguen reservados.`,
+    whatsappTemplate: { name: "quento_turno_fijo_liberado", parameters: [recipientName, day, time, court] },
+  };
+}
+
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long", timeZone: "UTC" });
+
+export type NoticeFixedBooking = { startDate: string; startTime: string; courtNumber: number };
+
+/** El admin dio de baja el turno fijo completo (HU-41). */
+export function fixedBookingCancelledNotice(recipientName: string, fixedBooking: NoticeFixedBooking): NotificationMessage {
+  const weekday = WEEKDAY_FORMATTER.format(new Date(`${fixedBooking.startDate}T00:00:00Z`));
+  // "lunes" a "viernes" ya están en plural; "sábado" y "domingo" no.
+  const weekdays = weekday.endsWith("s") ? weekday : `${weekday}s`;
+  const time = fixedBooking.startTime.slice(0, 5);
+  const court = String(fixedBooking.courtNumber);
+  return {
+    subject: `Se dio de baja tu turno fijo de los ${weekdays}`,
+    text: `Hola ${recipientName}, se dio de baja tu turno fijo de los ${weekdays} a las ${time} en la cancha ${court}. Se cancelaron todas sus próximas fechas.`,
+    whatsappTemplate: { name: "quento_turno_fijo_cancelado", parameters: [recipientName, weekdays, time, court] },
   };
 }

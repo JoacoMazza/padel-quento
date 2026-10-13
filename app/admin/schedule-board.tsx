@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Calendar, RefreshCw } from "lucide-react";
 import { BookingState, CourtState } from "@/src/domain/enums";
 import { getScheduleBoardData } from "@/src/actions/scheduleBoard";
@@ -19,12 +19,14 @@ import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/t
 import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
 import { AttendanceModal } from "@/app/admin/attendance-modal";
 import { getNextSlotChange } from "@/app/admin/schedule-refresh";
+import { dateToClockLabel } from "@/src/domain/time-format";
 
-type CellState = "available" | "reserved" | "pending" | "blocked" | "closed";
+type CellState = "available" | "reserved" | "fixed" | "pending" | "blocked" | "closed";
 
 const CELL_STYLES: Record<CellState, string> = {
   available: "border border-line bg-card text-success",
   reserved: "bg-ink text-white hover:bg-ink-soft",
+  fixed: "bg-occupied text-white hover:bg-occupied/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
   blocked: "bg-danger-light text-danger",
   closed: "border border-dashed border-line text-foreground/30",
@@ -33,6 +35,7 @@ const CELL_STYLES: Record<CellState, string> = {
 const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: string }[] = [
   { state: "available", label: "Disponible", swatch: "border border-line bg-card" },
   { state: "reserved", label: "Reservado", swatch: "bg-ink" },
+  { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
   { state: "blocked", label: "Bloqueado", swatch: "bg-danger-light border border-danger/30" },
 ];
@@ -50,8 +53,22 @@ const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfS
  * Pide sus datos al montarse y, mientras está visible (isActive), los refresca
  * solo cuando cambia de turno (ver getNextSlotChange) o cuando el admin hace
  * click en Actualizar: oculta en el panel conserva lo último obtenido sin seguir consultando.
+ * También se refresca cuando cambia refreshKey (por ejemplo, al crear o liberar
+ * un turno fijo). toolbarActions se muestra junto al botón Actualizar. Con
+ * onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
+ * pueden clickear para agendar un turno en esa cancha, día y hora.
  */
-export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
+export function ScheduleBoard({
+  isActive = true,
+  refreshKey = 0,
+  toolbarActions,
+  onAvailableSlotClick,
+}: {
+  isActive?: boolean;
+  refreshKey?: number;
+  toolbarActions?: ReactNode;
+  onAvailableSlotClick?: (slot: { courtId: number; date: string; startTime: string }) => void;
+}) {
   const [data, setData] = useState<BoardData>(EMPTY_BOARD);
   const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -61,6 +78,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
   const isFetchingRef = useRef(false);
   const hasLoadedRef = useRef(false);
   const lastAttemptRef = useRef<Date | null>(null);
+  const lastRefreshKeyRef = useRef(refreshKey);
 
   const refresh = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -70,6 +88,9 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
     try {
       const result = await getScheduleBoardData();
       if (result.success) {
+        const fixedDates = new Map(
+          result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
+        );
         setData({
           courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
           schedules: result.data.schedules.map((s) => ({
@@ -79,7 +100,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
             closingTime: String(s.closingTime),
             courtId: s.court?.id,
           })),
-          bookings: result.data.bookings.map(mapBookingToAdminProp),
+          bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
           outOfServices: result.data.outOfServices.map((o) => ({
             id: o.id,
             fromDateTime: new Date(o.fromDateTime),
@@ -105,6 +126,12 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
     hasLoadedRef.current = true;
     refresh();
   }, [isActive, refresh]);
+
+  useEffect(() => {
+    if (refreshKey === lastRefreshKeyRef.current) return;
+    lastRefreshKeyRef.current = refreshKey;
+    refresh();
+  }, [refreshKey, refresh]);
 
   // Se reprograma tras cada intento de refresco (isRefreshing vuelve a false) y
   // al volver a la sección. El próximo cambio se cuenta desde el último intento:
@@ -186,7 +213,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
       overlappingBooking?.bookingState === BookingState.RESERVED ||
       overlappingBooking?.bookingState === BookingState.PAID
     ) {
-      return { state: "reserved", booking: overlappingBooking };
+      return { state: overlappingBooking.fixedBookingDateId ? "fixed" : "reserved", booking: overlappingBooking };
     }
 
     return { state: "available" };
@@ -232,7 +259,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
             />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          En vivo{lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-AR")}` : null}
+          En vivo{lastUpdated ? ` · actualizado ${dateToClockLabel(lastUpdated)}` : null}
           <button
             type="button"
             aria-label="Actualizar turnera"
@@ -244,6 +271,7 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
             <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             Actualizar
           </button>
+          {toolbarActions}
         </div>
       </div>
 
@@ -288,17 +316,42 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
                   </td>
                   {courtSchedules.map(({ court, openMinutes, closeMinutes }) => {
                     const { state, booking } = cellInfo(court, openMinutes, closeMinutes, minutesOfDay);
-                    const isClickable = booking !== undefined;
+                    const canSchedule =
+                      state === "available" &&
+                      onAvailableSlotClick !== undefined &&
+                      buildSlotDate(selectedDate, minutesOfDay).getTime() > Date.now();
+                    const isClickable = booking !== undefined || canSchedule;
+                    const handleClick = booking
+                      ? () => setSelectedBooking(booking)
+                      : canSchedule
+                        ? () =>
+                            onAvailableSlotClick({
+                              courtId: court.id,
+                              date: dateInput,
+                              startTime: minutesToTimeLabel(minutesOfDay),
+                            })
+                        : undefined;
                     return (
                       <td key={court.id} className="px-2 py-1.5 text-center">
                         <span
                           role={isClickable ? "button" : undefined}
                           tabIndex={isClickable ? 0 : undefined}
-                          onClick={isClickable ? () => setSelectedBooking(booking) : undefined}
-                          title={isClickable ? "Ver y marcar asistencia" : undefined}
-                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""}`}
+                          data-state={state}
+                          onClick={handleClick}
+                          title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
+                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
-                          {state === "closed" ? "—" : LEGEND.find((l) => l.state === state)?.label}
+                          {state === "closed" ? (
+                            "—"
+                          ) : canSchedule ? (
+                            // Al pasar el mouse, la celda libre indica que se puede agendar ahí.
+                            <>
+                              <span className="group-hover:hidden">Disponible</span>
+                              <span className="hidden group-hover:inline">+ Agendar</span>
+                            </>
+                          ) : (
+                            LEGEND.find((l) => l.state === state)?.label
+                          )}
                         </span>
                       </td>
                     );
@@ -333,6 +386,10 @@ export function ScheduleBoard({ isActive = true }: { isActive?: boolean }) {
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleAttendanceUpdated}
+          onReleased={() => {
+            setSelectedBooking(null);
+            refresh();
+          }}
         />
       ) : null}
     </div>

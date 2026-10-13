@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState } from "@/src/domain/enums";
 
 const {
+  fixedDateExistsBy,
   create,
   save,
   update,
@@ -23,6 +24,7 @@ const {
     const findOne = vi.fn();
     const playerFindOne = vi.fn(async () => ({ id: 1, account: { isBlocked: false } }) as unknown);
     const bookerExistsBy = vi.fn(async () => true);
+    const fixedDateExistsBy = vi.fn(async () => false);
     const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
     const deleteFn = vi.fn();
     const getOne = vi.fn(async () => null as unknown);
@@ -31,6 +33,7 @@ const {
     const repository = { create, save, update, find, findOne, merge, delete: deleteFn };
     const playerRepository = { create, save, update, find, findOne: playerFindOne, merge, delete: deleteFn };
     const bookerRepository = { existsBy: bookerExistsBy };
+    const fixedDateRepository = { existsBy: fixedDateExistsBy };
 
     const queryBuilder: any = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
@@ -38,7 +41,13 @@ const {
     queryBuilder.getOne = getOne;
 
     const getRepoForEntity = (entity: unknown) =>
-      entity === "Player" ? playerRepository : entity === "Booker" ? bookerRepository : repository;
+      entity === "Player"
+        ? playerRepository
+        : entity === "Booker"
+          ? bookerRepository
+          : entity === "FixedBookingDate"
+            ? fixedDateRepository
+            : repository;
 
     const manager = {
       query: queryFn,
@@ -51,6 +60,7 @@ const {
     const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
 
     return {
+      fixedDateExistsBy,
       create,
       save,
       update,
@@ -637,6 +647,20 @@ describe("booking actions", () => {
       await updateBooking(1, { bookingState: BookingState.CANCELLED });
 
       expect(notifyMatchCancelledByCreator).toHaveBeenCalledWith(1);
+    });
+
+    it("no deja cancelar desde la app una fecha de un turno fijo", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, bookingState: BookingState.RESERVED });
+      fixedDateExistsBy.mockResolvedValueOnce(true);
+
+      const result = await updateBooking(1, { bookingState: BookingState.CANCELLED });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Es un turno fijo: para liberar esta fecha comunicate con el club.",
+      });
+      expect(save).not.toHaveBeenCalled();
+      expect(notifyMatchCancelledByCreator).not.toHaveBeenCalled();
     });
 
     it("no avisa nada si el turno ya estaba cancelado", async () => {

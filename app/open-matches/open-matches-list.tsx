@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarPlus, Check, UserPlus } from "lucide-react";
-import { formatPrice, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatPrice } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 import { PlayerDots, missingPlayersLabel } from "@/app/components/ui/player-dots";
 import {
   matchesOpenMatchFilter,
@@ -61,7 +62,7 @@ export function OpenMatchesList({ matches }: { matches: OpenMatchItem[] }) {
             >
               <div className="md:w-28 md:shrink-0 md:border-r md:border-line md:pr-6">
                 <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
-                  {minutesToTimeLabel(match.start.getHours() * 60 + match.start.getMinutes())}
+                  {dateToTimeLabel(match.start)}
                 </p>
                 <p className="text-sm text-foreground/50" suppressHydrationWarning>
                   {shortDate(match.start, now)}

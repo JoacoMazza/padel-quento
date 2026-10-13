@@ -44,3 +44,9 @@ export const REPUTATION_ALERT_PCT = 70;
 
 /** Largo máximo, en caracteres, del comentario de una reseña (HU-36). */
 export const REVIEW_COMMENT_MAX_LENGTH = 500;
+
+/**
+ * Días hacia adelante (unos 6 meses) que quedan reservados los turnos fijos
+ * (HU-41). Un proceso en segundo plano va generando las fechas nuevas.
+ */
+export const FIXED_BOOKING_HORIZON_DAYS = 182;
