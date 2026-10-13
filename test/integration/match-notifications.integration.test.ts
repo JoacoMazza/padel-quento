@@ -15,7 +15,8 @@ import {
 import { getDataSource } from "@/src/lib/db";
 import { createCourt, updateCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
+import { getBookingById, updateBooking } from "@/src/actions/booking";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { cancelExpiredMatches, closeMatch, leaveMatch } from "@/src/actions/match";
 import { createOutOfService } from "@/src/actions/outOfService";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
@@ -62,7 +63,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
   }
 
   async function createOpenMatch(fromDateTime: Date, groupSize: number, creator = ana, onCourtId = courtId) {
-    const created = await createBooking({ fromDateTime, bookerId: creator.id, courtId: onCourtId, groupSize });
+    const created = await createBookingForPlayer({ fromDateTime, bookerId: creator.id, courtId: onCourtId, groupSize });
     if (!created.success) throw new Error(`no se pudo crear el partido: ${created.error}`);
     const found = await getBookingById(created.data.id);
     if (!found.success || !found.data?.match) throw new Error("se esperaba un partido abierto");
@@ -101,10 +102,10 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa a los demás jugadores del partido quién se sumó y cuántos lugares quedan", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 1);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
-      const joined = await joinOpenMatch({ bookingId, playerId: carla.id });
+      const joined = await joinOpenMatchForPlayer({ bookingId, playerId: carla.id });
 
       expect(joined.success).toBe(true);
       expect(notify).toHaveBeenCalledTimes(1);
@@ -119,10 +120,10 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("cuando el partido se completa avisa a todos sus jugadores, incluido quien se sumó (HU-17)", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
-      const joined = await joinOpenMatch({ bookingId, playerId: carla.id });
+      const joined = await joinOpenMatchForPlayer({ bookingId, playerId: carla.id });
 
       expect(joined.success).toBe(true);
       expect(notify).toHaveBeenCalledTimes(1);
@@ -136,10 +137,10 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
 
     it("no avisa nada si no se pudo sumar", async () => {
       const { bookingId } = await createOpenMatch(uniqueFromDateTime(), 3);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
-      const joined = await joinOpenMatch({ bookingId, playerId: bruno.id });
+      const joined = await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
 
       expect(joined.success).toBe(false);
       expect(notify).not.toHaveBeenCalled();
@@ -150,8 +151,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa a los demás jugadores del partido quién se bajó y cuántos lugares quedan", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId, matchId } = await createOpenMatch(fromDateTime, 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
-      await joinOpenMatch({ bookingId, playerId: carla.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: carla.id });
       notify.mockClear();
 
       const left = await leaveMatch(matchId, bruno.id);
@@ -171,9 +172,9 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa a todos los jugadores de cada turno cancelado, sin tocar los turnos que no se superponen", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       const later = uniqueFromDateTime();
-      const untouched = await createBooking({ fromDateTime: later, bookerId: carla.id, courtId, groupSize: 4 });
+      const untouched = await createBookingForPlayer({ fromDateTime: later, bookerId: carla.id, courtId, groupSize: 4 });
       if (!untouched.success) throw new Error("no se pudo crear el turno de prueba");
       notify.mockClear();
 
@@ -196,7 +197,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
 
     it("avisa a quien reservó un turno completo (sin partido abierto)", async () => {
       const fromDateTime = uniqueFromDateTime();
-      const booked = await createBooking({ fromDateTime, bookerId: carla.id, courtId, groupSize: 4 });
+      const booked = await createBookingForPlayer({ fromDateTime, bookerId: carla.id, courtId, groupSize: 4 });
       if (!booked.success) throw new Error("no se pudo crear el turno de prueba");
       notify.mockClear();
 
@@ -229,7 +230,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa que se bajó sin ofrecer su lugar, porque el partido no vuelve a buscar jugadores", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId, matchId } = await createOpenMatch(fromDateTime, 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
       vi.useFakeTimers({ toFake: ["Date"] });
@@ -250,8 +251,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa a todos los demás jugadores anotados", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 1);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
-      await joinOpenMatch({ bookingId, playerId: carla.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: carla.id });
       notify.mockClear();
 
       const cancelled = await updateBooking(bookingId, { bookingState: BookingState.CANCELLED });
@@ -267,7 +268,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     });
 
     it("no avisa nada al cancelar un turno sin otros jugadores anotados", async () => {
-      const booked = await createBooking({ fromDateTime: uniqueFromDateTime(), bookerId: ana.id, courtId, groupSize: 4 });
+      const booked = await createBookingForPlayer({ fromDateTime: uniqueFromDateTime(), bookerId: ana.id, courtId, groupSize: 4 });
       if (!booked.success) throw new Error("no se pudo crear el turno de prueba");
       notify.mockClear();
 
@@ -278,7 +279,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
 
     it("no avisa nada si el cambio del turno no es una cancelación", async () => {
       const { bookingId } = await createOpenMatch(uniqueFromDateTime(), 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
       await updateBooking(bookingId, { price: 12000 });
@@ -291,7 +292,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("avisa a los demás jugadores que el partido ya no busca más jugadores", async () => {
       const fromDateTime = uniqueFromDateTime();
       const { bookingId, matchId } = await createOpenMatch(fromDateTime, 2);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
       const closed = await closeMatch(matchId);
@@ -310,7 +311,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       const elena = await newPlayer("Elena", "Ruiz");
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 1, diego);
-      await joinOpenMatch({ bookingId, playerId: elena.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: elena.id });
       notify.mockClear();
 
       vi.useFakeTimers({ toFake: ["Date"] });
@@ -334,7 +335,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       if (!other.success) throw new Error("no se pudo crear la cancha de prueba");
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 2, ana, other.data.id);
-      await joinOpenMatch({ bookingId, playerId: bruno.id });
+      await joinOpenMatchForPlayer({ bookingId, playerId: bruno.id });
       notify.mockClear();
 
       // Dar de baja una cancha es solo para administradores.

@@ -1,33 +1,27 @@
 import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
 import { PageShell } from "@/app/components/page-shell";
 import { PageHeading } from "@/app/components/ui/page-heading";
 import { OpenMatchesList } from "@/app/open-matches/open-matches-list";
-import { listOpenMatches } from "@/app/open-matches/open-matches";
+import { anonymizeOpenMatchItem, listOpenMatches } from "@/app/open-matches/open-matches";
 import { authOptions } from "@/src/lib/auth";
-import { getDataSource } from "@/src/lib/db";
-import { Player } from "@/src/entities/Player";
+import { getSessionPlayerId } from "@/src/lib/session-player";
 import { getBookings } from "@/src/actions/booking";
 import { pageMetadata } from "@/app/site-metadata";
 
 export const metadata = pageMetadata("Partidos abiertos", "/open-matches");
 
 export default async function OpenMatchesPage() {
+  // Se puede ver sin sesión (issue #55), sin el nombre de quien organiza.
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
-
-  const dataSource = await getDataSource();
-  const player = await dataSource
-    .getRepository<Player>("Player")
-    .findOne({ where: { account: { email: session.user.email } } });
+  const isGuest = !session?.user?.email;
+  const playerId = isGuest ? null : await getSessionPlayerId();
 
   const bookingsResult = await getBookings();
-  const matches = listOpenMatches(bookingsResult.success ? bookingsResult.data : [], player?.id ?? null, new Date());
+  const allMatches = listOpenMatches(bookingsResult.success ? bookingsResult.data : [], playerId, new Date());
+  const matches = isGuest ? allMatches.map(anonymizeOpenMatchItem) : allMatches;
 
   return (
-    <PageShell active="/open-matches" user={session.user}>
+    <PageShell active="/open-matches" user={isGuest ? null : session.user}>
       <PageHeading
         eyebrow="Comunidad Quento"
         title="Partidos abiertos"

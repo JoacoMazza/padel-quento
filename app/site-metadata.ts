@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const SITE_NAME = "Quento Padel Club";
 
 export const SITE_DESCRIPTION =
-  "Reservá tu cancha de pádel en Quento Club, City Bell: mirá los turnos disponibles, armá partidos abiertos con otros jugadores y sumá puntos.";
+  "Reservá tu cancha de pádel en Quento Club, Villa Elisa: mirá los turnos disponibles, armá partidos abiertos con otros jugadores y sumá puntos.";
 
 /**
  * Imagen para compartir (Open Graph y Twitter). Se declara explícitamente en vez

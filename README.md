@@ -35,6 +35,7 @@ Las personas se modelan en tres tablas: `accounts` guarda las credenciales de ac
 ```
 app/                  Rutas y páginas (App Router de Next.js)
   api/auth/           Endpoints de NextAuth
+  landing/            Página de inicio pública: info del complejo y funcionalidades
   login/, register/   Páginas de autenticación
   bookings/           Turnos disponibles: grilla de canchas/horarios y reserva
   my-bookings/        Mis turnos: próximos/anteriores, filtros y cancelación
@@ -57,13 +58,21 @@ docs/
   der/                Diagrama Entidad-Relación (imagen + fuente editable)
 ```
 
+## Acceso sin sesión
+
+La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-matches`) se pueden ver sin iniciar sesión (ver `proxy.ts`). El login se pide recién al reservar o sumarse a un partido: el visitante va a `/login` y, al volver, encuentra elegido el turno que había seleccionado. Las rutas personales (`/my-bookings`, `/profile`, `/chats/*`) y las de admin siguen protegidas, y el admin con sesión sigue encerrado en su panel.
+
+- `createBooking` y `joinOpenMatch` toman el jugador de la sesión, nunca del id que manda el cliente; la lógica que recibe el id vive en [src/lib/bookings.ts](src/lib/bookings.ts) y solo se usa desde el servidor.
+- La grilla pública usa `getPublicBookings` ([src/lib/public-bookings.ts](src/lib/public-bookings.ts)), sin datos de quién reservó ni de quiénes juegan, y los partidos abiertos se muestran a los visitantes sin nombres ni chat.
+- El WhatsApp de contacto de la landing está en [app/components/club-info.ts](app/components/club-info.ts) (`CLUB_WHATSAPP_NUMBER`).
+
 ## Turnos fijos
 
-Los turnos fijos (HU-41) los gestiona solo el administrador, desde la sección **Turnos Fijos** del panel: una cancha reservada para el mismo titular todas las semanas o cada dos semanas, a la misma hora, con fecha de fin opcional. El titular puede ser un jugador registrado o alguien sin cuenta (nombre, apellido y teléfono).
+Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera Global** del panel (botón **Registrar turno fijo**, con el listado de turnos fijos debajo de la grilla, donde se ven en azul): una cancha reservada para el mismo titular todas las semanas o cada dos semanas, a la misma hora, con fecha de fin opcional. El titular puede ser un jugador registrado o alguien sin cuenta (nombre, apellido y teléfono).
 
 - Cada fecha se reserva como un turno común en `bookings`, así que la web y el bot de WhatsApp la ven ocupada sin cambios. Los jugadores solo ven el horario como reservado; el titular, si tiene cuenta, la ve en "Mis turnos" como turno fijo, sin poder cancelarla.
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
-- El admin puede liberar una sola fecha (desde la sección o tocando el turno en la Turnera Global), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
+- El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
 
 ## Configuración del proyecto
