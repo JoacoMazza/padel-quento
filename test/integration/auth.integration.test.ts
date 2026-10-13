@@ -36,7 +36,7 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
     const dataSource = await getDataSource();
     await dataSource.getRepository("Account").update(blocked.data.account.id, { isBlocked: true });
     // administrador
-    await createAdmin({ email: emailAdmin, password, names: "Admin", lastnames: "Login" });
+    await createAdmin({ email: emailAdmin, password, names: "Admin", lastnames: "Login", dni: 30999888 });
   });
 
   afterAll(async () => {
