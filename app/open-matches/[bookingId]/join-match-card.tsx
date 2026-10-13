@@ -7,6 +7,7 @@ import { CircleCheck, MessageCircle, UserPlus } from "lucide-react";
 import { joinOpenMatch } from "@/src/actions/booking";
 import { formatPrice } from "@/app/bookings/slot-utils";
 import { GroupSizePicker } from "@/app/bookings/summary-parts";
+import { MissingCategoryNotice } from "@/app/components/ui/missing-category-notice";
 import type { OpenMatchStatus } from "@/app/open-matches/open-matches";
 
 const CLOSED_MESSAGES: Record<Exclude<OpenMatchStatus, "open">, string> = {
@@ -27,6 +28,7 @@ export function JoinMatchCard({
   status,
   alreadyJoined,
   chatId,
+  hasCategory,
 }: {
   bookingId: number;
   playerId: number | null;
@@ -38,6 +40,8 @@ export function JoinMatchCard({
   status: OpenMatchStatus;
   alreadyJoined: boolean;
   chatId: number | null;
+  /** Sin categoría cargada no puede sumarse: se lo manda a completarla en su perfil. */
+  hasCategory: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -110,6 +114,10 @@ export function JoinMatchCard({
         <p className="mt-6 rounded-xl bg-white/5 px-4 py-3 text-center text-sm font-medium text-white/70">
           {CLOSED_MESSAGES[status]}
         </p>
+      ) : !hasCategory ? (
+        <div className="mt-6">
+          <MissingCategoryNotice message="Para sumarte a un partido abierto necesitás cargar tu categoría." />
+        </div>
       ) : (
         <div className="mt-6 space-y-4">
           {remainingSpots > 1 ? (

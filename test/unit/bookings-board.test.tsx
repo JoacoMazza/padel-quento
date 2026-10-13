@@ -27,11 +27,12 @@ const openMatch = {
   matchPlayerIds: [9],
 };
 
-function renderBoard() {
+function renderBoard({ hasCategory = true }: { hasCategory?: boolean } = {}) {
   return render(
     <BookingsBoard
       playerId={7}
       bookerId={7}
+      hasCategory={hasCategory}
       courts={courts}
       schedules={schedules}
       bookings={[openMatch]}
@@ -101,6 +102,7 @@ describe("BookingsBoard", () => {
       <BookingsBoard
         playerId={7}
         bookerId={7}
+        hasCategory
         courts={courts}
         schedules={schedules}
         bookings={[]}
@@ -168,6 +170,36 @@ describe("BookingsBoard", () => {
     expect(screen.getByText("Modalidad")).toBeTruthy();
     expect(screen.queryByText("¿Cómo vienen?")).toBeNull();
     expect(screen.getByText("$ 4.500 por jugador")).toBeTruthy();
+  });
+
+  it("sin categoría cargada, al elegir un partido abierto le pide completarla en su perfil", () => {
+    renderBoard({ hasCategory: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" }));
+
+    expect(screen.getByText("Para sumarte a un partido abierto necesitás cargar tu categoría.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Completar mi perfil" }).getAttribute("href")).toBe("/profile");
+    expect(screen.queryByRole("button", { name: "Sumarme al partido" })).toBeNull();
+  });
+
+  it("sin categoría cargada, al elegir buscar jugadores le pide completarla y no deja reservar", () => {
+    renderBoard({ hasCategory: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+    fireEvent.click(screen.getByLabelText(/Buscar jugadores/));
+
+    expect(screen.getByText("Para crear un partido abierto necesitás cargar tu categoría.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Completar mi perfil" }).getAttribute("href")).toBe("/profile");
+    expect((screen.getByRole("button", { name: /Reservar turno/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("sin categoría cargada puede reservar la cancha completa", () => {
+    renderBoard({ hasCategory: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+    expect(screen.queryByText("Para crear un partido abierto necesitás cargar tu categoría.")).toBeNull();
+    expect((screen.getByRole("button", { name: /Reservar turno/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("al volver a hacer click en el partido abierto elegido lo deselecciona en vez de ofrecer reservarlo", () => {

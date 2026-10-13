@@ -16,6 +16,7 @@ import { Player } from "@/src/entities/Player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
+import { PlayerCategory } from "@/src/domain/enums";
 
 export const metadata: Metadata = { title: "Partido abierto" };
 
@@ -179,6 +180,8 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
           status={detail.status}
           alreadyJoined={detail.alreadyJoined}
           chatId={detail.chatId}
+          // Una cuenta sin jugador ya no puede sumarse: no hace falta pedirle categoría.
+          hasCategory={player?.category !== PlayerCategory.WITHOUT_CATEGORY}
         />
       </div>
     </PageShell>

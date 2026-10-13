@@ -14,6 +14,7 @@ import {
   SummaryTotal,
 } from "@/app/bookings/summary-parts";
 import type { SelectedOpenMatch } from "@/app/bookings/types";
+import { MissingCategoryNotice } from "@/app/components/ui/missing-category-notice";
 
 export function JoinMatchPanel({
   selectedDate,
@@ -21,6 +22,7 @@ export function JoinMatchPanel({
   feedback,
   isPending,
   alreadyJoined,
+  hasCategory,
   groupSize,
   onGroupSizeChange,
   onConfirm,
@@ -31,6 +33,8 @@ export function JoinMatchPanel({
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
   alreadyJoined: boolean;
+  /** Sin categoría cargada no puede sumarse: se lo manda a completarla en su perfil. */
+  hasCategory: boolean;
   groupSize: number;
   onGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
@@ -72,6 +76,10 @@ export function JoinMatchPanel({
           <CircleCheck className="h-4 w-4" />
           Ya formás parte de este partido.
         </p>
+      ) : !hasCategory ? (
+        <div className="mt-5">
+          <MissingCategoryNotice message="Para sumarte a un partido abierto necesitás cargar tu categoría." />
+        </div>
       ) : (
         <div className="mt-5 space-y-4">
           {remainingSpots > 1 ? (

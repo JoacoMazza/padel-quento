@@ -59,8 +59,26 @@ describe("listOpenMatches", () => {
       confirmedPlayers: 2,
       remainingSpots: 2,
       organizerName: "Martín Prado",
+      category: PlayerCategory.FIFTH,
       alreadyJoined: false,
     });
+  });
+
+  it("toma la categoría del partido de quien lo creó", () => {
+    const [item] = listOpenMatches(
+      [
+        booking({
+          players: [
+            { id: 1, names: "Martín", lastnames: "Prado", category: PlayerCategory.SECOND },
+            { id: 2, names: "Ana", lastnames: "Gómez", category: PlayerCategory.SECOND },
+          ],
+        }),
+      ],
+      null,
+      NOW,
+    );
+
+    expect(item.category).toBe(PlayerCategory.SECOND);
   });
 
   it("excluye turnos sin partido, partidos completos, cancelados y los que ya empezaron", () => {

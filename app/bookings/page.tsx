@@ -8,6 +8,7 @@ import { BookingsBoard } from "@/app/bookings/bookings-board";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
+import { PlayerCategory } from "@/src/domain/enums";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
 import { getBookings } from "@/src/actions/booking";
@@ -62,6 +63,8 @@ export default async function BookingsPage() {
       <BookingsBoard
         playerId={player?.id ?? null}
         bookerId={player?.id ?? null}
+        // Una cuenta sin jugador ya no puede reservar: no hace falta pedirle categoría.
+        hasCategory={player?.category !== PlayerCategory.WITHOUT_CATEGORY}
         courts={courts.map((c) => ({
           id: c.id,
           number: c.number,

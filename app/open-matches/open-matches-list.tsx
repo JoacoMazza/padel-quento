@@ -6,6 +6,7 @@ import { ArrowRight, CalendarPlus, Check, UserPlus } from "lucide-react";
 import { formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import { PlayerDots, missingPlayersLabel } from "@/app/components/ui/player-dots";
+import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import {
   matchesOpenMatchFilter,
   type OpenMatchFilter,
@@ -75,6 +76,7 @@ export function OpenMatchesList({ matches }: { matches: OpenMatchItem[] }) {
                   Cancha {match.courtNumber}
                 </p>
                 <p className="text-sm text-foreground/50">Organiza {match.organizerName}</p>
+                <span className="badge badge-primary mt-2">{PLAYER_CATEGORY_LABELS[match.category]}</span>
               </div>
 
               <div className="flex items-center gap-3">
