@@ -19,6 +19,7 @@ import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/t
 import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
 import { AttendanceModal } from "@/app/admin/attendance-modal";
 import { getNextSlotChange } from "@/app/admin/schedule-refresh";
+import { dateToClockLabel } from "@/src/domain/time-format";
 
 type CellState = "available" | "reserved" | "fixed" | "pending" | "blocked" | "closed";
 
@@ -254,7 +255,7 @@ export function ScheduleBoard({
             />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          En vivo{lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-AR")}` : null}
+          En vivo{lastUpdated ? ` · actualizado ${dateToClockLabel(lastUpdated)}` : null}
           <button
             type="button"
             aria-label="Actualizar turnera"

@@ -100,6 +100,13 @@ describe("ScheduleBoard - refresco", () => {
     expect(getScheduleBoardData).toHaveBeenCalledTimes(1);
   });
 
+  it("muestra la hora de la última actualización con el cero adelante", async () => {
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(screen.getByText(/actualizado 09:00:00/)).toBeTruthy();
+  });
+
   it("si falla el refresco no reintenta hasta el próximo cambio de turno", async () => {
     render(<ScheduleBoard />);
     await advance(0);

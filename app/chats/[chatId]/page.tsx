@@ -13,7 +13,8 @@ import { Player } from "@/src/entities/Player";
 import { getChatById, getChatMessages } from "@/src/actions/chat";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { ChatRoom } from "./chat-room";
-import { SLOT_DURATION_MINUTES, formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { SLOT_DURATION_MINUTES, formatLongDate } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 export const metadata: Metadata = { title: "Chat del partido" };
 
@@ -51,7 +52,7 @@ export default async function ChatPage({
   const booking = chat.booking;
   const messagesResult = await getChatMessages(chat.id);
   const initialMessages = messagesResult.success ? messagesResult.data : [];
-  const startLabel = minutesToTimeLabel(booking.fromDateTime.getHours() * 60 + booking.fromDateTime.getMinutes());
+  const startLabel = dateToTimeLabel(booking.fromDateTime);
 
   return (
     <PageShell active="/my-bookings" user={session.user} width="narrow">

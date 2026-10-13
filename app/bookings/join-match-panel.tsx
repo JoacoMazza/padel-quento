@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, CircleCheck, UserPlus } from "lucide-react";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { formatLongDate, minutesToTimeLabel } from "@/app/bookings/slot-utils";
+import { formatLongDate } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 import { PlayerDots } from "@/app/components/ui/player-dots";
 import {
   GroupSizePicker,
@@ -37,7 +38,7 @@ export function JoinMatchPanel({
 }) {
   const remainingSpots = OPEN_MATCH_MAX_PLAYERS - selectedMatch.confirmedPlayers;
   const groupSizeOptions = Array.from({ length: remainingSpots }, (_, i) => i + 1);
-  const timeRange = `${minutesToTimeLabel(selectedMatch.start.getHours() * 60 + selectedMatch.start.getMinutes())} – ${minutesToTimeLabel(selectedMatch.end.getHours() * 60 + selectedMatch.end.getMinutes())}`;
+  const timeRange = `${dateToTimeLabel(selectedMatch.start)} – ${dateToTimeLabel(selectedMatch.end)}`;
 
   return (
     <SummaryPanel label="Partido abierto">

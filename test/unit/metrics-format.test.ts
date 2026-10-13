@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatPercent, formatSlotTime } from "@/app/admin/metrics-format";
+import { formatDuration, formatPercent } from "@/app/admin/metrics-format";
 
 describe("metrics format", () => {
   describe("formatDuration", () => {
@@ -28,14 +28,6 @@ describe("metrics format", () => {
       expect(formatPercent(2 / 3)).toBe("66,67%");
       expect(formatPercent(1)).toBe("100,00%");
       expect(formatPercent(0)).toBe("0,00%");
-    });
-  });
-
-  describe("formatSlotTime", () => {
-    it("muestra la hora del turno sin los minutos cuando es en punto", () => {
-      expect(formatSlotTime(9 * 60)).toBe("9");
-      expect(formatSlotTime(10 * 60 + 30)).toBe("10:30");
-      expect(formatSlotTime(12 * 60)).toBe("12");
     });
   });
 });

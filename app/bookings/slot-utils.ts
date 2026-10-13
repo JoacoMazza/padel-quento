@@ -34,11 +34,8 @@ export function timeStringToMinutes(value: string): number {
   return hours * 60 + minutes;
 }
 
-export function minutesToTimeLabel(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-}
+// El formato de horas es único para toda la app (ver src/domain/time-format.ts).
+export { minutesToTimeLabel } from "@/src/domain/time-format";
 
 export function buildSlotDate(baseDate: Date, minutesOfDay: number): Date {
   const result = new Date(baseDate);
