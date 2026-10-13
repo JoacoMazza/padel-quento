@@ -31,6 +31,7 @@ describe("chat actions (integración con Postgres real)", () => {
   async function newPlayer(prefix: string, overrides: Record<string, unknown> = {}) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",

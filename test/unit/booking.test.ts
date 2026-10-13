@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 
 const {
   fixedDateExistsBy,
@@ -108,11 +108,21 @@ const fromDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
 const PHONE_NUMBER = "2215550101";
 
 /** Jugador registrado que reserva: Player hereda de Booker, así que tiene su teléfono. */
-function bookingPlayer(overrides: { isBlocked?: boolean } = {}) {
+function bookingPlayer(overrides: { isBlocked?: boolean; category?: PlayerCategory } = {}) {
   return {
     id: 1,
     phoneNumber: PHONE_NUMBER,
+    category: overrides.category ?? PlayerCategory.FOURTH,
     account: { isBlocked: overrides.isBlocked ?? false },
+  };
+}
+
+/** Partido abierto creado por el jugador 1 (quien reservó el turno 10), con su categoría. */
+function openMatchWithCreator(creatorCategory: PlayerCategory) {
+  return {
+    id: 20,
+    needPlayers: true,
+    matchPlayers: [{ playerId: 1, player: { id: 1, category: creatorCategory } }],
   };
 }
 
@@ -342,6 +352,26 @@ describe("booking actions", () => {
       expect(result.success).toBe(true);
     });
 
+    it("rechaza crear un partido abierto si quien reserva no tiene categoría cargada", async () => {
+      playerFindOne.mockResolvedValueOnce(bookingPlayer({ category: PlayerCategory.WITHOUT_CATEGORY }));
+
+      const result = await createBooking({ fromDateTime, groupSize: 2, bookerId: 1, courtId: 2 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Cargá tu categoría en tu perfil para crear un partido abierto.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("permite reservar la cancha completa sin categoría cargada", async () => {
+      playerFindOne.mockResolvedValueOnce(bookingPlayer({ category: PlayerCategory.WITHOUT_CATEGORY }));
+
+      const result = await createBooking({ fromDateTime, groupSize: 4, bookerId: 1, courtId: 2 });
+
+      expect(result.success).toBe(true);
+    });
+
     it("permite crear una reserva completa (no partido abierto) con menos de 3 horas de anticipación", async () => {
       const soon = new Date(Date.now() + 30 * 60_000);
 
@@ -497,6 +527,50 @@ describe("booking actions", () => {
         error: "El partido ya está completo, no quedan lugares libres.",
       });
       expect(create).not.toHaveBeenCalled();
+    });
+
+    it("suma al jugador si tiene la misma categoría que quien creó el partido", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED, booker: { id: 1 } });
+      findOne.mockResolvedValueOnce(openMatchWithCreator(PlayerCategory.FOURTH));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result.success).toBe(true);
+      expect(create).toHaveBeenCalledWith({ match: { id: 20 }, player: { id: 5 }, playersCount: 1 });
+    });
+
+    it("rechaza al jugador de otra categoría que la de quien creó el partido", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED, booker: { id: 1 } });
+      findOne.mockResolvedValueOnce(openMatchWithCreator(PlayerCategory.THIRD));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({ success: false, error: "Este partido es para jugadores de 3ª Categoría." });
+      expect(create).not.toHaveBeenCalled();
+      expect(notifyPlayerJoined).not.toHaveBeenCalled();
+    });
+
+    it("rechaza al jugador sin categoría cargada y le pide que la complete", async () => {
+      playerFindOne.mockResolvedValueOnce(bookingPlayer({ category: PlayerCategory.WITHOUT_CATEGORY }));
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED, booker: { id: 1 } });
+      findOne.mockResolvedValueOnce(openMatchWithCreator(PlayerCategory.FOURTH));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Cargá tu categoría en tu perfil para sumarte a un partido abierto.",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("no restringe la categoría si quien creó el partido no tiene una (partidos previos a la validación)", async () => {
+      findOne.mockResolvedValueOnce({ id: 10, bookingState: BookingState.RESERVED, booker: { id: 1 } });
+      findOne.mockResolvedValueOnce(openMatchWithCreator(PlayerCategory.WITHOUT_CATEGORY));
+
+      const result = await joinOpenMatch({ bookingId: 10, playerId: 5 });
+
+      expect(result.success).toBe(true);
     });
 
     it("rechaza al jugador si se encuentra bloqueado", async () => {

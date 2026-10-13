@@ -9,7 +9,7 @@ vi.mock("next-auth/next", () => ({
 }));
 
 import { getServerSession } from "next-auth/next";
-import { BookingState, Role } from "@/src/domain/enums";
+import { BookingState, Role, PlayerCategory } from "@/src/domain/enums";
 import {
   ATTENDANCE_POINTS,
   OPEN_MATCH_JOIN_BONUS_POINTS,
@@ -87,6 +87,7 @@ describe("attendance actions (integración con Postgres real)", () => {
   async function createTestPlayer(prefix: string) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",

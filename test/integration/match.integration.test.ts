@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
@@ -33,6 +33,7 @@ describe("match actions (integración con Postgres real)", () => {
     courtId = court.data.id;
 
     const player = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("match-player"),
       password: "secreto123",

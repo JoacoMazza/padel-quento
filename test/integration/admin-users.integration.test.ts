@@ -12,7 +12,7 @@ import { createCourt } from "@/src/actions/court";
 import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
 import { recordPointsMovement } from "@/src/actions/profile";
-import { BookingState, Role } from "@/src/domain/enums";
+import { BookingState, Role, PlayerCategory } from "@/src/domain/enums";
 import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 
 vi.mock("next/cache", () => ({
@@ -51,6 +51,7 @@ describe("admin player actions (integración con Postgres real)", () => {
   it("getPlayersAdmin lista los jugadores existentes", async () => {
     // crear un jugador para asegurar que hay al menos uno
     await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("lista"),
       password: "pass123",
@@ -77,6 +78,7 @@ describe("admin player actions (integración con Postgres real)", () => {
 
   it("blockPlayer marca isBlocked = true en la BD", async () => {
     const created = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("bloquear"),
       password: "pass123",
@@ -100,6 +102,7 @@ describe("admin player actions (integración con Postgres real)", () => {
   it("unblockPlayer marca isBlocked = false en la BD", async () => {
     // crear un jugador y bloquearlo primero
     const created = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("desbloquear"),
       password: "pass123",
@@ -140,6 +143,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     const courtId = court.data.id;
 
     const created = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("ficha"),
       password: "pass123",
@@ -147,6 +151,7 @@ describe("admin player actions (integración con Postgres real)", () => {
       lastnames: "Test",
     });
     const other = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("ficha.otro"),
       password: "pass123",
