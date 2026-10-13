@@ -2,55 +2,44 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { addPlayerToChat, refresh } = vi.hoisted(() => ({ addPlayerToChat: vi.fn(), refresh: vi.fn() }));
+const { addPlayerToMatch, refresh } = vi.hoisted(() => ({ addPlayerToMatch: vi.fn(), refresh: vi.fn() }));
 
-vi.mock("@/src/actions/chat", () => ({ addPlayerToChat }));
+vi.mock("@/src/actions/match", () => ({ addPlayerToMatch }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { PlayerCategory } from "@/src/domain/enums";
-import { InvitePanel } from "@/app/chats/[chatId]/invite-panel";
+import { AddPlayerForm } from "@/app/open-matches/add-player-form";
 
-describe("InvitePanel", () => {
-  const writeText = vi.fn(async () => undefined);
-
+describe("AddPlayerForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("shares the link of the open match page (the same one shown since the match was created)", async () => {
-    render(<InvitePanel chatId={12} bookingId={34} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Compartir link/ }));
-
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/open-matches/34`));
-  });
-
-  it("adds a registered player by email or phone and refreshes the room", async () => {
-    addPlayerToChat.mockResolvedValueOnce({
+  it("adds a registered player by email or phone to the match and refreshes the page", async () => {
+    addPlayerToMatch.mockResolvedValueOnce({
       success: true,
       data: { id: 9, names: "Caro", lastnames: "Gómez", category: PlayerCategory.FOURTH },
     });
-    render(<InvitePanel chatId={12} bookingId={34} />);
+    render(<AddPlayerForm bookingId={34} />);
 
     fireEvent.change(screen.getByLabelText("Email o teléfono del jugador"), { target: { value: "caro@test.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
 
     await waitFor(() => expect(screen.getByText("Caro Gómez se sumó al partido.")).toBeTruthy());
-    expect(addPlayerToChat).toHaveBeenCalledWith(12, "caro@test.com");
+    expect(addPlayerToMatch).toHaveBeenCalledWith(34, "caro@test.com");
     expect(refresh).toHaveBeenCalled();
   });
 
   it("shows the error when the player cannot be added", async () => {
-    addPlayerToChat.mockResolvedValueOnce({
+    addPlayerToMatch.mockResolvedValueOnce({
       success: false,
       error: "No encontramos un jugador registrado con ese email o teléfono.",
     });
-    render(<InvitePanel chatId={12} bookingId={34} />);
+    render(<AddPlayerForm bookingId={34} />);
 
     fireEvent.change(screen.getByLabelText("Email o teléfono del jugador"), { target: { value: "nadie@test.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
@@ -59,5 +48,11 @@ describe("InvitePanel", () => {
       expect(screen.getByRole("alert").textContent).toBe("No encontramos un jugador registrado con ese email o teléfono."),
     );
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not submit an empty identifier", () => {
+    render(<AddPlayerForm bookingId={34} />);
+
+    expect((screen.getByRole("button", { name: "Agregar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

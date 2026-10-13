@@ -14,7 +14,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
-vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch }));
+vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch, addPlayerToMatch: vi.fn() }));
 
 import { BookingState } from "@/src/domain/enums";
 import { BookingRow } from "@/app/my-bookings/booking-row";
@@ -235,6 +235,39 @@ describe("BookingRow", () => {
       render(<BookingRow booking={booking()} now={NOW} />);
 
       expect(screen.queryByRole("button", { name: /Compartir link/ })).toBeNull();
+    });
+  });
+
+  describe("add player (HU-40)", () => {
+    function openMatch(overrides: Partial<MyBookingItem> = {}) {
+      return booking({ matchId: 5, needPlayers: true, confirmedPlayers: 1, chatId: null, ...overrides });
+    }
+
+    it("lets a member of an open match add a registered player, even before the chat room exists", () => {
+      render(<BookingRow booking={openMatch()} now={NOW} />);
+
+      expect(screen.queryByLabelText("Email o teléfono del jugador")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Agregar jugador" }));
+
+      expect(screen.getByLabelText("Email o teléfono del jugador")).toBeTruthy();
+    });
+
+    it("also offers it on a full match, to replace a companion", () => {
+      render(<BookingRow booking={openMatch({ needPlayers: false, confirmedPlayers: 4 })} now={NOW} />);
+
+      expect(screen.getByRole("button", { name: "Agregar jugador" })).toBeTruthy();
+    });
+
+    it("does not offer it for a cancelled match", () => {
+      render(<BookingRow booking={openMatch({ bookingState: BookingState.CANCELLED })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: "Agregar jugador" })).toBeNull();
+    });
+
+    it("does not offer it for a regular booking without an open match", () => {
+      render(<BookingRow booking={booking()} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: "Agregar jugador" })).toBeNull();
     });
   });
 });

@@ -13,7 +13,6 @@ import { Player } from "@/src/entities/Player";
 import { getChatById, getChatMessages } from "@/src/actions/chat";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
 import { ChatRoom } from "./chat-room";
-import { InvitePanel } from "./invite-panel";
 import { SLOT_DURATION_MINUTES, formatLongDate } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 
@@ -46,12 +45,8 @@ export default async function ChatPage({
   // Solo los jugadores que se sumaron con su cuenta al partido pueden entrar a la sala.
   const isParticipant = player ? participants.some((participant) => participant.id === player.id) : false;
 
-  if (!player || !chat) {
+  if (!player || !chat || !isParticipant) {
     redirect("/my-bookings");
-  }
-  // Quien no participa todavía puede ver el partido abierto y sumarse desde ahí (HU-40).
-  if (!isParticipant) {
-    redirect(`/open-matches/${chat.booking.id}`);
   }
 
   const booking = chat.booking;
@@ -118,8 +113,6 @@ export default async function ChatPage({
             ))}
           </div>
         </div>
-
-        {chat.isClosed ? null : <InvitePanel chatId={chat.id} bookingId={chat.booking.id} />}
 
         <ChatRoom
           chatId={chat.id}
