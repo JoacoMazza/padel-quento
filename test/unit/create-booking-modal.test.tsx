@@ -48,6 +48,8 @@ describe("CreateBookingModal", () => {
     expect(screen.getByRole("heading", { name: "Nuevo turno" })).toBeTruthy();
     expect((screen.getByLabelText("Cancha") as HTMLSelectElement).value).toBe("11");
     expect((screen.getByLabelText("Fecha") as HTMLInputElement).value).toBe("2026-10-20");
+    // Día/mes/año, como lo leemos acá (el campo nativo depende del idioma del navegador).
+    expect(screen.getByText("20/10/2026")).toBeTruthy();
     await waitFor(() => expect((screen.getByLabelText("Hora") as HTMLSelectElement).value).toBe("19:30"));
     expect((screen.getByLabelText("Precio") as HTMLInputElement).value).toBe(formatPrice(25000));
   });

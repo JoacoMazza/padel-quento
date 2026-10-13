@@ -13,6 +13,7 @@ import {
   toBookingHolder,
   type HolderPlayerOption,
 } from "@/app/admin/holder-fields";
+import { DateField } from "@/app/admin/date-field";
 
 export type BookingCourtOption = { id: number; number: number; price: number };
 
@@ -138,19 +139,7 @@ export function CreateBookingModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="booking-date" className={LABEL_CLASS}>
-                Fecha
-              </label>
-              <input
-                id="booking-date"
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <DateField id="booking-date" label="Fecha" required value={date} onChange={setDate} />
             <div>
               <label htmlFor="booking-time" className={LABEL_CLASS}>
                 Hora

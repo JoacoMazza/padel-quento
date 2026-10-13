@@ -20,6 +20,7 @@ import {
   toBookingHolder,
   type HolderPlayerOption,
 } from "@/app/admin/holder-fields";
+import { DateField } from "@/app/admin/date-field";
 
 export type FixedBookingCourtOption = { id: number; number: number };
 export type FixedBookingPlayerOption = HolderPlayerOption;
@@ -367,19 +368,7 @@ function CreateFixedBookingModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="fixed-start-date" className={LABEL_CLASS}>
-                Fecha de inicio
-              </label>
-              <input
-                id="fixed-start-date"
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <DateField id="fixed-start-date" label="Fecha de inicio" required value={startDate} onChange={setStartDate} />
             <div>
               <label htmlFor="fixed-start-time" className={LABEL_CLASS}>
                 Hora
@@ -416,18 +405,7 @@ function CreateFixedBookingModal({
                 <option value={FixedBookingFrequency.BIWEEKLY}>Quincenal (cada 2 semanas)</option>
               </select>
             </div>
-            <div>
-              <label htmlFor="fixed-end-date" className={LABEL_CLASS}>
-                Fecha de fin (opcional)
-              </label>
-              <input
-                id="fixed-end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <DateField id="fixed-end-date" label="Fecha de fin (opcional)" value={endDate} onChange={setEndDate} />
           </div>
 
           <HolderFields idPrefix="fixed" players={players} value={holder} onChange={setHolder} />
