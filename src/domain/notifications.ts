@@ -1,4 +1,5 @@
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 /** Persona a la que se le avisa: cada canal usa el dato de contacto que le corresponde. */
 export type NotificationRecipient = {
@@ -37,9 +38,7 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "
 // Los turnos se guardan como hora de pared del club, así que se formatean con la hora local.
 function describeBooking(booking: NoticeBooking) {
   const day = DAY_FORMATTER.format(booking.fromDateTime).replace(",", "");
-  const hours = String(booking.fromDateTime.getHours()).padStart(2, "0");
-  const minutes = String(booking.fromDateTime.getMinutes()).padStart(2, "0");
-  return { day, time: `${hours}:${minutes}`, court: String(booking.courtNumber) };
+  return { day, time: dateToTimeLabel(booking.fromDateTime), court: String(booking.courtNumber) };
 }
 
 /** Turno cancelado porque la cancha quedó fuera de servicio. */

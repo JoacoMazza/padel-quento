@@ -11,10 +11,3 @@ export function formatDuration(minutes: number): string {
 export function formatPercent(ratio: number): string {
   return `${(ratio * 100).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
-
-/** Hora de un turno sin los minutos cuando es en punto (por ejemplo 9, 10:30, 12). */
-export function formatSlotTime(minutesOfDay: number): string {
-  const hours = Math.floor(minutesOfDay / 60);
-  const mins = minutesOfDay % 60;
-  return mins === 0 ? String(hours) : `${hours}:${String(mins).padStart(2, "0")}`;
-}
