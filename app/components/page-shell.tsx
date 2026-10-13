@@ -2,8 +2,9 @@ import { AppHeader, type HeaderActiveTab } from "@/app/components/app-header";
 import { AppFooter } from "@/app/components/app-footer";
 
 const WIDTH_CLASSES = {
-  wide: "max-w-7xl",
-  narrow: "max-w-5xl",
+  wide: "mx-auto max-w-7xl px-6 py-10 sm:py-12",
+  narrow: "mx-auto max-w-5xl px-6 py-10 sm:py-12",
+  full: "w-full px-0 py-0",
 } as const;
 
 /** Estructura común de las pantallas de jugador: header, contenido centrado y footer. */
@@ -28,7 +29,7 @@ export function PageShell({
         userRole={user?.role}
         guest={user === null}
       />
-      <main className={`mx-auto w-full flex-1 px-6 py-10 sm:py-12 ${WIDTH_CLASSES[width]}`}>{children}</main>
+      <main className={`w-full flex-1 ${WIDTH_CLASSES[width]}`}>{children}</main>
       <AppFooter />
     </div>
   );

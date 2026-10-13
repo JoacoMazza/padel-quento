@@ -8,8 +8,14 @@ function isPublicPath(pathname: string) {
   if (publicPaths.has(pathname)) {
     return true;
   }
-  // El navegador pide el manifest sin cookies de sesión.
-  return pathname.startsWith("/api/auth") || pathname === "/manifest.webmanifest";
+  // El navegador pide el manifest y recursos estáticos sin cookies de sesión.
+  return (
+    pathname.startsWith("/api/auth") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname.startsWith("/material_landing/") ||
+    pathname === "/favicon.ico" ||
+    /\.(mp4|jpg|jpeg|png|gif|webp|svg|ico)$/i.test(pathname)
+  );
 }
 
 /**

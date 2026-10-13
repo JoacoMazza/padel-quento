@@ -30,12 +30,18 @@ export default async function Home() {
     }));
 
   return (
-    <PageShell active="/" user={isGuest ? null : session.user}>
+    <PageShell active="/" user={isGuest ? null : session.user} width="full">
       <Landing
         userName={isGuest ? null : (session.user.name ?? null)}
         isGuest={isGuest}
         courtCount={activeCourts.length}
         hours={summarizeClubHours(schedules)}
+        courts={activeCourts.map((c) => ({
+          id: c.id,
+          number: c.number,
+          price: c.price,
+          state: c.state,
+        }))}
       />
     </PageShell>
   );

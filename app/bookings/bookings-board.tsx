@@ -40,7 +40,7 @@ function capitalize(value: string) {
 }
 
 /** Turno que se había elegido antes de ir a iniciar sesión (llega en la URL de /bookings). */
-export type InitialSelection = { date: string; courtId: number; time: string };
+export type InitialSelection = { date: string; courtId: number; time: string; isOpenMatch?: boolean };
 
 /** Login que, al terminar, vuelve a /bookings con el mismo turno elegido. */
 function loginUrlFor(courtId: number, start: Date) {
@@ -114,7 +114,7 @@ export function BookingsBoard({
   );
   const [courtFilter, setCourtFilter] = useState<string>("all");
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(initialPick?.slot ?? null);
-  const [isOpenMatch, setIsOpenMatch] = useState(false);
+  const [isOpenMatch, setIsOpenMatch] = useState(() => initialSelection?.isOpenMatch ?? false);
   const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
   const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(initialPick?.openMatch ?? null);
   const [joinGroupSize, setJoinGroupSize] = useState(1);
