@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, UserPlus, Users, X } from "lucide-react";
 import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
+import { ShareLinkButton } from "@/app/components/share-link-button";
+import { AddPlayerForm } from "@/app/open-matches/add-player-form";
 import { BookingState } from "@/src/domain/enums";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { isLateCancellation } from "@/src/domain/late-cancellation";
@@ -47,6 +49,7 @@ export function BookingRow({
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<"cancel" | "close" | "leave" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
@@ -58,6 +61,13 @@ export function BookingRow({
     booking.joinedAsParticipant &&
     booking.matchId !== null &&
     playerId !== null;
+  // El link del partido abierto se comparte desde que se crea y mientras busque
+  // jugadores, aunque todavía no exista la sala de chat (HU-40).
+  const canShare = tone === "pending" && booking.matchId !== null;
+  // Agregar jugadores registrados: también con el partido completo, para
+  // reemplazar a un acompañante sin cuenta (cada fila es un partido del que
+  // el jugador es miembro).
+  const canAddPlayer = (tone === "pending" || tone === "confirmed") && booking.matchId !== null;
   // El cierre manual es una acción del creador del partido, no de quien se sumó.
   const canCloseManually =
     booking.needPlayers &&
@@ -221,6 +231,18 @@ export function BookingRow({
                 Ver detalle
               </Link>
             ) : null}
+            {canShare ? <ShareLinkButton path={`/open-matches/${booking.id}`} /> : null}
+            {canAddPlayer ? (
+              <button
+                type="button"
+                onClick={() => setShowAddPlayer((value) => !value)}
+                aria-expanded={showAddPlayer}
+                className="btn btn-outline btn-sm"
+              >
+                <UserPlus className="h-4 w-4" />
+                Agregar jugador
+              </button>
+            ) : null}
             {booking.chatId !== null ? (
               <Link href={`/chats/${booking.chatId}`} className="btn btn-outline btn-sm">
                 <MessageCircle className="h-4 w-4" />
@@ -262,6 +284,11 @@ export function BookingRow({
             ) : null}
           </div>
         )}
+        {canAddPlayer && showAddPlayer && !pendingAction ? (
+          <div className="w-full sm:max-w-sm">
+            <AddPlayerForm bookingId={booking.id} />
+          </div>
+        ) : null}
       </div>
     </div>
   );

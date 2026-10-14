@@ -7,7 +7,9 @@ import { PageShell } from "@/app/components/page-shell";
 import { Avatar } from "@/app/components/ui/avatar";
 import { CLUB_LOCATION } from "@/app/components/club-info";
 import { JoinMatchCard } from "@/app/open-matches/[bookingId]/join-match-card";
-import { anonymizeOpenMatch, toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import { anonymizeOpenMatch, inviteOptions, toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import { AddPlayerForm } from "@/app/open-matches/add-player-form";
+import { ShareLinkButton } from "@/app/components/share-link-button";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
@@ -38,6 +40,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
   const timeRange = `${dateToTimeLabel(detail.start)} – ${dateToTimeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
   const emptySpots = detail.status === "open" ? detail.remainingSpots : 0;
+  const invite = inviteOptions(detail);
 
   return (
     <PageShell active="/open-matches" user={isGuest ? null : session.user}>
@@ -163,19 +166,34 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
           </section>
         </div>
 
-        <JoinMatchCard
-          bookingId={detail.bookingId}
-          isGuest={isGuest}
-          courtNumber={detail.courtNumber}
-          timeRange={timeRange}
-          dateLabel={formatLongDate(detail.start)}
-          price={detail.price}
-          remainingSpots={detail.remainingSpots}
-          status={detail.status}
-          alreadyJoined={detail.alreadyJoined}
-          chatId={detail.chatId}
-          hasCategory={await playerHasCategory(playerId)}
-        />
+        <div className="flex flex-col gap-6">
+          <JoinMatchCard
+            bookingId={detail.bookingId}
+            isGuest={isGuest}
+            courtNumber={detail.courtNumber}
+            timeRange={timeRange}
+            dateLabel={formatLongDate(detail.start)}
+            price={detail.price}
+            remainingSpots={detail.remainingSpots}
+            status={detail.status}
+            alreadyJoined={detail.alreadyJoined}
+            chatId={detail.chatId}
+            hasCategory={await playerHasCategory(playerId)}
+          />
+
+          {invite.canShare || invite.canAddPlayer ? (
+            <section className="card flex flex-col gap-4 p-6">
+              <div>
+                <h2 className="label-caps">Invitar jugadores</h2>
+                <p className="mt-1 text-sm text-foreground/60">
+                  Compartí el link del partido o agregá a un jugador registrado por su email o teléfono.
+                </p>
+              </div>
+              {invite.canShare ? <ShareLinkButton path={`/open-matches/${detail.bookingId}`} /> : null}
+              {invite.canAddPlayer ? <AddPlayerForm bookingId={detail.bookingId} /> : null}
+            </section>
+          ) : null}
+        </div>
       </div>
     </PageShell>
   );

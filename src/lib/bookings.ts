@@ -14,7 +14,7 @@ import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
-import { OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
+import { JOIN_MATCH_LOCK_CLASS, OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { notifyPlayerJoined } from "@/src/lib/match-notifications";
@@ -69,10 +69,6 @@ const categoryMismatchMessage = (category: PlayerCategory) =>
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
-
-// Namespace distinto (forma de dos claves) al lock por cancha de createBooking/updateBooking,
-// para que un bookingId nunca contienda con un courtId que tenga el mismo número.
-const JOIN_MATCH_LOCK_CLASS = 42;
 
 export class DoubleBookingError extends Error {}
 class InvalidGroupSizeError extends Error {}

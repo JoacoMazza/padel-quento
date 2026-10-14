@@ -84,6 +84,19 @@ export function toOpenMatchDetail(booking: Booking, playerId: number | null, now
   };
 }
 
+/**
+ * Qué se ofrece en el detalle del partido para sumar gente (HU-40): cualquier
+ * jugador puede compartir el link mientras el partido busca jugadores, y solo
+ * sus miembros pueden agregar jugadores registrados, también con el partido
+ * completo (para reemplazar a un acompañante sin cuenta).
+ */
+export function inviteOptions(detail: OpenMatchDetail): { canShare: boolean; canAddPlayer: boolean } {
+  return {
+    canShare: detail.status === "open",
+    canAddPlayer: detail.alreadyJoined && (detail.status === "open" || detail.status === "full"),
+  };
+}
+
 /** Partidos que todavía buscan jugadores y no empezaron, del más próximo al más lejano. */
 export function listOpenMatches(bookings: Booking[], playerId: number | null, now: Date): OpenMatchItem[] {
   return bookings
