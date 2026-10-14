@@ -11,7 +11,7 @@ import {
 import { getDataSource } from "@/src/lib/db";
 import { Booking } from "@/src/entities/Booking";
 import { FixedBookingDate } from "@/src/entities/FixedBookingDate";
-import { createCourt, updateCourt } from "@/src/actions/court";
+import { updateCourt } from "@/src/actions/court";
 import { createSchedule } from "@/src/actions/schedule";
 import { createPlayer } from "@/src/actions/player";
 import { updateBooking } from "@/src/actions/booking";
@@ -24,7 +24,7 @@ import {
   releaseFixedBookingDate,
   restoreFixedBookingDate,
 } from "@/src/actions/fixedBooking";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestAdmin, createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const { notify } = vi.hoisted(() => ({ notify: vi.fn(async () => {}) }));
 vi.mock("@/src/lib/notifications", () => ({ notify }));
@@ -34,8 +34,14 @@ import { getServerSession } from "next-auth/next";
 
 type NotifyCall = [NotificationRecipient[], (recipient: NotificationRecipient) => NotificationMessage];
 
+// El admin de la sesión es un dueño real: dar de baja una cancha es solo para el dueño.
+let adminEmail = "";
+beforeAll(async () => {
+  adminEmail = (await createTestAdmin()).email;
+});
+
 function mockSession(role: Role) {
-  vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role } } as never);
+  vi.mocked(getServerSession).mockResolvedValue({ user: { email: adminEmail, role } } as never);
 }
 
 const ALL_DAYS = Object.values(DayOfWeek);
@@ -52,7 +58,7 @@ describe("turnos fijos (integración con Postgres real)", () => {
 
   async function newCourt(price = 20000) {
     const number = uniqueCourtNumber();
-    const court = await createCourt({ number, price });
+    const court = await createTestCourt({ number, price });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     for (const dayOfWeek of ALL_DAYS) {
       await createSchedule({

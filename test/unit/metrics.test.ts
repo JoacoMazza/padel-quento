@@ -18,6 +18,11 @@ const { finds, getDataSource } = vi.hoisted(() => {
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+// Sin base de datos: el chequeo de dueño (contra la base) se prueba en los tests de integración.
+vi.mock("@/src/lib/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/lib/rbac")>();
+  return { ...actual, requireOwner: vi.fn(async () => ({ ...(await actual.requireAdmin()), adminId: 1 })) };
+});
 
 import { getServerSession } from "next-auth/next";
 import { BookingState, DayOfWeek, Role } from "@/src/domain/enums";

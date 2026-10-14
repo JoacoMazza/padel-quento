@@ -15,6 +15,11 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+// Sin base de datos: el chequeo de dueño (contra la base) se prueba en los tests de integración.
+vi.mock("@/src/lib/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/lib/rbac")>();
+  return { ...actual, requireOwner: vi.fn(async () => ({ ...(await actual.requireAdmin()), adminId: 1 })) };
+});
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 
 import { getServerSession } from "next-auth/next";
@@ -40,6 +45,8 @@ describe("court actions", () => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    // Por defecto, un admin (que en estos tests pasa también como dueño; ver el mock de rbac).
+    signInAs(Role.ADMIN);
   });
 
   describe("createCourt", () => {
@@ -150,7 +157,8 @@ describe("court actions", () => {
 
       const result = await updateCourt(1, { price: 15000 });
 
-      expect(result).toEqual({ success: false, error: "No se pudo actualizar la cancha." });
+      // Ahora se muestra el motivo: no tiene permisos de administrador.
+      expect(result).toEqual({ success: false, error: "Acceso denegado: Se requieren permisos de Administrador" });
       expect(findOne).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });
@@ -216,7 +224,7 @@ describe("court actions", () => {
 
       const result = await updateAllCourtsPrice(15000);
 
-      expect(result).toEqual({ success: false, error: "No se pudo actualizar el precio de las canchas." });
+      expect(result).toEqual({ success: false, error: "Acceso denegado: Se requieren permisos de Administrador" });
       expect(save).not.toHaveBeenCalled();
     });
   });

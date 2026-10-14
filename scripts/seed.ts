@@ -5,7 +5,7 @@ import { Schedule } from "@/src/entities/Schedule";
 import { Account } from "@/src/entities/Account";
 import { Admin } from "@/src/entities/Admin";
 import { Player } from "@/src/entities/Player";
-import { CourtState, DayOfWeek } from "@/src/domain/enums";
+import { AdminAccessLevel, CourtState, DayOfWeek } from "@/src/domain/enums";
 
 const COURT_COUNT = 8;
 const OPENING_TIME = "09:00:00";
@@ -72,7 +72,10 @@ async function main() {
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash("admin123", 12);
     const account = await accounts.save(accounts.create({ email: adminEmail, passwordHash }));
-    await admins.save(admins.create({ account, names: "Administrador", lastnames: "Quento", dni: 30111222 }));
+    // El admin del seed es el dueño: puede crear al resto del equipo desde el panel.
+    await admins.save(
+      admins.create({ account, names: "Administrador", lastnames: "Quento", dni: 30111222, accessLevel: AdminAccessLevel.OWNER }),
+    );
     console.log("Usuario Administrador creado: admin@quento.com / admin123");
   }
 

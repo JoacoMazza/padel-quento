@@ -10,7 +10,7 @@ import { BookingState } from "@/src/domain/enums";
 import type { OccupancyInput } from "@/src/domain/occupancy";
 import { getDataSource } from "@/src/lib/db";
 import type { ActionResult } from "@/src/lib/action-result";
-import { requireAdmin } from "@/src/lib/rbac";
+import { ForbiddenError, UnauthorizedError, requireOwner } from "@/src/lib/rbac";
 
 export type OccupancyReportData = Omit<OccupancyInput, "from" | "to">;
 
@@ -26,7 +26,8 @@ export async function getOccupancyReportData(range: {
   to: Date;
 }): Promise<ActionResult<OccupancyReportData>> {
   try {
-    await requireAdmin();
+    // Métricas y reportes son solo para el dueño del complejo.
+    await requireOwner();
     if (range.from.getTime() > range.to.getTime()) {
       return { success: false, error: "El rango de fechas no es válido." };
     }
@@ -70,6 +71,9 @@ export async function getOccupancyReportData(range: {
       },
     };
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof UnauthorizedError) {
+      return { success: false, error: error.message };
+    }
     console.error("getOccupancyReportData", error);
     return { success: false, error: "No se pudieron obtener las métricas de ocupación." };
   }

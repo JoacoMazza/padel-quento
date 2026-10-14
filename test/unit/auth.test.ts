@@ -67,14 +67,14 @@ describe("authorize (CredentialsProvider)", () => {
       id: 7,
       email: "a@test.com",
       passwordHash: "hash",
-      admin: { id: 1, names: "Ana", lastnames: "Gomez" },
+      admin: { id: 1, names: "Ana", lastnames: "Gomez", accessLevel: "owner" },
       player: null,
     });
     vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
 
     const result = await getAuthorize()({ email: "  A@Test.com ", password: "correcta" });
 
-    expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin" });
+    expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin", isOwner: true });
     expect(findOne).toHaveBeenCalledWith({
       where: { email: "a@test.com" },
       relations: { admin: true, player: true },
@@ -93,7 +93,7 @@ describe("authorize (CredentialsProvider)", () => {
 
     const result = await getAuthorize()({ email: "j@test.com", password: "correcta" });
 
-    expect(result).toEqual({ id: "8", email: "j@test.com", name: "Luis Pérez", role: "player" });
+    expect(result).toEqual({ id: "8", email: "j@test.com", name: "Luis Pérez", role: "player", isOwner: false });
   });
 
   it("devuelve null cuando el usuario tiene isBlocked = true (aunque la contraseña sea correcta)", async () => {

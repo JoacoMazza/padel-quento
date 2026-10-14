@@ -1,7 +1,18 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import bcrypt from "bcrypt";
+import { AdminAccessLevel, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createAdmin, getAdmins, getAdminById, updateAdmin, deleteAdmin } from "@/src/actions/admin";
+import { createAdmin, getAdmins, getAdminById, getTeam, updateAdmin, deleteAdmin } from "@/src/actions/admin";
+import { createTestAdmin } from "./helpers";
+
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
+import { getServerSession } from "next-auth/next";
+
+function signInAs(email: string | null) {
+  vi.mocked(getServerSession).mockResolvedValue(email ? ({ user: { email, role: Role.ADMIN } } as never) : null);
+}
+
+const OWNER_ONLY = "Solo el dueño del complejo puede hacer esto.";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -13,6 +24,19 @@ function uniqueDni() {
 }
 
 describe("admin actions (integración con Postgres real)", () => {
+  // Gestionar administradores es solo para el dueño del complejo.
+  let owner: { id: number; email: string };
+  let staff: { id: number; email: string };
+
+  beforeAll(async () => {
+    owner = await createTestAdmin(AdminAccessLevel.OWNER);
+    staff = await createTestAdmin(AdminAccessLevel.STAFF);
+  });
+
+  beforeEach(() => {
+    signInAs(owner.email);
+  });
+
   afterAll(async () => {
     const dataSource = await getDataSource();
     await dataSource.destroy();
@@ -136,5 +160,85 @@ describe("admin actions (integración con Postgres real)", () => {
 
     const secondAttempt = await deleteAdmin(created.data.id);
     expect(secondAttempt).toEqual({ success: false, error: "El administrador no existe." });
+  });
+
+  describe("dueño y trabajadores", () => {
+    it("un administrador nuevo es trabajador, salvo que se lo cree como dueño", async () => {
+      const worker = await createAdmin({ email: uniqueEmail("trabajador"), password: "secreto123", names: "T", lastnames: "B", dni: uniqueDni() });
+      const partner = await createAdmin({
+        email: uniqueEmail("socio"),
+        password: "secreto123",
+        names: "S",
+        lastnames: "D",
+        dni: uniqueDni(),
+        accessLevel: AdminAccessLevel.OWNER,
+      });
+
+      expect(worker.success && worker.data.accessLevel).toBe(AdminAccessLevel.STAFF);
+      expect(partner.success && partner.data.accessLevel).toBe(AdminAccessLevel.OWNER);
+    });
+
+    it("el dueño puede cambiarle el nivel a otro administrador", async () => {
+      const created = await createAdmin({ email: uniqueEmail("ascenso"), password: "secreto123", names: "A", lastnames: "B", dni: uniqueDni() });
+      if (!created.success) throw new Error(created.error);
+
+      const result = await updateAdmin(created.data.id, { accessLevel: AdminAccessLevel.OWNER });
+
+      expect(result.success && result.data.accessLevel).toBe(AdminAccessLevel.OWNER);
+    });
+
+    it("un trabajador no puede gestionar administradores", async () => {
+      signInAs(staff.email);
+
+      const results = [
+        await createAdmin({ email: uniqueEmail("intruso"), password: "secreto123", names: "I", lastnames: "N", dni: uniqueDni() }),
+        await getAdmins(),
+        await getAdminById(owner.id),
+        await updateAdmin(staff.id, { accessLevel: AdminAccessLevel.OWNER }),
+        await deleteAdmin(owner.id),
+      ];
+
+      expect(results).toEqual(Array(5).fill({ success: false, error: OWNER_ONLY }));
+    });
+
+    it("sin sesión no se puede gestionar administradores", async () => {
+      signInAs(null);
+
+      const result = await createAdmin({ email: uniqueEmail("anonimo"), password: "secreto123", names: "A", lastnames: "N", dni: uniqueDni() });
+
+      expect(result.success).toBe(false);
+      const dataSource = await getDataSource();
+      expect(await dataSource.getRepository("Admin").count({ where: { names: "A", lastnames: "N" } })).toBe(0);
+    });
+
+    it("lista el equipo con su nivel, marcando al propio dueño y sin datos de la cuenta", async () => {
+      const result = await getTeam();
+
+      if (!result.success) throw new Error(result.error);
+      const me = result.data.find((member) => member.id === owner.id);
+      const worker = result.data.find((member) => member.id === staff.id);
+      expect(me).toMatchObject({ email: owner.email, accessLevel: AdminAccessLevel.OWNER, isSelf: true });
+      expect(worker).toMatchObject({ email: staff.email, accessLevel: AdminAccessLevel.STAFF, isSelf: false });
+      expect(Object.keys(me!)).not.toContain("passwordHash");
+      expect(JSON.stringify(result.data)).not.toContain("passwordHash");
+    });
+
+    it("un trabajador no puede ver el equipo", async () => {
+      signInAs(staff.email);
+
+      expect(await getTeam()).toEqual({ success: false, error: OWNER_ONLY });
+    });
+
+    it("el dueño no puede darse de baja a sí mismo", async () => {
+      const result = await deleteAdmin(owner.id);
+
+      expect(result).toEqual({ success: false, error: "No podés darte de baja a vos mismo." });
+    });
+
+    it("el dueño no puede cambiar su propio nivel", async () => {
+      const result = await updateAdmin(owner.id, { accessLevel: AdminAccessLevel.STAFF });
+
+      expect(result).toEqual({ success: false, error: "No podés cambiar tu propio nivel de acceso." });
+    });
   });
 });

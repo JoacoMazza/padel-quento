@@ -14,7 +14,7 @@ import {
 import { LATE_CANCELLATION_REASON, LATE_LEAVE_REASON } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import type { ActionResult } from "@/src/lib/action-result";
-import { requireAdmin } from "@/src/lib/rbac";
+import { ForbiddenError, UnauthorizedError, requireOwner } from "@/src/lib/rbac";
 
 // Solo los datos del jugador que muestra el reporte, ya como objeto plano.
 function toReportPlayer(player: ReportPlayer): ReportPlayer {
@@ -32,7 +32,8 @@ function toReportPlayer(player: ReportPlayer): ReportPlayer {
  */
 export async function getAttendanceReport(range: { from: Date; to: Date }): Promise<ActionResult<AttendanceReport>> {
   try {
-    await requireAdmin();
+    // Métricas y reportes son solo para el dueño del complejo.
+    await requireOwner();
     if (range.from.getTime() > range.to.getTime()) {
       return { success: false, error: "El rango de fechas no es válido." };
     }
@@ -75,6 +76,9 @@ export async function getAttendanceReport(range: { from: Date; to: Date }): Prom
       }),
     };
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof UnauthorizedError) {
+      return { success: false, error: error.message };
+    }
     console.error("getAttendanceReport", error);
     return { success: false, error: "No se pudo generar el reporte de asistencia." };
   }

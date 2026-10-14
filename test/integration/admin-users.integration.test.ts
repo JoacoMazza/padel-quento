@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getDataSource } from "@/src/lib/db";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import {
   getPlayersAdmin,
   getPlayerRecordAdmin,
@@ -8,7 +8,6 @@ import {
   unblockPlayer,
   createPlayer,
 } from "@/src/actions/player";
-import { createCourt } from "@/src/actions/court";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
 import { recordPointsMovement } from "@/src/actions/profile";
 import { BookingState, Role, PlayerCategory } from "@/src/domain/enums";
@@ -138,7 +137,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     expect(result).toEqual({ success: false, error: "El jugador no existe." });
   });
   it("getPlayerRecordAdmin devuelve el historial de reservas, inasistencias y puntos del jugador", async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     const courtId = court.data.id;
 
