@@ -4,6 +4,7 @@ import type { Booking } from "@/src/entities/Booking";
 import {
   anonymizeOpenMatch,
   anonymizeOpenMatchItem,
+  inviteOptions,
   listOpenMatches,
   matchesOpenMatchFilter,
   toOpenMatchDetail,
@@ -201,5 +202,31 @@ describe("vista de partidos abiertos para visitantes sin sesión", () => {
     ]);
     expect(JSON.stringify(anonymous)).not.toMatch(/Martín|Prado|Lucía|Gómez/);
     expect(anonymous.remainingSpots).toBe(detail.remainingSpots);
+  });
+});
+
+describe("inviteOptions (HU-40)", () => {
+  // Player 1 is the creator (member); player 99 is any other logged-in player.
+  function options(viewerId: number, overrides: Parameters<typeof booking>[0] = {}) {
+    const detail = toOpenMatchDetail(booking(overrides), viewerId, NOW);
+    if (!detail) throw new Error("expected an open match");
+    return inviteOptions(detail);
+  }
+
+  it("lets members share the link and add players while the match looks for players", () => {
+    expect(options(1)).toEqual({ canShare: true, canAddPlayer: true });
+  });
+
+  it("lets any player share the link of an open match, but only members add players", () => {
+    expect(options(99)).toEqual({ canShare: true, canAddPlayer: false });
+  });
+
+  it("lets members add players to a full match (replacing a companion), without sharing it", () => {
+    expect(options(1, { needPlayers: false })).toEqual({ canShare: false, canAddPlayer: true });
+  });
+
+  it("offers neither once the match is cancelled or has started", () => {
+    expect(options(1, { bookingState: BookingState.CANCELLED })).toEqual({ canShare: false, canAddPlayer: false });
+    expect(options(1, { fromDateTime: new Date(2026, 9, 12, 9, 0) })).toEqual({ canShare: false, canAddPlayer: false });
   });
 });

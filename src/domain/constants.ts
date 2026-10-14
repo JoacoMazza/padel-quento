@@ -2,6 +2,14 @@
 export const OPEN_MATCH_MAX_PLAYERS = 4;
 
 /**
+ * Clave del advisory lock (pg_advisory_xact_lock(clase, bookingId)) que serializa
+ * las altas de jugadores en un mismo partido, para no pasarse del cupo máximo.
+ * Namespace distinto (forma de dos claves) al lock por cancha de las reservas,
+ * para que un bookingId nunca contienda con un courtId que tenga el mismo número.
+ */
+export const JOIN_MATCH_LOCK_CLASS = 42;
+
+/**
  * Antelación mínima, en horas, para crear un partido abierto. Por debajo de este
  * umbral no alcanzaría tiempo para sumar jugadores, así que solo se permiten
  * reservas completas. El mismo umbral usa el proceso que cancela automáticamente
