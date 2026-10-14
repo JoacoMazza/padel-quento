@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const { push, createBooking, joinOpenMatch } = vi.hoisted(() => ({
+  push: vi.fn(),
+  createBooking: vi.fn(),
+  joinOpenMatch: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
-vi.mock("@/src/actions/booking", () => ({ createBooking: vi.fn(), joinOpenMatch: vi.fn() }));
+vi.mock("@/src/actions/booking", () => ({ createBooking, joinOpenMatch }));
 
 import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
@@ -27,12 +33,13 @@ const openMatch = {
   matchPlayerIds: [9],
 };
 
-function renderBoard({ hasCategory = true }: { hasCategory?: boolean } = {}) {
+function renderBoard(props: Partial<React.ComponentProps<typeof BookingsBoard>> = {}) {
   return render(
     <BookingsBoard
       playerId={7}
-      bookerId={7}
-      hasCategory={hasCategory}
+      isGuest={false}
+      hasCategory
+      {...props}
       courts={courts}
       schedules={schedules}
       bookings={[openMatch]}
@@ -43,6 +50,7 @@ function renderBoard({ hasCategory = true }: { hasCategory?: boolean } = {}) {
 
 describe("BookingsBoard", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     // Lunes 12/10/2026 a las 10:00: todos los turnos del día siguen disponibles.
     vi.setSystemTime(new Date(2026, 9, 12, 10, 0));
@@ -101,7 +109,7 @@ describe("BookingsBoard", () => {
     render(
       <BookingsBoard
         playerId={7}
-        bookerId={7}
+        isGuest={false}
         hasCategory
         courts={courts}
         schedules={schedules}
@@ -213,5 +221,60 @@ describe("BookingsBoard", () => {
     expect(screen.queryByRole("button", { name: "Sumarme al partido" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Reservar turno/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
+  });
+
+  describe("visitante sin sesión", () => {
+    const loginFor = (bookingsUrl: string) => `/login?callbackUrl=${encodeURIComponent(bookingsUrl)}`;
+
+    it("al reservar lo manda a iniciar sesión, con el turno elegido para volver, sin llamar a la reserva", () => {
+      renderBoard({ playerId: null, isGuest: true });
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+      fireEvent.click(screen.getByRole("button", { name: /Reservar turno/ }));
+
+      expect(push).toHaveBeenCalledWith(loginFor("/bookings?date=2026-10-12&court=1&time=18:00"));
+      expect(createBooking).not.toHaveBeenCalled();
+    });
+
+    it("al sumarse a un partido abierto lo manda a iniciar sesión, sin llamar a la acción", () => {
+      renderBoard({ playerId: null, isGuest: true });
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sumarme al partido" }));
+
+      expect(push).toHaveBeenCalledWith(loginFor("/bookings?date=2026-10-12&court=1&time=19:30"));
+      expect(joinOpenMatch).not.toHaveBeenCalled();
+    });
+  });
+
+  it("con sesión reserva sin mandar a nombre de quién: lo define el servidor", async () => {
+    createBooking.mockResolvedValue({ success: true, data: {} });
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+    fireEvent.click(screen.getByRole("button", { name: /Reservar turno/ }));
+
+    await waitFor(() => expect(createBooking).toHaveBeenCalled());
+    expect(createBooking.mock.calls[0][0]).not.toHaveProperty("bookerId");
+    expect(createBooking.mock.calls[0][0]).toMatchObject({ courtId: 1, fromDateTime: new Date(2026, 9, 12, 18, 0) });
+  });
+
+  it("al volver del login deja elegido el turno que había seleccionado", () => {
+    renderBoard({ initialSelection: { date: "2026-10-12", courtId: 1, time: "18:00" } });
+
+    expect(screen.getByRole("button", { name: "Cancha 1, 18:00, seleccionado" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Reservar turno/ })).toBeTruthy();
+  });
+
+  it("al volver del login deja elegido el partido abierto al que se quería sumar", () => {
+    renderBoard({ initialSelection: { date: "2026-10-12", courtId: 1, time: "19:30" } });
+
+    expect(screen.getByRole("button", { name: "Sumarme al partido" })).toBeTruthy();
+  });
+
+  it("ignora un turno elegido que ya no está disponible", () => {
+    renderBoard({ initialSelection: { date: "2026-10-12", courtId: 1, time: "07:00" } });
+
+    expect(screen.queryByRole("button", { name: /Reservar turno/ })).toBeNull();
   });
 });

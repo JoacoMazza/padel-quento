@@ -19,7 +19,7 @@ const CLOSED_MESSAGES: Record<Exclude<OpenMatchStatus, "open">, string> = {
 /** Panel lateral del detalle de un partido abierto para sumarse (ver joinOpenMatch). */
 export function JoinMatchCard({
   bookingId,
-  playerId,
+  isGuest,
   courtNumber,
   timeRange,
   dateLabel,
@@ -31,7 +31,8 @@ export function JoinMatchCard({
   hasCategory,
 }: {
   bookingId: number;
-  playerId: number | null;
+  /** Visitante sin sesión: sumarse lo manda a iniciar sesión y a volver a este partido. */
+  isGuest: boolean;
   courtNumber: number;
   timeRange: string;
   dateLabel: string;
@@ -49,14 +50,14 @@ export function JoinMatchCard({
   const [error, setError] = useState<string | null>(null);
 
   function handleJoin() {
-    if (!playerId) {
-      setError("Tu cuenta no puede sumarse a partidos.");
+    if (isGuest) {
+      router.push(`/login?callbackUrl=${encodeURIComponent(`/open-matches/${bookingId}`)}`);
       return;
     }
 
     setError(null);
     startTransition(async () => {
-      const result = await joinOpenMatch({ bookingId, playerId, groupSize });
+      const result = await joinOpenMatch({ bookingId, groupSize });
       if (!result.success) {
         setError(result.error);
         return;

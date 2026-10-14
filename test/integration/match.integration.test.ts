@@ -3,9 +3,10 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById } from "@/src/actions/booking";
+import { getBookingById } from "@/src/actions/booking";
 import { closeMatch, cancelExpiredMatches } from "@/src/actions/match";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -50,7 +51,7 @@ describe("match actions (integración con Postgres real)", () => {
   });
 
   async function createOpenMatch(fromDateTime: Date, groupSize = 2) {
-    const created = await createBooking({ fromDateTime, bookerId, courtId, groupSize });
+    const created = await createBookingForPlayer({ fromDateTime, bookerId, courtId, groupSize });
     if (!created.success) throw new Error("expected success");
 
     const found = await getBookingById(created.data.id);

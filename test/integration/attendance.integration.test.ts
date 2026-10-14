@@ -19,7 +19,7 @@ import {
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
+import { getBookingById } from "@/src/actions/booking";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
 import {
   setBookingAttendance,
@@ -27,6 +27,7 @@ import {
   awardAttendancePoints,
 } from "@/src/actions/attendance";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -101,7 +102,7 @@ describe("attendance actions (integración con Postgres real)", () => {
   describe("setBookingAttendance", () => {
     it("marca la asistencia de un turno sin partido abierto", async () => {
       const player = await createTestPlayer("asistencia-simple");
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: player.bookerId,
         courtId,
@@ -121,7 +122,7 @@ describe("attendance actions (integración con Postgres real)", () => {
 
     it("devuelve error si el turno tiene un partido abierto asociado", async () => {
       const player = await createTestPlayer("asistencia-abierto");
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: player.bookerId,
         courtId,
@@ -146,7 +147,7 @@ describe("attendance actions (integración con Postgres real)", () => {
 
     it("devuelve error si el usuario no es admin", async () => {
       const player = await createTestPlayer("asistencia-no-admin");
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: player.bookerId,
         courtId,
@@ -164,7 +165,7 @@ describe("attendance actions (integración con Postgres real)", () => {
   describe("setMatchPlayerAttendance", () => {
     it("marca la asistencia de un jugador puntual de un partido abierto", async () => {
       const creator = await createTestPlayer("mp-creador");
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: creator.bookerId,
         courtId,
@@ -199,7 +200,7 @@ describe("attendance actions (integración con Postgres real)", () => {
     it("acredita los puntos al jugador de un turno simple ya finalizado", async () => {
       const player = await createTestPlayer("puntos-simple");
       const past = uniquePastFromDateTime();
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: past,
         durationMinutes: 90,
         bookerId: player.bookerId,
@@ -224,7 +225,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       // Con saldo 0 no habría nada que descontar (el piso es 0).
       await recordPointsMovement(player.id, 50, "bonus", "Puntos iniciales de prueba");
       const past = uniquePastFromDateTime();
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: past,
         durationMinutes: 90,
         bookerId: player.bookerId,
@@ -250,7 +251,7 @@ describe("attendance actions (integración con Postgres real)", () => {
     it("no procesa turnos cancelados ni turnos futuros", async () => {
       const player = await createTestPlayer("puntos-cancelado");
       const past = uniquePastFromDateTime();
-      const cancelled = await createBooking({
+      const cancelled = await createBookingForPlayer({
         fromDateTime: past,
         durationMinutes: 90,
         bookerId: player.bookerId,
@@ -259,7 +260,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       });
       if (!cancelled.success) throw new Error("expected success");
 
-      const future = await createBooking({
+      const future = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         durationMinutes: 90,
         bookerId: player.bookerId,
@@ -280,7 +281,7 @@ describe("attendance actions (integración con Postgres real)", () => {
     it("no acredita puntos dos veces al correr el job otra vez sobre el mismo turno", async () => {
       const player = await createTestPlayer("puntos-idempotente");
       const past = uniquePastFromDateTime();
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: past,
         durationMinutes: 90,
         bookerId: player.bookerId,
@@ -312,7 +313,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       // arrastrar de paso los turnos "a 30 días" que crean otros tests de este
       // archivo (que seguirían sin finalizar en ese momento simulado).
       const startTime = new Date(Date.now() + (OPEN_MATCH_MIN_HOURS_BEFORE_START + 1) * 60 * 60_000);
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: startTime,
         bookerId: creator.bookerId,
         courtId,
@@ -320,7 +321,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       });
       if (!created.success) throw new Error("expected success");
 
-      const joined = await joinOpenMatch({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
+      const joined = await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
       if (!joined.success) throw new Error("expected success");
 
       const found = await getBookingById(created.data.id);
@@ -356,7 +357,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       // Mismo esquema de horario cercano + fake timer que el test anterior. Se
       // desplaza unas horas más para no solapar con ese turno en la misma cancha.
       const startTime = new Date(Date.now() + (OPEN_MATCH_MIN_HOURS_BEFORE_START + 3) * 60 * 60_000);
-      const created = await createBooking({
+      const created = await createBookingForPlayer({
         fromDateTime: startTime,
         bookerId: creator.bookerId,
         courtId,
@@ -364,7 +365,7 @@ describe("attendance actions (integración con Postgres real)", () => {
       });
       if (!created.success) throw new Error("expected success");
 
-      const joined = await joinOpenMatch({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
+      const joined = await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
       if (!joined.success) throw new Error("expected success");
 
       vi.useFakeTimers();

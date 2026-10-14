@@ -1,52 +1,46 @@
 import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, Clock, LayoutGrid, Plus, Users } from "lucide-react";
 import { PageShell } from "@/app/components/page-shell";
 import { Avatar } from "@/app/components/ui/avatar";
 import { CLUB_LOCATION } from "@/app/components/club-info";
 import { JoinMatchCard } from "@/app/open-matches/[bookingId]/join-match-card";
-import { toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import { anonymizeOpenMatch, toOpenMatchDetail } from "@/app/open-matches/open-matches";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
-import { getDataSource } from "@/src/lib/db";
-import { Player } from "@/src/entities/Player";
+import { getSessionPlayerId, playerHasCategory } from "@/src/lib/session-player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
-import { PlayerCategory } from "@/src/domain/enums";
 
 export const metadata: Metadata = { title: "Partido abierto" };
 
 export default async function OpenMatchDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
+  // Se puede ver sin sesión (issue #55), pero sin los nombres de los jugadores ni el chat.
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const isGuest = !session?.user?.email;
 
   const { bookingId } = await params;
   const id = Number(bookingId);
   const result = Number.isInteger(id) ? await getBookingById(id) : null;
   const booking = result?.success ? result.data : null;
 
-  const dataSource = await getDataSource();
-  const player = await dataSource
-    .getRepository<Player>("Player")
-    .findOne({ where: { account: { email: session.user.email } } });
-
-  const detail = booking ? toOpenMatchDetail(booking, player?.id ?? null, new Date()) : null;
-  if (!detail) {
+  const playerId = isGuest ? null : await getSessionPlayerId();
+  const fullDetail = booking ? toOpenMatchDetail(booking, playerId, new Date()) : null;
+  if (!fullDetail) {
     notFound();
   }
+  const detail = isGuest ? anonymizeOpenMatch(fullDetail) : fullDetail;
 
   const timeRange = `${dateToTimeLabel(detail.start)} – ${dateToTimeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
   const emptySpots = detail.status === "open" ? detail.remainingSpots : 0;
 
   return (
-    <PageShell active="/open-matches" user={session.user}>
+    <PageShell active="/open-matches" user={isGuest ? null : session.user}>
       <Link
         href="/open-matches"
         className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-foreground/70 transition-colors hover:text-primary"
@@ -171,7 +165,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
 
         <JoinMatchCard
           bookingId={detail.bookingId}
-          playerId={player?.id ?? null}
+          isGuest={isGuest}
           courtNumber={detail.courtNumber}
           timeRange={timeRange}
           dateLabel={formatLongDate(detail.start)}
@@ -180,8 +174,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
           status={detail.status}
           alreadyJoined={detail.alreadyJoined}
           chatId={detail.chatId}
-          // Una cuenta sin jugador ya no puede sumarse: no hace falta pedirle categoría.
-          hasCategory={player?.category !== PlayerCategory.WITHOUT_CATEGORY}
+          hasCategory={await playerHasCategory(playerId)}
         />
       </div>
     </PageShell>

@@ -7,7 +7,7 @@ import { Booking } from "@/src/entities/Booking";
 import { createCourt, updateCourt } from "@/src/actions/court";
 import { createSchedule } from "@/src/actions/schedule";
 import { blockPlayer, createPlayer } from "@/src/actions/player";
-import { createBooking } from "@/src/actions/booking";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 import { createOutOfService } from "@/src/actions/outOfService";
 import { createBookingAdmin, getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
@@ -132,7 +132,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
 
   it("no agenda sobre un turno que ya ocupa ese horario", async () => {
     const courtId = await newCourt();
-    const existing = await createBooking({
+    const existing = await createBookingForPlayer({
       fromDateTime: occurrenceStart(date, "18:00"),
       bookerId: player.id,
       courtId,
@@ -246,7 +246,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
 
     it("no ofrece los turnos ocupados ni los que se pisan con un bloqueo", async () => {
       const courtId = await newCourt();
-      await createBooking({ fromDateTime: occurrenceStart(date, "10:30"), bookerId: player.id, courtId });
+      await createBookingForPlayer({ fromDateTime: occurrenceStart(date, "10:30"), bookerId: player.id, courtId });
       await createOutOfService({
         courtId,
         fromDateTime: occurrenceStart(date, "17:00"),
@@ -261,7 +261,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
 
     it("un turno cancelado deja el horario libre", async () => {
       const courtId = await newCourt();
-      await createBooking({
+      await createBookingForPlayer({
         fromDateTime: occurrenceStart(date, "10:30"),
         bookerId: player.id,
         courtId,

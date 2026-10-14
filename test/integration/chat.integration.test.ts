@@ -9,9 +9,10 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch, updateBooking } from "@/src/actions/booking";
+import { getBookingById, updateBooking } from "@/src/actions/booking";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
 import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -60,9 +61,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
 
     const found = await getBookingById(booking.data.id);
@@ -126,9 +127,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 41 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
     const found = await getBookingById(booking.data.id);
     if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
@@ -173,9 +174,9 @@ describe("chat actions (integración con Postgres real)", () => {
 
     const fromDateTime = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
     fromDateTime.setHours(9, 0, 0, 0);
-    const booking = await createBooking({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+    const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
     if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
-    const joined = await joinOpenMatch({ bookingId: booking.data.id, playerId: beto.id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
     if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
     const found = await getBookingById(booking.data.id);
     if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");

@@ -9,7 +9,6 @@ import {
   createPlayer,
 } from "@/src/actions/player";
 import { createCourt } from "@/src/actions/court";
-import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
 import { recordPointsMovement } from "@/src/actions/profile";
 import { BookingState, Role, PlayerCategory } from "@/src/domain/enums";
@@ -25,6 +24,7 @@ vi.mock("next-auth/next", () => ({
 }));
 
 import { getServerSession } from "next-auth/next";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function mockAdminSession() {
   vi.mocked(getServerSession).mockResolvedValue({
@@ -164,7 +164,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     // Turno común reservado por el jugador, al que faltó.
     const base = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000);
     base.setHours(8, 0, 0, 0);
-    const ownBooking = await createBooking({
+    const ownBooking = await createBookingForPlayer({
       fromDateTime: base,
       bookingState: BookingState.RESERVED,
       bookerId: id,
@@ -175,14 +175,14 @@ describe("admin player actions (integración con Postgres real)", () => {
     await setBookingAttendance(ownBooking.data.id, false);
 
     // Partido abierto de otro jugador al que se sumó y también faltó.
-    const otherMatch = await createBooking({
+    const otherMatch = await createBookingForPlayer({
       fromDateTime: new Date(base.getTime() + 3 * 60 * 60_000),
       groupSize: 2,
       bookerId: other.data.id,
       courtId,
     });
     if (!otherMatch.success) throw new Error("expected success creando partido");
-    const joined = await joinOpenMatch({ bookingId: otherMatch.data.id, playerId: id });
+    const joined = await joinOpenMatchForPlayer({ bookingId: otherMatch.data.id, playerId: id });
     if (!joined.success) throw new Error("expected success sumándose al partido");
     const dataSource = await getDataSource();
     const matchPlayer = await dataSource.getRepository<MatchPlayer>("MatchPlayer").findOne({
@@ -193,7 +193,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     await setMatchPlayerAttendance(matchPlayer.id, false);
 
     // Turno de otro jugador en el que no participa: no debe aparecer.
-    await createBooking({
+    await createBookingForPlayer({
       fromDateTime: new Date(base.getTime() + 6 * 60 * 60_000),
       bookingState: BookingState.RESERVED,
       bookerId: other.data.id,
