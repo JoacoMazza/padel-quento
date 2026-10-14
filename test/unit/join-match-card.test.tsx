@@ -27,6 +27,7 @@ function renderCard(overrides: Partial<Props> = {}) {
       status="open"
       alreadyJoined={false}
       chatId={null}
+      hasCategory
       {...overrides}
     />,
   );
@@ -68,6 +69,24 @@ describe("JoinMatchCard", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "El partido ya está completo, no quedan lugares libres.",
     );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("si el jugador no tiene categoría, le pide completarla en su perfil en vez de dejarlo sumarse", () => {
+    renderCard({ hasCategory: false });
+
+    expect(screen.getByText("Para sumarte a un partido abierto necesitás cargar tu categoría.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Completar mi perfil" }).getAttribute("href")).toBe("/profile");
+    expect(screen.queryByRole("button", { name: "Sumarme al partido" })).toBeNull();
+  });
+
+  it("muestra el error de categoría distinta que devuelve el servidor", async () => {
+    joinOpenMatch.mockResolvedValueOnce({ success: false, error: "Este partido es para jugadores de 3ª Categoría." });
+    renderCard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sumarme al partido" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Este partido es para jugadores de 3ª Categoría.");
     expect(push).not.toHaveBeenCalled();
   });
 

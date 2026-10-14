@@ -13,7 +13,7 @@ import { ShareLinkButton } from "@/app/components/share-link-button";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
-import { getSessionPlayerId } from "@/src/lib/session-player";
+import { getSessionPlayerId, playerHasCategory } from "@/src/lib/session-player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
@@ -178,6 +178,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
             status={detail.status}
             alreadyJoined={detail.alreadyJoined}
             chatId={detail.chatId}
+            hasCategory={await playerHasCategory(playerId)}
           />
 
           {invite.canShare || invite.canAddPlayer ? (

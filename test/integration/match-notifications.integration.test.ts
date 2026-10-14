@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { BookingState, CourtState, OutOfServiceReason, Role } from "@/src/domain/enums";
+import { BookingState, CourtState, OutOfServiceReason, Role, PlayerCategory } from "@/src/domain/enums";
 import {
   courtUnavailableNotice,
   matchCancelledByCreatorNotice,
@@ -57,7 +57,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
   async function newPlayer(names: string, lastnames: string) {
     const email = uniqueEmail(names.toLowerCase());
     const phoneNumber = uniquePhoneNumber();
-    const player = await createPlayer({ phoneNumber, email, password: "secreto123", names, lastnames });
+    const player = await createPlayer({ category: PlayerCategory.FOURTH, phoneNumber, email, password: "secreto123", names, lastnames });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
     return { id: player.data.id, names, email, phoneNumber };
   }

@@ -12,7 +12,8 @@ import { Court } from "@/src/entities/Court";
 import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
+import { categoryMismatchMessage, openMatchCategoryProblem } from "@/src/domain/open-match-category";
 import { JOIN_MATCH_LOCK_CLASS, OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
@@ -61,6 +62,8 @@ const MATCH_FULL_MESSAGE = "El partido ya está completo, no quedan lugares libr
 const BLOCKED_PLAYER_MESSAGE = "El usuario se encuentra bloqueado y no puede realizar reservas.";
 export const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
 export const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
+const MISSING_CATEGORY_TO_CREATE_MESSAGE = "Cargá tu categoría en tu perfil para crear un partido abierto.";
+const MISSING_CATEGORY_TO_JOIN_MESSAGE = "Cargá tu categoría en tu perfil para sumarte a un partido abierto.";
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
@@ -76,6 +79,13 @@ class BlockedPlayerError extends Error {}
 export class BookerNotFoundError extends Error {}
 export class NoPlayerAccountError extends Error {}
 class InvalidPriceError extends Error {}
+class MissingCategoryToCreateError extends Error {}
+class MissingCategoryToJoinError extends Error {}
+class CategoryMismatchError extends Error {
+  constructor(public category: PlayerCategory) {
+    super();
+  }
+}
 class InvalidJoinGroupSizeError extends Error {
   constructor(public remainingSpots: number) {
     super();
@@ -155,6 +165,11 @@ export async function createBookingForPlayer(
       }
       const isOpenMatch = !input.bookingState && groupSize < OPEN_MATCH_MAX_PLAYERS;
       const bookingState = input.bookingState ?? BookingState.RESERVED;
+
+      // Los partidos abiertos se arman por categoría (ver joinOpenMatchForPlayer): quien lo crea tiene que tener una.
+      if (isOpenMatch && player.category === PlayerCategory.WITHOUT_CATEGORY) {
+        throw new MissingCategoryToCreateError();
+      }
 
       if (isOpenMatch) {
         const hoursUntilStart = (input.fromDateTime.getTime() - Date.now()) / (60 * 60_000);
@@ -238,6 +253,9 @@ export async function createBookingForPlayer(
     if (error instanceof InvalidPriceError) {
       return { success: false, error: INVALID_PRICE_MESSAGE };
     }
+    if (error instanceof MissingCategoryToCreateError) {
+      return { success: false, error: MISSING_CATEGORY_TO_CREATE_MESSAGE };
+    }
     console.error("createBooking", error);
     return { success: false, error: "No se pudo crear la reserva." };
   }
@@ -271,7 +289,7 @@ export async function joinOpenMatchForPlayer(
       ]);
 
       const bookings = manager.getRepository<Booking>("Booking");
-      const booking = await bookings.findOne({ where: { id: input.bookingId } });
+      const booking = await bookings.findOne({ where: { id: input.bookingId }, relations: { booker: true } });
       if (!booking) {
         throw new BookingNotFoundError();
       }
@@ -279,7 +297,7 @@ export async function joinOpenMatchForPlayer(
       const matches = manager.getRepository<Match>("Match");
       const match = await matches.findOne({
         where: { booking: { id: booking.id } },
-        relations: { matchPlayers: true },
+        relations: { matchPlayers: { player: true } },
       });
       if (!match || !match.needPlayers) {
         throw new NotOpenMatchError();
@@ -288,6 +306,16 @@ export async function joinOpenMatchForPlayer(
       const alreadyJoined = match.matchPlayers.some((mp) => mp.playerId === input.playerId);
       if (alreadyJoined) {
         throw new AlreadyJoinedError();
+      }
+
+      // Solo se suman jugadores de la misma categoría que quien creó el partido (ver openMatchCategoryProblem).
+      const creatorCategory = match.matchPlayers.find((mp) => mp.playerId === booking.booker?.id)?.player?.category;
+      const categoryProblem = player ? openMatchCategoryProblem(creatorCategory, player.category) : null;
+      if (categoryProblem?.kind === "missing_category") {
+        throw new MissingCategoryToJoinError();
+      }
+      if (categoryProblem?.kind === "category_mismatch") {
+        throw new CategoryMismatchError(categoryProblem.category);
       }
 
       const confirmedPlayers = match.matchPlayers.reduce(
@@ -355,6 +383,12 @@ export async function joinOpenMatchForPlayer(
     }
     if (error instanceof InvalidJoinGroupSizeError) {
       return { success: false, error: invalidJoinGroupSizeMessage(error.remainingSpots) };
+    }
+    if (error instanceof MissingCategoryToJoinError) {
+      return { success: false, error: MISSING_CATEGORY_TO_JOIN_MESSAGE };
+    }
+    if (error instanceof CategoryMismatchError) {
+      return { success: false, error: categoryMismatchMessage(error.category) };
     }
     console.error("joinOpenMatch", error);
     return { success: false, error: "No se pudo sumar al partido." };

@@ -76,6 +76,7 @@ export function BookingsBoard({
   playerId,
   isGuest,
   initialSelection,
+  hasCategory,
   courts,
   schedules,
   bookings,
@@ -85,6 +86,8 @@ export function BookingsBoard({
   /** Visitante sin sesión: puede ver y elegir turnos, pero reservar lo manda a iniciar sesión. */
   isGuest: boolean;
   initialSelection?: InitialSelection;
+  /** Si el jugador logueado cargó su categoría: la requieren los partidos abiertos. */
+  hasCategory: boolean;
   courts: CourtProp[];
   schedules: ScheduleProp[];
   bookings: BookingProp[];
@@ -321,6 +324,7 @@ export function BookingsBoard({
             feedback={feedback}
             isPending={isPending}
             alreadyJoined={selectedOpenMatch.alreadyJoined}
+            hasCategory={hasCategory}
             groupSize={joinGroupSize}
             onGroupSizeChange={setJoinGroupSize}
             onConfirm={handleJoinConfirm}
@@ -334,6 +338,7 @@ export function BookingsBoard({
             isPending={isPending}
             isOpenMatch={isOpenMatch}
             onIsOpenMatchChange={setIsOpenMatch}
+            hasCategory={hasCategory}
             openMatchGroupSize={openMatchGroupSize}
             onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
             onConfirm={handleConfirm}

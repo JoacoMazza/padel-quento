@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
@@ -36,11 +36,12 @@ describe("turnos para la vista pública (integración con Postgres real)", () =>
 
     const phoneNumber = uniquePhoneNumber();
     const email = uniqueEmail("organizador");
-    const created = await createPlayer({ email, phoneNumber, password: "secreto123", names: "Olga", lastnames: "Privada" });
+    const created = await createPlayer({ category: PlayerCategory.FOURTH, email, phoneNumber, password: "secreto123", names: "Olga", lastnames: "Privada" });
     if (!created.success) throw new Error("no se pudo crear el jugador de prueba");
     organizer = { id: created.data.id, email, phoneNumber };
 
     const other = await createPlayer({
+      category: PlayerCategory.FOURTH,
       email: uniqueEmail("sumado"),
       phoneNumber: uniquePhoneNumber(),
       password: "secreto123",

@@ -4,7 +4,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
@@ -55,6 +55,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
   async function createTestPlayer(prefix: string) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",
@@ -86,6 +87,7 @@ describe("penalización por cancelación tardía (integración con Postgres real
 
   it("registra la penalidad por cancelación tardía aunque el jugador no tenga puntos para descontar", async () => {
     const created = await createPlayer({
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email: uniqueEmail("cancela-tarde-sin-puntos"),
       password: "secreto123",

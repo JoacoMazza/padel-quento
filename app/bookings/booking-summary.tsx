@@ -14,6 +14,7 @@ import {
   SummaryTotal,
 } from "@/app/bookings/summary-parts";
 import type { SelectedSlot } from "@/app/bookings/types";
+import { MissingCategoryNotice } from "@/app/components/ui/missing-category-notice";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 
 export function BookingSummary({
@@ -23,6 +24,7 @@ export function BookingSummary({
   isPending,
   isOpenMatch,
   onIsOpenMatchChange,
+  hasCategory,
   openMatchGroupSize,
   onOpenMatchGroupSizeChange,
   onConfirm,
@@ -34,12 +36,15 @@ export function BookingSummary({
   isPending: boolean;
   isOpenMatch: boolean;
   onIsOpenMatchChange: (value: boolean) => void;
+  /** Sin categoría cargada no puede crear un partido abierto (sí reservar la cancha completa). */
+  hasCategory: boolean;
   openMatchGroupSize: number;
   onOpenMatchGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
   onClose: () => void;
 }) {
   const openMatchGroupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS - 1 }, (_, i) => i + 1);
+  const missingCategory = isOpenMatch && !hasCategory;
 
   return (
     <SummaryPanel label="Resumen de tu turno">
@@ -78,7 +83,11 @@ export function BookingSummary({
             title="Buscar jugadores"
             description="Abrí el partido para que se sume gente"
           />
-          {isOpenMatch ? (
+          {missingCategory ? (
+            <div className="pt-2">
+              <MissingCategoryNotice message="Para crear un partido abierto necesitás cargar tu categoría." />
+            </div>
+          ) : isOpenMatch ? (
             <div className="pt-2">
               <GroupSizePicker
                 question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
@@ -98,7 +107,12 @@ export function BookingSummary({
         Cancelación sin cargo hasta {LATE_CANCELLATION_HOURS} h antes. El pago se abona en la recepción del club.
       </p>
 
-      <button type="button" disabled={isPending} onClick={onConfirm} className="btn btn-primary btn-lg mt-5 w-full">
+      <button
+        type="button"
+        disabled={isPending || missingCategory}
+        onClick={onConfirm}
+        className="btn btn-primary btn-lg mt-5 w-full"
+      >
         {isPending ? "Confirmando…" : "Reservar turno"}
         {!isPending ? <ArrowRight className="h-5 w-5" /> : null}
       </button>
