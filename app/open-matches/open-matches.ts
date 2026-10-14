@@ -11,6 +11,8 @@ export type OpenMatchItem = {
   confirmedPlayers: number;
   remainingSpots: number;
   organizerName: string;
+  /** Categoría de quien creó el partido: solo se pueden sumar jugadores de la misma (ver joinOpenMatch). */
+  category: PlayerCategory;
   /** true si el jugador logueado ya forma parte del partido (creador o sumado). */
   alreadyJoined: boolean;
 };
@@ -47,6 +49,7 @@ export function toOpenMatchDetail(booking: Booking, playerId: number | null, now
   const start = new Date(booking.fromDateTime);
   const matchPlayers = match.matchPlayers ?? [];
   const confirmedPlayers = matchPlayers.reduce((sum, mp) => sum + (mp.playersCount ?? 1), 0);
+  const organizer = matchPlayers.find((mp) => mp.playerId === booking.booker.id);
 
   const status: OpenMatchStatus =
     booking.bookingState === BookingState.CANCELLED
@@ -66,6 +69,7 @@ export function toOpenMatchDetail(booking: Booking, playerId: number | null, now
     confirmedPlayers,
     remainingSpots: Math.max(OPEN_MATCH_MAX_PLAYERS - confirmedPlayers, 0),
     organizerName: `${booking.booker.names} ${booking.booker.lastnames}`,
+    category: organizer?.player.category ?? PlayerCategory.WITHOUT_CATEGORY,
     alreadyJoined: playerId !== null && matchPlayers.some((mp) => mp.playerId === playerId),
     status,
     chatId: match.chat?.id ?? null,
@@ -108,6 +112,7 @@ export function listOpenMatches(bookings: Booking[], playerId: number | null, no
       confirmedPlayers: detail.confirmedPlayers,
       remainingSpots: detail.remainingSpots,
       organizerName: detail.organizerName,
+      category: detail.category,
       alreadyJoined: detail.alreadyJoined,
     }));
 }

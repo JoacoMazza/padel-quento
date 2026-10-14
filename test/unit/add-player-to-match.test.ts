@@ -47,13 +47,13 @@ import { addPlayerToMatch } from "@/src/actions/match";
 const NOW = new Date("2026-10-01T10:00:00");
 const BOOKING_START = new Date("2026-10-05T18:00:00");
 
-function player(overrides: { id?: number; names?: string; isBlocked?: boolean } = {}) {
+function player(overrides: { id?: number; names?: string; isBlocked?: boolean; category?: PlayerCategory } = {}) {
   return {
     id: overrides.id ?? 7,
     names: overrides.names ?? "Ana",
     lastnames: "Gómez",
     phoneNumber: "2215550101",
-    category: PlayerCategory.FOURTH,
+    category: overrides.category ?? PlayerCategory.FOURTH,
     account: { id: 70, email: "ana@test.com", passwordHash: "$2b$10$hash", isBlocked: overrides.isBlocked ?? false },
   };
 }
@@ -131,7 +131,11 @@ describe("addPlayerToMatch", () => {
 
     const result = await addPlayerToMatch(3, "caro@test.com");
 
-    expect(bookings.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: { match: { matchPlayers: true } } });
+    expect(bookings.findOne).toHaveBeenCalledWith({
+      where: { id: 3 },
+      // booker y matchPlayers.player: para comparar contra la categoría de quien creó el partido.
+      relations: { booker: true, match: { matchPlayers: { player: true } } },
+    });
     expect(result.success).toBe(true);
   });
 
@@ -300,6 +304,61 @@ describe("addPlayerToMatch", () => {
       success: false,
       error: "No encontramos un jugador registrado con ese email o teléfono.",
     });
+  });
+
+  it("adds a player of the same category as the match creator", async () => {
+    mockSession("ana@test.com");
+    players.findOne.mockResolvedValueOnce(player()).mockResolvedValueOnce(player(CARO));
+    bookings.findOne.mockResolvedValueOnce({
+      ...openMatchBooking(),
+      booker: { id: 7 },
+      match: { id: 2, matchPlayers: [{ playerId: 7, player: { id: 7, category: PlayerCategory.FOURTH } }] },
+    });
+    matches.findOne.mockResolvedValueOnce({
+      id: 2,
+      needPlayers: true,
+      chat: null,
+      matchPlayers: [{ id: 30, playerId: 7, playersCount: 1 }],
+    });
+
+    const result = await addPlayerToMatch(3, "caro@test.com");
+
+    expect(result.success).toBe(true);
+    expect(matchPlayers.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects adding a player of a different category than the match creator", async () => {
+    mockSession("ana@test.com");
+    players.findOne
+      .mockResolvedValueOnce(player())
+      .mockResolvedValueOnce(player({ ...CARO, category: PlayerCategory.SECOND }));
+    bookings.findOne.mockResolvedValueOnce({
+      ...openMatchBooking(),
+      booker: { id: 7 },
+      match: { id: 2, matchPlayers: [{ playerId: 7, player: { id: 7, category: PlayerCategory.FOURTH } }] },
+    });
+
+    const result = await addPlayerToMatch(3, "caro@test.com");
+
+    expect(result).toEqual({ success: false, error: "Este partido es para jugadores de 4ª Categoría." });
+    expect(matchPlayers.save).not.toHaveBeenCalled();
+    expect(notifyPlayerJoined).not.toHaveBeenCalled();
+  });
+
+  it("rejects adding a player who has not set a category yet", async () => {
+    mockSession("ana@test.com");
+    players.findOne
+      .mockResolvedValueOnce(player())
+      .mockResolvedValueOnce(player({ ...CARO, category: PlayerCategory.WITHOUT_CATEGORY }));
+    bookings.findOne.mockResolvedValueOnce(openMatchBooking());
+
+    const result = await addPlayerToMatch(3, "caro@test.com");
+
+    expect(result).toEqual({
+      success: false,
+      error: "Ese jugador todavía no cargó su categoría en su perfil, así que no se puede sumar a un partido abierto.",
+    });
+    expect(matchPlayers.save).not.toHaveBeenCalled();
   });
 
   it("rejects adding a blocked player", async () => {

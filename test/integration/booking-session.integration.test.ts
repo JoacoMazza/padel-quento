@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
@@ -34,6 +35,7 @@ describe("reservar y sumarse a partidos con la sesión (integración con Postgre
   async function newPlayer(names: string) {
     const email = uniqueEmail(names.toLowerCase());
     const created = await createPlayer({
+      category: PlayerCategory.FOURTH,
       email,
       phoneNumber: uniquePhoneNumber(),
       password: "secreto123",

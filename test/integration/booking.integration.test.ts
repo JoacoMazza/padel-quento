@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BookingState } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
+import { Player } from "@/src/entities/Player";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { Booker } from "@/src/entities/Booker";
@@ -37,8 +38,9 @@ describe("booking actions (integración con Postgres real)", () => {
   let bookerId: number;
   let bookerPhoneNumber: string;
 
-  async function createExtraPlayer(prefix: string) {
+  async function createExtraPlayer(prefix: string, category = PlayerCategory.FOURTH) {
     const player = await createPlayer({
+      category,
       email: uniqueEmail(prefix),
       password: "secreto123",
       names: "Jugador",
@@ -55,6 +57,7 @@ describe("booking actions (integración con Postgres real)", () => {
     courtId = court.data.id;
 
     const player = await createPlayer({
+      category: PlayerCategory.FOURTH,
       email: uniqueEmail("booking-player"),
       password: "secreto123",
       names: "Jugador",
@@ -419,6 +422,86 @@ describe("booking actions (integración con Postgres real)", () => {
       const result = await joinOpenMatchForPlayer({ bookingId: 999_999_999, playerId: joinerId });
 
       expect(result).toEqual({ success: false, error: "El turno no existe." });
+    });
+  });
+
+  describe("categoría en partidos abiertos", () => {
+    async function createMatchOf(creatorId: number) {
+      const created = await createBookingForPlayer({ fromDateTime: uniqueFromDateTime(), bookerId: creatorId, courtId, groupSize: 2 });
+      if (!created.success) throw new Error(`expected success: ${created.error}`);
+      return created.data.id;
+    }
+
+    async function matchPlayerIds(bookingId: number) {
+      const found = await getBookingById(bookingId);
+      if (!found.success) throw new Error("expected success");
+      return found.data?.match?.matchPlayers?.map((mp) => mp.playerId) ?? [];
+    }
+
+    it("suma al jugador de la misma categoría que quien creó el partido", async () => {
+      const creatorId = await createExtraPlayer("cat-creador-igual", PlayerCategory.THIRD);
+      const joinerId = await createExtraPlayer("cat-sumado-igual", PlayerCategory.THIRD);
+      const bookingId = await createMatchOf(creatorId);
+
+      const result = await joinOpenMatchForPlayer({ bookingId, playerId: joinerId });
+
+      expect(result.success).toBe(true);
+      expect(await matchPlayerIds(bookingId)).toContain(joinerId);
+    });
+
+    it("rechaza al jugador de otra categoría y no lo inscribe", async () => {
+      const creatorId = await createExtraPlayer("cat-creador-distinta", PlayerCategory.THIRD);
+      const joinerId = await createExtraPlayer("cat-sumado-distinta", PlayerCategory.FIFTH);
+      const bookingId = await createMatchOf(creatorId);
+
+      const result = await joinOpenMatchForPlayer({ bookingId, playerId: joinerId });
+
+      expect(result).toEqual({ success: false, error: "Este partido es para jugadores de 3ª Categoría." });
+      expect(await matchPlayerIds(bookingId)).not.toContain(joinerId);
+    });
+
+    it("rechaza al jugador sin categoría y, una vez que la carga, lo deja sumarse si coincide", async () => {
+      const creatorId = await createExtraPlayer("cat-creador-sin", PlayerCategory.THIRD);
+      const joinerId = await createExtraPlayer("cat-sumado-sin", PlayerCategory.WITHOUT_CATEGORY);
+      const bookingId = await createMatchOf(creatorId);
+
+      const rejected = await joinOpenMatchForPlayer({ bookingId, playerId: joinerId });
+      expect(rejected).toEqual({
+        success: false,
+        error: "Cargá tu categoría en tu perfil para sumarte a un partido abierto.",
+      });
+      expect(await matchPlayerIds(bookingId)).not.toContain(joinerId);
+
+      // Carga su categoría desde el perfil.
+      const dataSource = await getDataSource();
+      await dataSource.getRepository<Player>("Player").update(joinerId, { category: PlayerCategory.THIRD });
+
+      const joined = await joinOpenMatchForPlayer({ bookingId, playerId: joinerId });
+      expect(joined.success).toBe(true);
+      expect(await matchPlayerIds(bookingId)).toContain(joinerId);
+    });
+
+    it("rechaza crear un partido abierto sin categoría, pero permite reservar la cancha completa", async () => {
+      const playerWithoutCategory = await createExtraPlayer("cat-crea-sin", PlayerCategory.WITHOUT_CATEGORY);
+
+      const openMatch = await createBookingForPlayer({
+        fromDateTime: uniqueFromDateTime(),
+        bookerId: playerWithoutCategory,
+        courtId,
+        groupSize: 2,
+      });
+      expect(openMatch).toEqual({
+        success: false,
+        error: "Cargá tu categoría en tu perfil para crear un partido abierto.",
+      });
+
+      const fullCourt = await createBookingForPlayer({
+        fromDateTime: uniqueFromDateTime(),
+        bookerId: playerWithoutCategory,
+        courtId,
+        groupSize: 4,
+      });
+      expect(fullCourt.success).toBe(true);
     });
   });
 

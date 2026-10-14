@@ -55,7 +55,15 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
   async function newPlayer(names: string): Promise<TestPlayer> {
     const email = uniqueEmail(names.toLowerCase());
     const phoneNumber = uniquePhoneNumber();
-    const created = await createPlayer({ email, phoneNumber, password: "secreto123", names, lastnames: "Resena" });
+    // Todos de la misma categoría: para crear o sumarse a un partido abierto hace falta tenerla cargada y que coincida (#54).
+    const created = await createPlayer({
+      email,
+      phoneNumber,
+      password: "secreto123",
+      names,
+      lastnames: "Resena",
+      category: PlayerCategory.FIFTH,
+    });
     if (!created.success) throw new Error("no se pudo crear el jugador de prueba");
     return { id: created.data.id, names, email, phoneNumber };
   }

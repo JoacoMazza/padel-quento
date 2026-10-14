@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { getServerSession } from "next-auth/next";
 import type { Player } from "@/src/entities/Player";
+import { PlayerCategory } from "@/src/domain/enums";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 
@@ -17,4 +18,17 @@ export async function getSessionPlayerId(): Promise<number | null> {
   const dataSource = await getDataSource();
   const player = await dataSource.getRepository<Player>("Player").findOne({ where: { account: { email } } });
   return player?.id ?? null;
+}
+
+/**
+ * Si el jugador cargó su categoría (la requieren los partidos abiertos, ver
+ * joinOpenMatchForPlayer). Sin jugador (visitante o cuenta que no es de un
+ * jugador) devuelve true: esos casos ya tienen su propio aviso.
+ */
+export async function playerHasCategory(playerId: number | null): Promise<boolean> {
+  if (playerId === null) return true;
+
+  const dataSource = await getDataSource();
+  const player = await dataSource.getRepository<Player>("Player").findOne({ where: { id: playerId } });
+  return player?.category !== PlayerCategory.WITHOUT_CATEGORY;
 }

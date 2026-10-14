@@ -6,7 +6,7 @@ import { CLUB_MAPS_URL, CLUB_SHORT_ADDRESS } from "@/app/components/club-info";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
 import { parseInitialSelection } from "@/app/bookings/initial-selection";
 import { authOptions } from "@/src/lib/auth";
-import { getSessionPlayerId } from "@/src/lib/session-player";
+import { getSessionPlayerId, playerHasCategory } from "@/src/lib/session-player";
 import { getPublicBookings } from "@/src/lib/public-bookings";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
@@ -57,6 +57,7 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
       <BookingsBoard
         playerId={playerId}
         isGuest={isGuest}
+        hasCategory={await playerHasCategory(playerId)}
         initialSelection={parseInitialSelection(await searchParams)}
         courts={courts.map((c) => ({
           id: c.id,
