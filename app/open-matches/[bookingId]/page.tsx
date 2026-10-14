@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, Clock, LayoutGrid, Plus, Users } from "lucide-react";
 import { PageShell } from "@/app/components/page-shell";
 import { Avatar } from "@/app/components/ui/avatar";
 import { CLUB_LOCATION } from "@/app/components/club-info";
 import { JoinMatchCard } from "@/app/open-matches/[bookingId]/join-match-card";
-import { toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import { anonymizeOpenMatch, inviteOptions, toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import { AddPlayerForm } from "@/app/open-matches/add-player-form";
+import { ShareLinkButton } from "@/app/components/share-link-button";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import { authOptions } from "@/src/lib/auth";
-import { getDataSource } from "@/src/lib/db";
-import { Player } from "@/src/entities/Player";
+import { getSessionPlayerId } from "@/src/lib/session-player";
 import { getBookingById } from "@/src/actions/booking";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from "@/src/domain/constants";
 import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
@@ -22,34 +23,34 @@ import { ReputationBadge } from "@/app/components/reputation-badge";
 export const metadata: Metadata = { title: "Partido abierto" };
 
 export default async function OpenMatchDetailPage({ params }: { params: Promise<{ bookingId: string }> }) {
+  // Se puede ver sin sesión (issue #55), pero sin los nombres de los jugadores ni el chat.
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const isGuest = !session?.user?.email;
 
   const { bookingId } = await params;
   const id = Number(bookingId);
   const result = Number.isInteger(id) ? await getBookingById(id) : null;
   const booking = result?.success ? result.data : null;
 
-  const dataSource = await getDataSource();
-  const player = await dataSource
-    .getRepository<Player>("Player")
-    .findOne({ where: { account: { email: session.user.email } } });
-
-  const detail = booking ? toOpenMatchDetail(booking, player?.id ?? null, new Date()) : null;
-  if (!detail) {
+  const playerId = isGuest ? null : await getSessionPlayerId();
+  const fullDetail = booking ? toOpenMatchDetail(booking, playerId, new Date()) : null;
+  if (!fullDetail) {
     notFound();
   }
-  // Reputación de cada jugador según sus compañeros de partidos anteriores (HU-36).
-  const reputations = await getReputations(detail.participants.map((participant) => participant.playerId));
+  const detail = isGuest ? anonymizeOpenMatch(fullDetail) : fullDetail;
+  // Reputación de cada jugador según sus compañeros de partidos anteriores (HU-36). A un
+  // visitante sin sesión no se le muestra: el partido se le muestra anónimo.
+  const reputations = await getReputations(
+    isGuest ? [] : detail.participants.map((participant) => participant.playerId),
+  );
 
   const timeRange = `${dateToTimeLabel(detail.start)} – ${dateToTimeLabel(detail.end)}`;
   const durationMinutes = Math.round((detail.end.getTime() - detail.start.getTime()) / 60_000);
   const emptySpots = detail.status === "open" ? detail.remainingSpots : 0;
+  const invite = inviteOptions(detail);
 
   return (
-    <PageShell active="/open-matches" user={session.user}>
+    <PageShell active="/open-matches" user={isGuest ? null : session.user}>
       <Link
         href="/open-matches"
         className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-foreground/70 transition-colors hover:text-primary"
@@ -177,18 +178,33 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
           </section>
         </div>
 
-        <JoinMatchCard
-          bookingId={detail.bookingId}
-          playerId={player?.id ?? null}
-          courtNumber={detail.courtNumber}
-          timeRange={timeRange}
-          dateLabel={formatLongDate(detail.start)}
-          price={detail.price}
-          remainingSpots={detail.remainingSpots}
-          status={detail.status}
-          alreadyJoined={detail.alreadyJoined}
-          chatId={detail.chatId}
-        />
+        <div className="flex flex-col gap-6">
+          <JoinMatchCard
+            bookingId={detail.bookingId}
+            isGuest={isGuest}
+            courtNumber={detail.courtNumber}
+            timeRange={timeRange}
+            dateLabel={formatLongDate(detail.start)}
+            price={detail.price}
+            remainingSpots={detail.remainingSpots}
+            status={detail.status}
+            alreadyJoined={detail.alreadyJoined}
+            chatId={detail.chatId}
+          />
+
+          {invite.canShare || invite.canAddPlayer ? (
+            <section className="card flex flex-col gap-4 p-6">
+              <div>
+                <h2 className="label-caps">Invitar jugadores</h2>
+                <p className="mt-1 text-sm text-foreground/60">
+                  Compartí el link del partido o agregá a un jugador registrado por su email o teléfono.
+                </p>
+              </div>
+              {invite.canShare ? <ShareLinkButton path={`/open-matches/${detail.bookingId}`} /> : null}
+              {invite.canAddPlayer ? <AddPlayerForm bookingId={detail.bookingId} /> : null}
+            </section>
+          ) : null}
+        </div>
       </div>
     </PageShell>
   );

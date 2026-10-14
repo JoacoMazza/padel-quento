@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import type { Booking } from "@/src/entities/Booking";
-import { listOpenMatches, matchesOpenMatchFilter, toOpenMatchDetail } from "@/app/open-matches/open-matches";
+import {
+  anonymizeOpenMatch,
+  anonymizeOpenMatchItem,
+  inviteOptions,
+  listOpenMatches,
+  matchesOpenMatchFilter,
+  toOpenMatchDetail,
+} from "@/app/open-matches/open-matches";
 
 const NOW = new Date(2026, 9, 12, 10, 0);
 
@@ -162,5 +169,64 @@ describe("toOpenMatchDetail", () => {
 
   it("devuelve null si el turno no tiene partido asociado", () => {
     expect(toOpenMatchDetail(booking({ withoutMatch: true }), null, NOW)).toBeNull();
+  });
+});
+
+describe("vista de partidos abiertos para visitantes sin sesión", () => {
+  it("oculta el nombre del organizador en el listado", () => {
+    const [item] = listOpenMatches([booking()], null, NOW);
+
+    expect(anonymizeOpenMatchItem(item)).toEqual({ ...item, organizerName: "Jugador del club" });
+  });
+
+  it("en el detalle oculta los nombres de los jugadores y el chat, pero deja la categoría y los cupos", () => {
+    const detail = toOpenMatchDetail(
+      booking({
+        chatId: 9,
+        players: [
+          { id: 1, names: "Martín", lastnames: "Prado", playersCount: 2, category: PlayerCategory.THIRD },
+          { id: 2, names: "Lucía", lastnames: "Gómez" },
+        ],
+      }),
+      null,
+      NOW,
+    )!;
+
+    const anonymous = anonymizeOpenMatch(detail);
+
+    expect(anonymous.organizerName).toBe("Jugador del club");
+    expect(anonymous.chatId).toBeNull();
+    expect(anonymous.participants.map((p) => [p.name, p.initials, p.category, p.playersCount, p.isOrganizer])).toEqual([
+      ["Jugador del club", "", PlayerCategory.THIRD, 2, true],
+      ["Jugador del club", "", PlayerCategory.FIFTH, 1, false],
+    ]);
+    expect(JSON.stringify(anonymous)).not.toMatch(/Martín|Prado|Lucía|Gómez/);
+    expect(anonymous.remainingSpots).toBe(detail.remainingSpots);
+  });
+});
+
+describe("inviteOptions (HU-40)", () => {
+  // Player 1 is the creator (member); player 99 is any other logged-in player.
+  function options(viewerId: number, overrides: Parameters<typeof booking>[0] = {}) {
+    const detail = toOpenMatchDetail(booking(overrides), viewerId, NOW);
+    if (!detail) throw new Error("expected an open match");
+    return inviteOptions(detail);
+  }
+
+  it("lets members share the link and add players while the match looks for players", () => {
+    expect(options(1)).toEqual({ canShare: true, canAddPlayer: true });
+  });
+
+  it("lets any player share the link of an open match, but only members add players", () => {
+    expect(options(99)).toEqual({ canShare: true, canAddPlayer: false });
+  });
+
+  it("lets members add players to a full match (replacing a companion), without sharing it", () => {
+    expect(options(1, { needPlayers: false })).toEqual({ canShare: false, canAddPlayer: true });
+  });
+
+  it("offers neither once the match is cancelled or has started", () => {
+    expect(options(1, { bookingState: BookingState.CANCELLED })).toEqual({ canShare: false, canAddPlayer: false });
+    expect(options(1, { fromDateTime: new Date(2026, 9, 12, 9, 0) })).toEqual({ canShare: false, canAddPlayer: false });
   });
 });

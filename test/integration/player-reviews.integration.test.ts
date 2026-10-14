@@ -12,7 +12,8 @@ import {
   deductPlayerPointsAdmin,
   getPlayerRecordAdmin,
 } from "@/src/actions/player";
-import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
+import { getBookingById } from "@/src/actions/booking";
+import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import { getReviewableTeammates, submitPlayerReview } from "@/src/actions/review";
 import { recordPointsMovement } from "@/src/actions/profile";
@@ -68,10 +69,10 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
     const future = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
     future.setHours(8 + (slot++ % 12), 0, 0, 0);
     future.setDate(future.getDate() + Math.floor(slot / 12));
-    const created = await createBooking({ fromDateTime: future, courtId, groupSize: 1, bookerId: ana.id });
+    const created = await createBookingForPlayer({ fromDateTime: future, courtId, groupSize: 1, bookerId: ana.id });
     if (!created.success) throw new Error(created.error);
-    await joinOpenMatch({ bookingId: created.data.id, playerId: bruno.id });
-    await joinOpenMatch({ bookingId: created.data.id, playerId: carla.id });
+    await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: bruno.id });
+    await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: carla.id });
 
     const dataSource = await getDataSource();
     const start = new Date(Date.now() - hoursAgo * 60 * 60_000 - 90 * 60_000);
@@ -262,9 +263,9 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
         const future = new Date(Date.now() + 70 * 24 * 60 * 60 * 1000);
         future.setHours(8 + (slot++ % 12), 0, 0, 0);
         future.setDate(future.getDate() + Math.floor(slot / 12));
-        const created = await createBooking({ fromDateTime: future, courtId, groupSize: 2, bookerId: elena.id });
+        const created = await createBookingForPlayer({ fromDateTime: future, courtId, groupSize: 2, bookerId: elena.id });
         if (!created.success) throw new Error(created.error);
-        await joinOpenMatch({ bookingId: created.data.id, playerId: reviewer.id });
+        await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: reviewer.id });
         signedInAs(reviewer);
         await dataSource
           .getRepository<Booking>("Booking")

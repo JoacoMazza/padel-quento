@@ -75,16 +75,20 @@ describe("proxy RBAC and Route Protection", () => {
     });
   });
 
-  describe("Rutas protegidas generales (/bookings, /profile)", () => {
-    it("redirige al login con callbackUrl si no hay token", async () => {
-      vi.mocked(getToken).mockResolvedValueOnce(null);
-      const req = createMockRequest("/bookings");
+  describe("Rutas personales (/my-bookings, /profile, /chats/*)", () => {
+    it.each(["/my-bookings", "/profile", "/chats/3"])(
+      "redirige %s al login con callbackUrl si no hay token",
+      async (pathname) => {
+        vi.mocked(getToken).mockResolvedValueOnce(null);
 
-      const res = await proxy(req);
+        const res = await proxy(createMockRequest(pathname));
 
-      expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toBe("http://localhost:3000/login?callbackUrl=%2Fbookings");
-    });
+        expect(res.status).toBe(307);
+        expect(res.headers.get("location")).toBe(
+          `http://localhost:3000/login?callbackUrl=${encodeURIComponent(pathname)}`,
+        );
+      },
+    );
 
     it("permite el acceso a usuarios con rol jugador", async () => {
       vi.mocked(getToken).mockResolvedValueOnce({
@@ -92,11 +96,43 @@ describe("proxy RBAC and Route Protection", () => {
         email: "jugador@test.com",
         role: Role.PLAYER,
       });
-      const req = createMockRequest("/bookings");
+      const req = createMockRequest("/profile");
 
       const res = await proxy(req);
 
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe("Rutas visibles sin sesión (/, /bookings, /open-matches)", () => {
+    it.each(["/", "/bookings", "/open-matches", "/open-matches/12"])(
+      "un visitante puede ver %s sin que lo manden al login",
+      async (pathname) => {
+        vi.mocked(getToken).mockResolvedValueOnce(null);
+
+        const res = await proxy(createMockRequest(pathname));
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("location")).toBeNull();
+      },
+    );
+
+    it("un jugador con sesión también las ve", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "jugador@test.com", role: Role.PLAYER });
+
+      const res = await proxy(createMockRequest("/"));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+
+    it.each(["/", "/bookings"])("un admin con sesión que entra a %s vuelve al panel", async (pathname) => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "3", email: "admin@test.com", role: Role.ADMIN });
+
+      const res = await proxy(createMockRequest(pathname));
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe("http://localhost:3000/admin");
     });
   });
 

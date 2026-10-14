@@ -80,6 +80,19 @@ export function toOpenMatchDetail(booking: Booking, playerId: number | null, now
   };
 }
 
+/**
+ * Qué se ofrece en el detalle del partido para sumar gente (HU-40): cualquier
+ * jugador puede compartir el link mientras el partido busca jugadores, y solo
+ * sus miembros pueden agregar jugadores registrados, también con el partido
+ * completo (para reemplazar a un acompañante sin cuenta).
+ */
+export function inviteOptions(detail: OpenMatchDetail): { canShare: boolean; canAddPlayer: boolean } {
+  return {
+    canShare: detail.status === "open",
+    canAddPlayer: detail.alreadyJoined && (detail.status === "open" || detail.status === "full"),
+  };
+}
+
 /** Partidos que todavía buscan jugadores y no empezaron, del más próximo al más lejano. */
 export function listOpenMatches(bookings: Booking[], playerId: number | null, now: Date): OpenMatchItem[] {
   return bookings
@@ -108,4 +121,25 @@ export function matchesOpenMatchFilter(start: Date, now: Date, filter: OpenMatch
   limit.setDate(limit.getDate() + (filter === "today" ? 1 : 7));
 
   return start >= startOfToday && start < limit;
+}
+
+// Los visitantes sin sesión ven los partidos abiertos sin datos personales de
+// los jugadores: ni nombres ni el chat del partido (sí la categoría y los cupos).
+const ANONYMOUS_PLAYER_NAME = "Jugador del club";
+
+export function anonymizeOpenMatchItem(item: OpenMatchItem): OpenMatchItem {
+  return { ...item, organizerName: ANONYMOUS_PLAYER_NAME };
+}
+
+export function anonymizeOpenMatch(detail: OpenMatchDetail): OpenMatchDetail {
+  return {
+    ...detail,
+    organizerName: ANONYMOUS_PLAYER_NAME,
+    chatId: null,
+    participants: detail.participants.map((participant) => ({
+      ...participant,
+      name: ANONYMOUS_PLAYER_NAME,
+      initials: "",
+    })),
+  };
 }
