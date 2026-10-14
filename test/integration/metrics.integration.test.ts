@@ -42,6 +42,8 @@ describe("getOccupancyReportData (integración con Postgres real)", () => {
   const bookingIds: Record<string, number> = {};
 
   beforeAll(async () => {
+    // Los bloqueos de cancha los crea un administrador.
+    mockAdminSession();
     courtNumber = uniqueCourtNumber();
     const court = await createCourt({ number: courtNumber, price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");

@@ -7,6 +7,7 @@ import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
+import { adminOnly } from "@/src/lib/rbac";
 
 export type CreateOutOfServiceInput = {
   fromDateTime: Date;
@@ -31,6 +32,9 @@ export type UpdateOutOfServiceInput = Partial<
 export async function createOutOfService(
   input: CreateOutOfServiceInput,
 ): Promise<ActionResult<OutOfService>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   if (new Date(input.toDateTime).getTime() <= new Date(input.fromDateTime).getTime()) {
     return { success: false, error: "La fecha de fin del bloqueo debe ser posterior a la de inicio." };
   }
@@ -109,6 +113,9 @@ export async function updateOutOfService(
   id: number,
   input: UpdateOutOfServiceInput,
 ): Promise<ActionResult<OutOfService>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
@@ -133,6 +140,9 @@ export async function updateOutOfService(
 }
 
 export async function deleteOutOfService(id: number): Promise<ActionResult<null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
@@ -154,6 +164,9 @@ export async function deleteOutOfService(id: number): Promise<ActionResult<null>
  * el registro, así queda el historial de cuándo estuvo fuera de servicio.
  */
 export async function endOutOfService(id: number): Promise<ActionResult<OutOfService>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
