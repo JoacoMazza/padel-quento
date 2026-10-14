@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
-import { CourtState } from "@/src/domain/enums";
+import { CourtState, Role } from "@/src/domain/enums";
 
 const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoisted(() => {
   const create = vi.fn((data: unknown) => data);
@@ -15,17 +15,24 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 
+import { getServerSession } from "next-auth/next";
+import * as courtActions from "@/src/actions/court";
 import {
   createCourt,
   getCourts,
   getCourtById,
+  updateAllCourtsPrice,
   updateCourt,
-  deleteCourt,
 } from "@/src/actions/court";
 
 function duplicateError() {
   return new QueryFailedError("insert into courts...", [], { code: "23505" } as never);
+}
+
+function signInAs(role: Role) {
+  vi.mocked(getServerSession).mockResolvedValue({ user: { email: "user@test.com", role } } as never);
 }
 
 describe("court actions", () => {
@@ -36,23 +43,45 @@ describe("court actions", () => {
   });
 
   describe("createCourt", () => {
-    it("crea una cancha con el estado AVAILABLE por defecto", async () => {
-      const result = await createCourt({ number: 3 });
+    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado", async () => {
+      const result = await createCourt({ number: 3, price: 10000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE });
-      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE } });
+      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000 });
+      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE, price: 10000 } });
     });
 
-    it("respeta el estado indicado", async () => {
-      await createCourt({ number: 5, state: CourtState.MAINTENANCE });
+    it("respeta el estado y precio indicados", async () => {
+      await createCourt({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE });
+      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+    });
+
+    it("devuelve error si el precio no se proporciona o no es mayor a 0", async () => {
+      const missingPrice = await createCourt({ number: 2 } as any);
+      expect(missingPrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      const zeroPrice = await createCourt({ number: 2, price: 0 });
+      expect(zeroPrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      const negativePrice = await createCourt({ number: 2, price: -100 });
+      expect(negativePrice).toEqual({
+        success: false,
+        error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
+      });
+
+      expect(create).not.toHaveBeenCalled();
     });
 
     it("devuelve error de número duplicado ante una violación de unicidad", async () => {
       save.mockRejectedValueOnce(duplicateError());
 
-      const result = await createCourt({ number: 1 });
+      const result = await createCourt({ number: 1, price: 10000 });
 
       expect(result).toEqual({ success: false, error: "Ya existe una cancha con ese número." });
     });
@@ -60,7 +89,7 @@ describe("court actions", () => {
     it("devuelve un error genérico ante cualquier otra falla", async () => {
       save.mockRejectedValueOnce(new Error("boom"));
 
-      const result = await createCourt({ number: 1 });
+      const result = await createCourt({ number: 1, price: 10000 });
 
       expect(result).toEqual({ success: false, error: "No se pudo crear la cancha." });
     });
@@ -112,6 +141,20 @@ describe("court actions", () => {
   });
 
   describe("updateCourt", () => {
+    beforeEach(() => {
+      signInAs(Role.ADMIN);
+    });
+
+    it("no permite editar una cancha a quien no es administrador", async () => {
+      signInAs(Role.PLAYER);
+
+      const result = await updateCourt(1, { price: 15000 });
+
+      expect(result).toEqual({ success: false, error: "No se pudo actualizar la cancha." });
+      expect(findOne).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
     it("actualiza los campos provistos", async () => {
       findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE });
 
@@ -142,30 +185,45 @@ describe("court actions", () => {
     });
   });
 
-  describe("deleteCourt", () => {
-    it("elimina la cancha", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 1 });
+  describe("updateAllCourtsPrice", () => {
+    it("aplica el nuevo precio a todas las canchas, incluidas las dadas de baja", async () => {
+      signInAs(Role.ADMIN);
+      find.mockResolvedValueOnce([
+        { id: 1, price: 10000, state: CourtState.AVAILABLE },
+        { id: 2, price: 12000, state: CourtState.CLOSED_DOWN },
+      ]);
 
-      const result = await deleteCourt(1);
+      const result = await updateAllCourtsPrice(15000);
 
-      expect(deleteFn).toHaveBeenCalledWith(1);
+      expect(save).toHaveBeenCalledWith([
+        { id: 1, price: 15000, state: CourtState.AVAILABLE },
+        { id: 2, price: 15000, state: CourtState.CLOSED_DOWN },
+      ]);
       expect(result).toEqual({ success: true, data: null });
     });
 
-    it("devuelve error si la cancha no existe", async () => {
-      deleteFn.mockResolvedValueOnce({ affected: 0 });
+    it("devuelve error si el precio no es mayor a 0", async () => {
+      signInAs(Role.ADMIN);
 
-      const result = await deleteCourt(999);
+      const result = await updateAllCourtsPrice(0);
 
-      expect(result).toEqual({ success: false, error: "La cancha no existe." });
+      expect(result).toEqual({ success: false, error: "El precio de la cancha es obligatorio y debe ser mayor a 0." });
+      expect(find).not.toHaveBeenCalled();
     });
 
-    it("devuelve un error genérico ante cualquier otra falla", async () => {
-      deleteFn.mockRejectedValueOnce(new Error("boom"));
+    it("no permite cambiar los precios a quien no es administrador", async () => {
+      signInAs(Role.PLAYER);
 
-      const result = await deleteCourt(1);
+      const result = await updateAllCourtsPrice(15000);
 
-      expect(result).toEqual({ success: false, error: "No se pudo eliminar la cancha." });
+      expect(result).toEqual({ success: false, error: "No se pudo actualizar el precio de las canchas." });
+      expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("baja de canchas", () => {
+    it("no expone una acción para eliminar canchas", () => {
+      expect(courtActions).not.toHaveProperty("deleteCourt");
     });
   });
 });

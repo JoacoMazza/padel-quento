@@ -8,7 +8,28 @@ function isPublicPath(pathname: string) {
   if (publicPaths.has(pathname)) {
     return true;
   }
-  return pathname.startsWith("/api/auth");
+  // El navegador pide el manifest y recursos estáticos sin cookies de sesión.
+  return (
+    pathname.startsWith("/api/auth") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname.startsWith("/material_landing/") ||
+    pathname === "/favicon.ico" ||
+    /\.(mp4|jpg|jpeg|png|gif|webp|svg|ico)$/i.test(pathname)
+  );
+}
+
+/**
+ * Pantallas que se pueden ver sin sesión (landing, turnos y partidos abiertos):
+ * el login se pide recién al reservar o sumarse a un partido. A diferencia de
+ * las rutas de autenticación, el admin con sesión igual vuelve a su panel.
+ */
+function isGuestVisiblePath(pathname: string) {
+  return (
+    pathname === "/" ||
+    pathname === "/bookings" ||
+    pathname === "/open-matches" ||
+    pathname.startsWith("/open-matches/")
+  );
 }
 
 function isAdminPath(pathname: string) {
@@ -22,7 +43,7 @@ export async function proxy(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  if (!token && !isPublicPath(pathname)) {
+  if (!token && !isPublicPath(pathname) && !isGuestVisiblePath(pathname)) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);

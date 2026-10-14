@@ -7,18 +7,19 @@ describe("getDataSource (integración con Postgres real)", () => {
     await dataSource.destroy();
   });
 
-  it("se conecta y sincroniza el esquema de la tabla users", async () => {
+  it("se conecta y sincroniza el esquema de la tabla accounts", async () => {
     const dataSource = await getDataSource();
     expect(dataSource.isInitialized).toBe(true);
 
     const columns: { column_name: string }[] = await dataSource.query(
-      "select column_name from information_schema.columns where table_name = 'users'",
+      "select column_name from information_schema.columns where table_name = 'accounts'",
     );
     const columnNames = columns.map((c) => c.column_name);
 
     expect(columnNames).toEqual(
-      expect.arrayContaining(["id", "email", "names", "last_names", "role", "type", "password_hashed"]),
+      expect.arrayContaining(["id", "email", "password_hashed", "is_blocked"]),
     );
+    expect(columnNames).not.toContain("photo_url");
   });
 
   it("reutiliza la misma instancia de DataSource en llamadas sucesivas", async () => {

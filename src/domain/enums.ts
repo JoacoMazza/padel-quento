@@ -38,10 +38,25 @@ export enum OutOfServiceReason {
   OTHER = "other",
 }
 
+export enum FixedBookingFrequency {
+  WEEKLY = "weekly",
+  BIWEEKLY = "biweekly",
+}
+
+/**
+ * Estado de cada fecha de un turno fijo: reservada (tiene su turno), liberada
+ * por el admin solo para esa fecha, o salteada porque al generarla el horario
+ * ya estaba ocupado.
+ */
+export enum FixedBookingDateState {
+  BOOKED = "booked",
+  RELEASED = "released",
+  CONFLICT = "conflict",
+}
+
 export enum BookingState {
   RESERVED = "reserved",
   AVAILABLE = "available",
   PAID = "paid",
   CANCELLED = "cancelled",
-  PENDING_PLAYERS = "pending_players",
 }

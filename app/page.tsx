@@ -1,58 +1,48 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
-import { AppHeader } from "@/app/components/app-header";
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { User, Shield, ArrowRight } from "lucide-react";
+import { PageShell } from "@/app/components/page-shell";
+import { Landing } from "@/app/landing/landing";
+import { summarizeClubHours } from "@/app/landing/club-hours";
+import { getCourts } from "@/src/actions/court";
+import { getSchedules } from "@/src/actions/schedule";
+import { CourtState } from "@/src/domain/enums";
 
+// La home usa el título por defecto del sitio; solo define su URL canónica.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+// Landing pública (issue #55): las canchas y los horarios salen de la base.
 export default async function Home() {
   const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const isGuest = !session?.user?.email;
 
-  const isAdmin = session.user.role === "admin";
+  const [courtsResult, schedulesResult] = await Promise.all([getCourts(), getSchedules()]);
+  const activeCourts = (courtsResult.success ? courtsResult.data : []).filter(
+    (court) => court.state !== CourtState.CLOSED_DOWN,
+  );
+  const activeCourtIds = new Set(activeCourts.map((court) => court.id));
+  const schedules = (schedulesResult.success ? schedulesResult.data : [])
+    .filter((schedule) => schedule.court && activeCourtIds.has(schedule.court.id))
+    .map((schedule) => ({
+      dayOfWeek: schedule.dayOfWeek,
+      openingTime: String(schedule.openingTime),
+      closingTime: String(schedule.closingTime),
+    }));
 
   return (
-    <div className="flex flex-1 flex-col bg-background min-h-screen">
-      <AppHeader
-        active="/"
-        userName={session.user.name}
-        userEmail={session.user.email}
-        userRole={session.user.role}
+    <PageShell active="/" user={isGuest ? null : session.user} width="full">
+      <Landing
+        userName={isGuest ? null : (session.user.name ?? null)}
+        isGuest={isGuest}
+        courtCount={activeCourts.length}
+        hours={summarizeClubHours(schedules)}
+        courts={activeCourts.map((c) => ({
+          id: c.id,
+          number: c.number,
+          price: c.price,
+          state: c.state,
+        }))}
       />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-16">
-        <div className="rounded-2xl border border-line bg-card p-8 shadow-sm space-y-4">
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Bienvenido{session?.user?.name ? `, ${session.user.name}` : ""}
-          </h1>
-          <p className="max-w-lg text-base leading-relaxed text-foreground/70">
-            Ya estás dentro de <span className="font-semibold text-primary">Quento CLUB</span>. Podés acceder a tu perfil para editar tus datos personales y revisar tu saldo acumulado de puntos.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href="/profile"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
-            >
-              <User size={18} />
-              Ir a Mi Perfil
-              <ArrowRight size={18} />
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-colors dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                <Shield size={18} />
-                Ir al Panel Admin
-                <ArrowRight size={18} />
-              </Link>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
+    </PageShell>
   );
 }
-

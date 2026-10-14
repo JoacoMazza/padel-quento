@@ -1,143 +1,77 @@
 "use server";
 
 import "reflect-metadata";
-import { EntityManager, In } from "typeorm";
 import { Booking } from "@/src/entities/Booking";
-import { BookingState } from "@/src/domain/enums";
+import type { FixedBookingDate } from "@/src/entities/FixedBookingDate";
+import { BookingState, FixedBookingDateState } from "@/src/domain/enums";
+import { PENALTY_POINTS } from "@/src/domain/constants";
+import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { getSessionPlayerId } from "@/src/lib/session-player";
+import { notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
+import {
+  BOOKER_NOT_FOUND_MESSAGE,
+  BookerNotFoundError,
+  DOUBLE_BOOKING_MESSAGE,
+  DoubleBookingError,
+  NO_PLAYER_ACCOUNT_MESSAGE,
+  NoPlayerAccountError,
+  createBookingForPlayer,
+  findBookingPlayer,
+  hasOverlappingBooking,
+  joinOpenMatchForPlayer,
+  type CreateBookingInput,
+  type JoinOpenMatchInput,
+  type UpdateBookingInput,
+} from "@/src/lib/bookings";
+import { recordPointsMovement } from "@/src/actions/profile";
 
-export type CreateBookingInput = {
-  fromDateTime: Date;
-  durationMinutes?: number;
-  bookingState?: BookingState;
-  playerId: number;
-  courtId: number;
-};
+export type { CreateBookingInput, JoinOpenMatchInput, UpdateBookingInput };
 
-export type UpdateBookingInput = Partial<
-  Omit<CreateBookingInput, "playerId" | "courtId">
-> & {
-  playerId?: number;
-  courtId?: number;
-};
+const LOGIN_REQUIRED_MESSAGE = "Tenés que iniciar sesión para reservar.";
+const FIXED_BOOKING_CANCELLATION_MESSAGE = "Es un turno fijo: para liberar esta fecha comunicate con el club.";
 
-const DOUBLE_BOOKING_MESSAGE = "Ese horario ya está reservado para esta cancha.";
-
-class DoubleBookingError extends Error {}
-
-/**
- * Un turno ocupa la cancha salvo que esté cancelado; por eso alcanza con excluir
- * bookingState = CANCELLED al buscar solapamientos, sin importar el resto de los estados.
- */
-async function hasOverlappingBooking(
-  manager: EntityManager,
-  params: { courtId: number; start: Date; durationMinutes: number; excludeBookingId?: number },
-): Promise<boolean> {
-  const qb = manager
-    .createQueryBuilder<Booking>("Booking", "booking")
-    .where('booking."court_id" = :courtId', { courtId: params.courtId })
-    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-    .andWhere('booking."datetime" < :end', {
-      end: new Date(params.start.getTime() + params.durationMinutes * 60_000),
-    })
-    .andWhere(
-      'booking."datetime" + make_interval(mins => booking."duration_minutes") > :start',
-      { start: params.start },
-    );
-
-  if (params.excludeBookingId) {
-    qb.andWhere('booking."id" != :excludeId', { excludeId: params.excludeBookingId });
-  }
-
-  const overlapping = await qb.getOne();
-  return overlapping !== null;
-}
+class FixedBookingCancellationError extends Error {}
 
 /**
- * Cancela, dentro de una transacción existente, las reservas de una cancha que se
- * solapan con un rango de fechas (por ejemplo, el bloqueo de un horario por
- * mantenimiento). No registra ninguna penalización: la causa es ajena al jugador.
+ * Reserva un turno a nombre del jugador de la sesión. El cliente no elige a
+ * nombre de quién reserva: sin sesión, devuelve el error para iniciar sesión.
  */
-export async function cancelBookingsInRange(
-  manager: EntityManager,
-  params: { courtId: number; from: Date; to: Date },
-): Promise<Booking[]> {
-  const affected = await manager
-    .createQueryBuilder<Booking>("Booking", "booking")
-    .where('booking."court_id" = :courtId', { courtId: params.courtId })
-    .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-    .andWhere('booking."datetime" < :to', { to: params.to })
-    .andWhere(
-      'booking."datetime" + make_interval(mins => booking."duration_minutes") > :from',
-      { from: params.from },
-    )
-    .getMany();
-
-  if (affected.length === 0) {
-    return [];
-  }
-
-  await manager
-    .getRepository<Booking>("Booking")
-    .update({ id: In(affected.map((booking) => booking.id)) }, { bookingState: BookingState.CANCELLED });
-
-  return affected.map((booking) => ({ ...booking, bookingState: BookingState.CANCELLED }));
-}
-
 export async function createBooking(
-  input: CreateBookingInput,
+  input: Omit<CreateBookingInput, "bookerId">,
 ): Promise<ActionResult<Booking>> {
-  try {
-    const dataSource = await getDataSource();
-
-    const saved = await dataSource.transaction(async (manager) => {
-      // Serializa los intentos de reserva para la misma cancha: el lock se toma y
-      // libera automáticamente con la transacción, así el chequeo de abajo nunca
-      // corre en paralelo con otro para la misma cancha.
-      await manager.query("SELECT pg_advisory_xact_lock($1)", [input.courtId]);
-
-      const durationMinutes = input.durationMinutes ?? 90;
-      const bookingState = input.bookingState ?? BookingState.RESERVED;
-
-      if (bookingState !== BookingState.CANCELLED) {
-        const overlaps = await hasOverlappingBooking(manager, {
-          courtId: input.courtId,
-          start: input.fromDateTime,
-          durationMinutes,
-        });
-        if (overlaps) {
-          throw new DoubleBookingError();
-        }
-      }
-
-      const bookings = manager.getRepository<Booking>("Booking");
-      const booking = bookings.create({
-        fromDateTime: input.fromDateTime,
-        durationMinutes,
-        bookingState,
-        player: { id: input.playerId },
-        court: { id: input.courtId },
-      });
-
-      return bookings.save(booking);
-    });
-
-    return { success: true, data: toPlain(saved) };
-  } catch (error) {
-    if (error instanceof DoubleBookingError) {
-      return { success: false, error: DOUBLE_BOOKING_MESSAGE };
-    }
-    console.error("createBooking", error);
-    return { success: false, error: "No se pudo crear la reserva." };
+  const playerId = await getSessionPlayerId();
+  if (playerId === null) {
+    return { success: false, error: LOGIN_REQUIRED_MESSAGE };
   }
+  return createBookingForPlayer({ ...input, bookerId: playerId });
 }
+
+/** Suma al jugador de la sesión a un partido abierto (nunca al que indique el cliente). */
+export async function joinOpenMatch(
+  input: Omit<JoinOpenMatchInput, "playerId">,
+): Promise<ActionResult<Booking>> {
+  const playerId = await getSessionPlayerId();
+  if (playerId === null) {
+    return { success: false, error: LOGIN_REQUIRED_MESSAGE };
+  }
+  return joinOpenMatchForPlayer({ ...input, playerId });
+}
+
+const BOOKING_RELATIONS = {
+  booker: true,
+  court: true,
+  match: { matchPlayers: { player: true }, chat: true },
+} as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
   try {
     const dataSource = await getDataSource();
     const bookings = dataSource.getRepository<Booking>("Booking");
-    const data = await bookings.find({ relations: { player: true, court: true } });
+    const data = await bookings.find({
+      relations: BOOKING_RELATIONS,
+    });
     return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getBookings", error);
@@ -153,7 +87,7 @@ export async function getBookingById(
     const bookings = dataSource.getRepository<Booking>("Booking");
     const data = await bookings.findOne({
       where: { id },
-      relations: { player: true, court: true },
+      relations: BOOKING_RELATIONS,
     });
     return { success: true, data: toPlain(data) };
   } catch (error) {
@@ -169,14 +103,46 @@ export async function updateBooking(
   try {
     const dataSource = await getDataSource();
 
+    let lateCancellationPlayerId: number | null = null;
+    let cancelled = false;
+
     const saved = await dataSource.transaction(async (manager) => {
       const bookings = manager.getRepository<Booking>("Booking");
-      const booking = await bookings.findOne({ where: { id }, relations: { court: true } });
+      const booking = await bookings.findOne({
+        where: { id },
+        relations: { court: true, booker: true },
+      });
       if (!booking) {
         throw new Error("NOT_FOUND");
       }
 
-      const { playerId, courtId, ...rest } = input;
+      cancelled =
+        input.bookingState === BookingState.CANCELLED && booking.bookingState !== BookingState.CANCELLED;
+
+      // Las fechas de un turno fijo (HU-41) solo las libera el admin desde el panel.
+      if (
+        cancelled &&
+        (await manager
+          .getRepository<FixedBookingDate>("FixedBookingDate")
+          .existsBy({ booking: { id }, state: FixedBookingDateState.BOOKED }))
+      ) {
+        throw new FixedBookingCancellationError();
+      }
+
+      // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
+      // turno previo a la migración puede no tener quien reservó.
+      if (
+        input.bookingState === BookingState.CANCELLED &&
+        booking.bookingState !== BookingState.CANCELLED &&
+        booking.booker &&
+        isLateCancellation(booking.fromDateTime)
+      ) {
+        lateCancellationPlayerId = booking.booker.id;
+      }
+
+      const { bookerId, courtId, ...rest } = input;
+
+      const booker = bookerId ? await findBookingPlayer(manager, bookerId) : null;
 
       const effectiveCourtId = courtId ?? booking.court?.id;
       const effectiveState = input.bookingState ?? booking.bookingState;
@@ -199,17 +165,37 @@ export async function updateBooking(
 
       bookings.merge(booking, {
         ...rest,
-        ...(playerId ? { player: { id: playerId } } : {}),
+        ...(booker ? { booker: { id: booker.id, phoneNumber: booker.phoneNumber } } : {}),
         ...(courtId ? { court: { id: courtId } } : {}),
       });
 
       return bookings.save(booking);
     });
 
+    // Fuera de la transacción: recordPointsMovement usa su propia conexión, y
+    // solo se penaliza si la cancelación efectivamente se guardó (RN-03).
+    if (lateCancellationPlayerId !== null) {
+      await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
+    }
+
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    if (cancelled) {
+      await notifyMatchCancelledByCreator(id);
+    }
+
     return { success: true, data: toPlain(saved) };
   } catch (error) {
     if (error instanceof DoubleBookingError) {
       return { success: false, error: DOUBLE_BOOKING_MESSAGE };
+    }
+    if (error instanceof BookerNotFoundError) {
+      return { success: false, error: BOOKER_NOT_FOUND_MESSAGE };
+    }
+    if (error instanceof NoPlayerAccountError) {
+      return { success: false, error: NO_PLAYER_ACCOUNT_MESSAGE };
+    }
+    if (error instanceof FixedBookingCancellationError) {
+      return { success: false, error: FIXED_BOOKING_CANCELLATION_MESSAGE };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La reserva no existe." };

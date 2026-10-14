@@ -4,6 +4,7 @@ import * as entities from "@/src/entities";
 
 const globalForDb = globalThis as unknown as {
   dataSource?: DataSource;
+  dataSourceInit?: Promise<DataSource>;
 };
 
 function createDataSource() {
@@ -21,15 +22,25 @@ function createDataSource() {
   });
 }
 
-export async function getDataSource() {
-  if (globalForDb.dataSource?.isInitialized) {
-    return globalForDb.dataSource;
-  }
-
+async function initializeDataSource() {
   const dataSource = globalForDb.dataSource ?? createDataSource();
   if (!dataSource.isInitialized) {
     await dataSource.initialize();
   }
   globalForDb.dataSource = dataSource;
   return dataSource;
+}
+
+export async function getDataSource() {
+  if (globalForDb.dataSource?.isInitialized) {
+    return globalForDb.dataSource;
+  }
+
+  // Los procesos en segundo plano piden la conexión todos juntos al arrancar:
+  // comparten la misma inicialización en curso para no crear varias conexiones
+  // que sincronicen el esquema a la vez. Si falla, se descarta para reintentar.
+  globalForDb.dataSourceInit ??= initializeDataSource().finally(() => {
+    globalForDb.dataSourceInit = undefined;
+  });
+  return globalForDb.dataSourceInit;
 }

@@ -20,7 +20,8 @@
     "migration:run": "pnpm typeorm migration:run",
     "migration:revert": "pnpm typeorm migration:revert",
     "migration:show": "pnpm typeorm migration:show",
-    "db:seed": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed.ts"
+    "db:seed": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed.ts",
+    "db:seed:bookings": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed-bookings.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -30,6 +31,7 @@
     "lucide-react": "^1.41.0",
     "next": "16.3.1",
     "next-auth": "^4.24.15",
+    "nodemailer": "^10.1.0",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -38,12 +40,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
+    "jsdom": "^30.1.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",

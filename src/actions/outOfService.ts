@@ -2,11 +2,11 @@
 
 import "reflect-metadata";
 import { OutOfService } from "@/src/entities/OutOfService";
-import { Booking } from "@/src/entities/Booking";
-import { OutOfServiceReason } from "@/src/domain/enums";
+import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
+import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { cancelBookingsInRange } from "@/src/actions/booking";
+import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
 
 export type CreateOutOfServiceInput = {
   fromDateTime: Date;
@@ -22,18 +22,23 @@ export type UpdateOutOfServiceInput = Partial<
   courtId?: number;
 };
 
-export type OutOfServiceWithCancellations = {
-  outOfService: OutOfService;
-  cancelledBookings: Booking[];
-};
-
+/**
+ * Crea el bloqueo y, en la misma transacción, cancela los turnos de la cancha que
+ * se superponen con su período (OutOfService.cancelAffectedBookings() del diagrama
+ * de clases). No se penaliza a nadie: la cancelación no la pidió ningún jugador.
+ * Después se les avisa a los jugadores de cada turno cancelado (HU-37).
+ */
 export async function createOutOfService(
   input: CreateOutOfServiceInput,
-): Promise<ActionResult<OutOfServiceWithCancellations>> {
+): Promise<ActionResult<OutOfService>> {
+  if (new Date(input.toDateTime).getTime() <= new Date(input.fromDateTime).getTime()) {
+    return { success: false, error: "La fecha de fin del bloqueo debe ser posterior a la de inicio." };
+  }
+
   try {
     const dataSource = await getDataSource();
 
-    const result = await dataSource.transaction(async (manager) => {
+    const { saved, cancelledBookingIds } = await dataSource.transaction(async (manager) => {
       const outOfServices = manager.getRepository<OutOfService>("OutOfService");
 
       const outOfService = outOfServices.create({
@@ -43,21 +48,28 @@ export async function createOutOfService(
         description: input.description ?? null,
         court: { id: input.courtId },
       });
+      const created = await outOfServices.save(outOfService);
 
-      const saved = await outOfServices.save(outOfService);
+      const cancelled = await manager
+        .createQueryBuilder()
+        .update("Booking")
+        .set({ bookingState: BookingState.CANCELLED })
+        .where('"court_id" = :courtId', { courtId: input.courtId })
+        .andWhere('"booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+        .andWhere('"datetime" < :to', { to: input.toDateTime })
+        .andWhere('"datetime" + make_interval(mins => "duration_minutes") > :from', { from: input.fromDateTime })
+        .returning("id")
+        .execute();
 
-      // RF-13: al bloquearse el horario, las reservas ya hechas en ese rango se
-      // cancelan automáticamente sin penalizar al jugador (la causa es ajena a él).
-      const cancelledBookings = await cancelBookingsInRange(manager, {
-        courtId: input.courtId,
-        from: input.fromDateTime,
-        to: input.toDateTime,
-      });
-
-      return { outOfService: saved, cancelledBookings };
+      const rows: { id: number }[] = cancelled.raw ?? [];
+      return { saved: created, cancelledBookingIds: rows.map((row) => row.id) };
     });
 
-    return { success: true, data: toPlain(result) };
+    if (cancelledBookingIds.length > 0) {
+      await notifyCourtUnavailable(cancelledBookingIds);
+    }
+
+    return { success: true, data: toPlain(saved) };
   } catch (error) {
     console.error("createOutOfService", error);
     return { success: false, error: "No se pudo crear el bloqueo de cancha." };
@@ -96,47 +108,25 @@ export async function getOutOfServiceById(
 export async function updateOutOfService(
   id: number,
   input: UpdateOutOfServiceInput,
-): Promise<ActionResult<OutOfServiceWithCancellations>> {
+): Promise<ActionResult<OutOfService>> {
   try {
     const dataSource = await getDataSource();
+    const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
 
-    const result = await dataSource.transaction(async (manager) => {
-      const outOfServices = manager.getRepository<OutOfService>("OutOfService");
-
-      const outOfService = await outOfServices.findOne({
-        where: { id },
-        relations: { court: true },
-      });
-      if (!outOfService) {
-        throw new Error("NOT_FOUND");
-      }
-
-      const { courtId, ...rest } = input;
-      outOfServices.merge(outOfService, {
-        ...rest,
-        ...(courtId ? { court: { id: courtId } } : {}),
-      });
-
-      const saved = await outOfServices.save(outOfService);
-
-      // Si se amplía el rango o se reasigna la cancha, también hay que cancelar
-      // (sin penalizar) las reservas que pasan a quedar dentro del bloqueo.
-      const cancelledBookings = saved.court?.id
-        ? await cancelBookingsInRange(manager, {
-            courtId: saved.court.id,
-            from: saved.fromDateTime,
-            to: saved.toDateTime,
-          })
-        : [];
-
-      return { outOfService: saved, cancelledBookings };
-    });
-
-    return { success: true, data: toPlain(result) };
-  } catch (error) {
-    if (error instanceof Error && error.message === "NOT_FOUND") {
+    const outOfService = await outOfServices.findOne({ where: { id } });
+    if (!outOfService) {
       return { success: false, error: "El bloqueo de cancha no existe." };
     }
+
+    const { courtId, ...rest } = input;
+    outOfServices.merge(outOfService, {
+      ...rest,
+      ...(courtId ? { court: { id: courtId } } : {}),
+    });
+
+    const saved = await outOfServices.save(outOfService);
+    return { success: true, data: toPlain(saved) };
+  } catch (error) {
     console.error("updateOutOfService", error);
     return { success: false, error: "No se pudo actualizar el bloqueo de cancha." };
   }
@@ -156,5 +146,33 @@ export async function deleteOutOfService(id: number): Promise<ActionResult<null>
   } catch (error) {
     console.error("deleteOutOfService", error);
     return { success: false, error: "No se pudo eliminar el bloqueo de cancha." };
+  }
+}
+
+/**
+ * Habilita la cancha finalizando en este momento su bloqueo activo. No se borra
+ * el registro, así queda el historial de cuándo estuvo fuera de servicio.
+ */
+export async function endOutOfService(id: number): Promise<ActionResult<OutOfService>> {
+  try {
+    const dataSource = await getDataSource();
+    const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
+
+    const outOfService = await outOfServices.findOne({ where: { id } });
+    if (!outOfService) {
+      return { success: false, error: "El bloqueo de cancha no existe." };
+    }
+
+    const now = new Date();
+    if (!isOutOfServiceActive(outOfService, now)) {
+      return { success: false, error: "El bloqueo de cancha no está activo." };
+    }
+
+    outOfService.toDateTime = now;
+    const saved = await outOfServices.save(outOfService);
+    return { success: true, data: toPlain(saved) };
+  } catch (error) {
+    console.error("endOutOfService", error);
+    return { success: false, error: "No se pudo habilitar la cancha." };
   }
 }

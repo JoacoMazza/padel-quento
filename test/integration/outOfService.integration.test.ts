@@ -3,44 +3,28 @@ import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
-import { createBooking, getBookingById } from "@/src/actions/booking";
-import { Penalty } from "@/src/entities/Penalty";
+import { getBookingById } from "@/src/actions/booking";
 import {
   createOutOfService,
   getOutOfServices,
   getOutOfServiceById,
   updateOutOfService,
   deleteOutOfService,
+  endOutOfService,
 } from "@/src/actions/outOfService";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
-
-function uniqueEmail(prefix: string) {
-  return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
-}
+import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createBookingForPlayer } from "@/src/lib/bookings";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
 const toDateTime = new Date("2026-01-01T12:00:00Z");
 
 describe("outOfService actions (integración con Postgres real)", () => {
   let courtId: number;
-  let playerId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber() });
+    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
-
-    const player = await createPlayer({
-      email: uniqueEmail("oos-player"),
-      password: "secreto123",
-      names: "Jugador",
-      lastnames: "De Prueba",
-    });
-    if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
-    playerId = player.data.id;
   });
 
   afterAll(async () => {
@@ -59,12 +43,11 @@ describe("outOfService actions (integración con Postgres real)", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    expect(result.data.outOfService).toMatchObject({
+    expect(result.data).toMatchObject({
       reason: OutOfServiceReason.MAINTENANCE,
       description: "Arreglo de red",
     });
-    expect(result.data.outOfService.id).toBeDefined();
-    expect(result.data.cancelledBookings).toEqual([]);
+    expect(result.data.id).toBeDefined();
   });
 
   it("lista los bloqueos con la cancha asociada cargada", async () => {
@@ -94,7 +77,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
     });
     if (!created.success) throw new Error("expected success");
 
-    const found = await getOutOfServiceById(created.data.outOfService.id);
+    const found = await getOutOfServiceById(created.data.id);
     expect(found.success).toBe(true);
     if (!found.success) throw new Error("expected success");
     expect(found.data?.reason).toBe(OutOfServiceReason.OTHER);
@@ -112,15 +95,13 @@ describe("outOfService actions (integración con Postgres real)", () => {
     });
     if (!created.success) throw new Error("expected success");
 
-    const result = await updateOutOfService(created.data.outOfService.id, {
+    const result = await updateOutOfService(created.data.id, {
       reason: OutOfServiceReason.MAINTENANCE,
     });
 
     expect(result).toEqual({
       success: true,
-      data: expect.objectContaining({
-        outOfService: expect.objectContaining({ reason: OutOfServiceReason.MAINTENANCE }),
-      }),
+      data: expect.objectContaining({ reason: OutOfServiceReason.MAINTENANCE }),
     });
   });
 
@@ -139,118 +120,80 @@ describe("outOfService actions (integración con Postgres real)", () => {
     });
     if (!created.success) throw new Error("expected success");
 
-    const result = await deleteOutOfService(created.data.outOfService.id);
+    const result = await deleteOutOfService(created.data.id);
     expect(result).toEqual({ success: true, data: null });
 
-    const secondAttempt = await deleteOutOfService(created.data.outOfService.id);
+    const secondAttempt = await deleteOutOfService(created.data.id);
     expect(secondAttempt).toEqual({ success: false, error: "El bloqueo de cancha no existe." });
   });
 
-  describe("cancelación automática de turnos afectados (RF-13)", () => {
-    it("cancela las reservas superpuestas al bloquear el horario y no penaliza al jugador", async () => {
-      const court = await createCourt({ number: uniqueCourtNumber() });
-      if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
-
-      const bookingFrom = new Date("2026-02-01T10:00:00Z");
-      const booking = await createBooking({
-        fromDateTime: bookingFrom,
-        durationMinutes: 90,
-        playerId,
-        courtId: court.data.id,
-      });
-      if (!booking.success) throw new Error("expected success");
-
-      const blockFrom = new Date("2026-02-01T09:30:00Z");
-      const blockTo = new Date("2026-02-01T11:00:00Z");
-      const result = await createOutOfService({
-        fromDateTime: blockFrom,
-        toDateTime: blockTo,
-        reason: OutOfServiceReason.MAINTENANCE,
-        courtId: court.data.id,
-      });
-
-      expect(result.success).toBe(true);
-      if (!result.success) throw new Error("expected success");
-      expect(result.data.cancelledBookings).toHaveLength(1);
-      expect(result.data.cancelledBookings[0]).toMatchObject({
-        id: booking.data.id,
-        bookingState: BookingState.CANCELLED,
-      });
-
-      const refreshed = await getBookingById(booking.data.id);
-      expect(refreshed.success).toBe(true);
-      if (!refreshed.success) throw new Error("expected success");
-      expect(refreshed.data?.bookingState).toBe(BookingState.CANCELLED);
-
-      const dataSource = await getDataSource();
-      const penalties = await dataSource
-        .getRepository<Penalty>("Penalty")
-        .find({ where: { playerId } });
-      expect(penalties).toEqual([]);
+  it("al crear el bloqueo cancela solo los turnos de esa cancha que se superponen", async () => {
+    const otherCourt = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    if (!otherCourt.success) throw new Error("no se pudo crear la cancha de prueba");
+    const player = await createPlayer({
+      phoneNumber: uniquePhoneNumber(),
+      email: `bloqueo.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
+      password: "secreto123",
+      names: "Jugador",
+      lastnames: "Bloqueo",
     });
+    if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
+    const playerId = player.data.id;
 
-    it("no cancela reservas fuera del rango bloqueado ni ya canceladas", async () => {
-      const court = await createCourt({ number: uniqueCourtNumber() });
-      if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
+    const day = new Date(Date.now() + 50 * 24 * 60 * 60 * 1000);
+    const at = (hours: number, minutes = 0) => {
+      const date = new Date(day);
+      date.setHours(hours, minutes, 0, 0);
+      return date;
+    };
+    async function book(hours: number, minutes: number, onCourtId: number) {
+      const booking = await createBookingForPlayer({ fromDateTime: at(hours, minutes), bookerId: playerId, courtId: onCourtId });
+      if (!booking.success) throw new Error(`no se pudo crear el turno de prueba: ${booking.error}`);
+      return booking.data.id;
+    }
 
-      const outsideBooking = await createBooking({
-        fromDateTime: new Date("2026-02-02T20:00:00Z"),
-        durationMinutes: 90,
-        playerId,
-        courtId: court.data.id,
-      });
-      if (!outsideBooking.success) throw new Error("expected success");
+    // Bloqueo de 10:00 a 13:00 en la cancha del archivo.
+    const overlapping = await book(9, 0, courtId); // 09:00-10:30, se superpone al inicio
+    const inside = await book(11, 0, courtId); // 11:00-12:30, dentro del bloqueo
+    const after = await book(13, 0, courtId); // 13:00-14:30, empieza justo al terminar
+    const otherCourtSameTime = await book(11, 0, otherCourt.data.id);
 
-      const result = await createOutOfService({
-        fromDateTime: new Date("2026-02-02T09:00:00Z"),
-        toDateTime: new Date("2026-02-02T12:00:00Z"),
-        reason: OutOfServiceReason.MAINTENANCE,
-        courtId: court.data.id,
-      });
-
-      expect(result.success).toBe(true);
-      if (!result.success) throw new Error("expected success");
-      expect(result.data.cancelledBookings).toEqual([]);
-
-      const refreshed = await getBookingById(outsideBooking.data.id);
-      expect(refreshed.success).toBe(true);
-      if (!refreshed.success) throw new Error("expected success");
-      expect(refreshed.data?.bookingState).toBe(BookingState.RESERVED);
+    const created = await createOutOfService({
+      fromDateTime: at(10),
+      toDateTime: at(13),
+      reason: OutOfServiceReason.MAINTENANCE,
+      courtId,
     });
+    expect(created.success).toBe(true);
 
-    it("cancela reservas que quedan dentro del rango al ampliar un bloqueo existente", async () => {
-      const court = await createCourt({ number: uniqueCourtNumber() });
-      if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
+    async function stateOf(bookingId: number) {
+      const found = await getBookingById(bookingId);
+      if (!found.success || !found.data) throw new Error("no se encontró el turno");
+      return found.data.bookingState;
+    }
+    expect(await stateOf(overlapping)).toBe(BookingState.CANCELLED);
+    expect(await stateOf(inside)).toBe(BookingState.CANCELLED);
+    expect(await stateOf(after)).not.toBe(BookingState.CANCELLED);
+    expect(await stateOf(otherCourtSameTime)).not.toBe(BookingState.CANCELLED);
+  });
 
-      const created = await createOutOfService({
-        fromDateTime: new Date("2026-02-03T09:00:00Z"),
-        toDateTime: new Date("2026-02-03T10:00:00Z"),
-        reason: OutOfServiceReason.MAINTENANCE,
-        courtId: court.data.id,
-      });
-      if (!created.success) throw new Error("expected success");
-
-      const booking = await createBooking({
-        fromDateTime: new Date("2026-02-03T11:00:00Z"),
-        durationMinutes: 60,
-        playerId,
-        courtId: court.data.id,
-      });
-      if (!booking.success) throw new Error("expected success");
-
-      const updated = await updateOutOfService(created.data.outOfService.id, {
-        toDateTime: new Date("2026-02-03T12:00:00Z"),
-      });
-
-      expect(updated.success).toBe(true);
-      if (!updated.success) throw new Error("expected success");
-      expect(updated.data.cancelledBookings).toHaveLength(1);
-      expect(updated.data.cancelledBookings[0]).toMatchObject({ id: booking.data.id });
-
-      const refreshed = await getBookingById(booking.data.id);
-      expect(refreshed.success).toBe(true);
-      if (!refreshed.success) throw new Error("expected success");
-      expect(refreshed.data?.bookingState).toBe(BookingState.CANCELLED);
+  it("finaliza un bloqueo activo y conserva el registro", async () => {
+    const created = await createOutOfService({
+      fromDateTime: new Date(Date.now() - 60 * 60 * 1000),
+      toDateTime: new Date(Date.now() + 60 * 60 * 1000),
+      reason: OutOfServiceReason.CLEANING,
+      courtId,
     });
+    if (!created.success) throw new Error("expected success");
+
+    const ended = await endOutOfService(created.data.id);
+    expect(ended.success).toBe(true);
+
+    const found = await getOutOfServiceById(created.data.id);
+    if (!found.success || !found.data) throw new Error("expected the block to still exist");
+    expect(found.data.toDateTime.getTime()).toBeLessThanOrEqual(Date.now());
+
+    const again = await endOutOfService(created.data.id);
+    expect(again).toEqual({ success: false, error: "El bloqueo de cancha no está activo." });
   });
 });

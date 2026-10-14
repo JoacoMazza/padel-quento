@@ -1,14 +1,10 @@
-import { getCourts } from "@/src/actions/court";
 import { AdminPanel } from "@/app/admin/admin-panel";
+import { pageMetadata } from "@/app/site-metadata";
 
-export default async function AdminPage() {
-  const result = await getCourts();
-  const courts = result.success ? result.data : [];
+export const metadata = pageMetadata("Panel de administración", "/admin");
 
-  return (
-    <AdminPanel
-      courts={courts.map((c) => ({ id: c.id, number: c.number, state: c.state }))}
-      courtsError={!result.success ? result.error : null}
-    />
-  );
+// Sin precarga en el servidor: cada sección del panel pide sus datos recién
+// cuando el admin la abre (ver AdminPanel).
+export default function AdminPage() {
+  return <AdminPanel />;
 }

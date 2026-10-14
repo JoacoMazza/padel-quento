@@ -1,0 +1,208 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Search, ShieldOff, ShieldCheck, IdCard } from "lucide-react";
+import { blockPlayer, unblockPlayer, type PlayerAdminItem } from "@/src/actions/player";
+import { PlayerRecordModal } from "@/app/admin/player-record-modal";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "1st": "1ª",
+  "2nd": "2ª",
+  "3rd": "3ª",
+  "4th": "4ª",
+  "5th": "5ª",
+  "6th": "6ª",
+  "7th": "7ª",
+  without_category: "Sin categoría",
+};
+
+export function UsersTable({ players: initialPlayers }: { players: PlayerAdminItem[] }) {
+  const [players, setPlayers] = useState(initialPlayers);
+  const [search, setSearch] = useState("");
+  const [actionError, setActionError] = useState<{ id: number; msg: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [recordPlayerId, setRecordPlayerId] = useState<number | null>(null);
+  const recordPlayer = players.find((p) => p.id === recordPlayerId) ?? null;
+
+  const filtered = players.filter((p) => {
+    const term = search.toLowerCase();
+    return (
+      `${p.names} ${p.lastnames}`.toLowerCase().includes(term) ||
+      p.email.toLowerCase().includes(term)
+    );
+  });
+
+  function handleToggleBlock(player: PlayerAdminItem) {
+    setActionError(null);
+    setPendingId(player.id);
+    const action = player.isBlocked ? unblockPlayer : blockPlayer;
+    startTransition(async () => {
+      const result = await action(player.id);
+      setPendingId(null);
+      if (!result.success) {
+        setActionError({ id: player.id, msg: result.error });
+        return;
+      }
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === player.id ? { ...p, isBlocked: !p.isBlocked } : p)),
+      );
+    });
+  }
+
+  if (players.length === 0) {
+    return <p className="text-sm text-foreground/60">No hay jugadores registrados todavía.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Barra de búsqueda */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="field bg-card pl-9"
+        />
+      </div>
+
+      {/* Tabla */}
+      <div className="card overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-line bg-background/60">
+            <tr>
+              <th className="table-head">Jugador</th>
+              <th className="table-head">Email</th>
+              <th className="table-head">Teléfono</th>
+              <th className="table-head">Categoría</th>
+              <th className="table-head">Estado</th>
+              <th className="table-head text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-6 text-center text-sm text-foreground/50">
+                  Sin resultados para &quot;{search}&quot;
+                </td>
+              </tr>
+            ) : (
+              filtered.map((player) => {
+                const isThisPending = isPending && pendingId === player.id;
+                const thisError = actionError?.id === player.id ? actionError.msg : null;
+
+                return (
+                  <tr key={player.id} className="transition-colors hover:bg-background/60">
+                    {/* Nombre */}
+                    <td className="table-cell font-semibold text-foreground">
+                      {player.names} {player.lastnames}
+                    </td>
+
+                    {/* Email */}
+                    <td className="table-cell text-foreground/70">
+                      {player.email}
+                    </td>
+
+                    {/* Teléfono */}
+                    <td className="table-cell text-foreground/70">
+                      {player.phoneNumber}
+                    </td>
+
+                    {/* Categoría */}
+                    <td className="table-cell text-foreground/70">
+                      {CATEGORY_LABELS[player.category] ?? player.category}
+                    </td>
+
+                    {/* Estado */}
+                    <td className="table-cell">
+                      {player.isBlocked ? (
+                        <span className="badge badge-danger">
+                          <span className="h-1.5 w-1.5 rounded-full bg-danger" />
+                          Bloqueado
+                        </span>
+                      ) : (
+                        <span className="badge badge-success">
+                          <span className="h-1.5 w-1.5 rounded-full bg-success" />
+                          Activo
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Acciones */}
+                    <td className="table-cell text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={`Ver ficha de ${player.names}`}
+                            title="Ver ficha"
+                            onClick={() => setRecordPlayerId(player.id)}
+                            className="btn btn-sm btn-soft"
+                          >
+                            <IdCard className="h-3.5 w-3.5" />
+                            Ver ficha
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isThisPending}
+                            aria-label={
+                              player.isBlocked
+                                ? `Desbloquear a ${player.names}`
+                                : `Bloquear a ${player.names}`
+                            }
+                            title={player.isBlocked ? "Desbloquear" : "Bloquear"}
+                            onClick={() => handleToggleBlock(player)}
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                              player.isBlocked
+                                ? "bg-success/10 text-success hover:bg-success/20"
+                                : "bg-danger/10 text-danger hover:bg-danger/20"
+                            }`}
+                          >
+                            {isThisPending ? (
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : player.isBlocked ? (
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            ) : (
+                              <ShieldOff className="h-3.5 w-3.5" />
+                            )}
+                            {isThisPending
+                              ? "Procesando…"
+                              : player.isBlocked
+                                ? "Desbloquear"
+                                : "Bloquear"}
+                          </button>
+                        </div>
+
+                        {thisError ? (
+                          <p className="text-[11px] font-medium text-danger">{thisError}</p>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {recordPlayer ? (
+        <PlayerRecordModal
+          player={recordPlayer}
+          isTogglePending={isPending && pendingId === recordPlayer.id}
+          toggleError={actionError?.id === recordPlayer.id ? actionError.msg : null}
+          onToggleBlock={() => handleToggleBlock(recordPlayer)}
+          onClose={() => setRecordPlayerId(null)}
+        />
+      ) : null}
+
+      {/* Contador */}
+      <p className="text-xs text-foreground/40">
+        {filtered.length} de {players.length} jugador{players.length !== 1 ? "es" : ""}
+      </p>
+    </div>
+  );
+}
+

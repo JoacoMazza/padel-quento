@@ -5,6 +5,7 @@ import {
   Entity,
   ManyToOne,
   PrimaryGeneratedColumn,
+  JoinColumn,
 } from "typeorm";
 import type { Player } from "@/src/entities/Player";
 
@@ -13,10 +14,8 @@ export class Penalty {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: "int", name: "player_id" })
-  playerId!: number;
-
   @ManyToOne("Player", "penalties", { onDelete: "CASCADE" })
+  @JoinColumn({ name: "player_id" })
   player!: Player;
 
   /** Puntos penalizados o bonificados (negativo para penalizaciones, positivo para bonificaciones) */
@@ -26,7 +25,7 @@ export class Penalty {
   @Column({ type: "varchar" })
   reason!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 }
 

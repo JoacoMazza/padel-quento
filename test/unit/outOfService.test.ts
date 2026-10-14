@@ -1,46 +1,33 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 
-const {
-  create,
-  save,
-  find,
-  findOne,
-  merge,
-  deleteFn,
-  updateFn,
-  getMany,
-  getDataSource,
-} = vi.hoisted(() => {
+const { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSource } = vi.hoisted(() => {
   const create = vi.fn((data: unknown) => data);
   const save = vi.fn(async (entity: unknown) => entity);
   const find = vi.fn();
   const findOne = vi.fn();
   const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
   const deleteFn = vi.fn();
-  const updateFn = vi.fn(async () => ({ affected: 0 }));
-  const getMany = vi.fn(async () => [] as unknown[]);
-
-  const repository = { create, save, find, findOne, merge, delete: deleteFn, update: updateFn };
-
-  const queryBuilder: any = {};
-  queryBuilder.where = vi.fn(() => queryBuilder);
-  queryBuilder.andWhere = vi.fn(() => queryBuilder);
-  queryBuilder.getMany = getMany;
-
-  const manager = {
-    getRepository: vi.fn(() => repository),
-    createQueryBuilder: vi.fn(() => queryBuilder),
+  const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
+  // Query builder de la cancelación de turnos afectados: registra cada llamada encadenada.
+  const bookingsUpdate = {
+    update: vi.fn(),
+    set: vi.fn(),
+    where: vi.fn(),
+    andWhere: vi.fn(),
+    returning: vi.fn(),
+    execute: vi.fn(),
   };
-
-  const getRepository = vi.fn(() => repository);
-  const transaction = vi.fn(async (cb: (manager: unknown) => unknown) => cb(manager));
+  const manager = { getRepository, createQueryBuilder: vi.fn(() => bookingsUpdate) };
+  const transaction = vi.fn(async (work: (m: typeof manager) => unknown) => work(manager));
   const getDataSource = vi.fn(async () => ({ getRepository, transaction }));
-
-  return { create, save, find, findOne, merge, deleteFn, updateFn, getMany, getDataSource };
+  return { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSource };
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+
+const { notifyCourtUnavailable } = vi.hoisted(() => ({ notifyCourtUnavailable: vi.fn(async () => {}) }));
+vi.mock("@/src/lib/match-notifications", () => ({ notifyCourtUnavailable }));
 
 import {
   createOutOfService,
@@ -48,6 +35,7 @@ import {
   getOutOfServiceById,
   updateOutOfService,
   deleteOutOfService,
+  endOutOfService,
 } from "@/src/actions/outOfService";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
@@ -58,7 +46,11 @@ describe("outOfService actions", () => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
     merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
-    getMany.mockResolvedValue([]);
+    save.mockImplementation(async (entity: unknown) => entity);
+    for (const method of ["update", "set", "where", "andWhere", "returning"] as const) {
+      bookingsUpdate[method].mockReturnValue(bookingsUpdate);
+    }
+    bookingsUpdate.execute.mockResolvedValue({ affected: 0, raw: [] });
   });
 
   describe("createOutOfService", () => {
@@ -80,14 +72,11 @@ describe("outOfService actions", () => {
       expect(result).toEqual({
         success: true,
         data: {
-          outOfService: {
-            fromDateTime,
-            toDateTime,
-            reason: OutOfServiceReason.MAINTENANCE,
-            description: null,
-            court: { id: 1 },
-          },
-          cancelledBookings: [],
+          fromDateTime,
+          toDateTime,
+          reason: OutOfServiceReason.MAINTENANCE,
+          description: null,
+          court: { id: 1 },
         },
       });
     });
@@ -106,33 +95,66 @@ describe("outOfService actions", () => {
       );
     });
 
-    it("cancela sin penalizar las reservas superpuestas con el bloqueo", async () => {
-      const overlapping = [
-        { id: 10, bookingState: BookingState.RESERVED },
-        { id: 11, bookingState: BookingState.PAID },
-      ];
-      getMany.mockResolvedValueOnce(overlapping);
-
+    it("rechaza un bloqueo cuya fecha de fin no es posterior a la de inicio", async () => {
       const result = await createOutOfService({
+        fromDateTime: toDateTime,
+        toDateTime: fromDateTime,
+        reason: OutOfServiceReason.MAINTENANCE,
+        courtId: 1,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "La fecha de fin del bloqueo debe ser posterior a la de inicio.",
+      });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("cancela los turnos no cancelados de la cancha que se superponen con el bloqueo", async () => {
+      await createOutOfService({
         fromDateTime,
         toDateTime,
         reason: OutOfServiceReason.MAINTENANCE,
         courtId: 1,
       });
 
-      expect(updateFn).toHaveBeenCalledWith(
-        { id: expect.anything() },
-        { bookingState: BookingState.CANCELLED },
+      expect(bookingsUpdate.update).toHaveBeenCalledWith("Booking");
+      expect(bookingsUpdate.set).toHaveBeenCalledWith({ bookingState: BookingState.CANCELLED });
+      const conditions = [...bookingsUpdate.where.mock.calls, ...bookingsUpdate.andWhere.mock.calls];
+      expect(conditions).toEqual(
+        expect.arrayContaining([
+          [expect.stringContaining("court_id"), { courtId: 1 }],
+          [expect.stringContaining("booking_state"), { cancelled: BookingState.CANCELLED }],
+          [expect.stringContaining("datetime"), { to: toDateTime }],
+          [expect.stringContaining("duration_minutes"), { from: fromDateTime }],
+        ]),
       );
-      expect(result).toEqual({
-        success: true,
-        data: expect.objectContaining({
-          cancelledBookings: [
-            { id: 10, bookingState: BookingState.CANCELLED },
-            { id: 11, bookingState: BookingState.CANCELLED },
-          ],
-        }),
+      expect(bookingsUpdate.execute).toHaveBeenCalled();
+    });
+
+    it("avisa a los jugadores de los turnos que canceló el bloqueo", async () => {
+      bookingsUpdate.execute.mockResolvedValueOnce({ affected: 2, raw: [{ id: 7 }, { id: 9 }] });
+
+      await createOutOfService({
+        fromDateTime,
+        toDateTime,
+        reason: OutOfServiceReason.MAINTENANCE,
+        courtId: 1,
       });
+
+      expect(bookingsUpdate.returning).toHaveBeenCalledWith("id");
+      expect(notifyCourtUnavailable).toHaveBeenCalledWith([7, 9]);
+    });
+
+    it("no avisa nada si el bloqueo no canceló ningún turno", async () => {
+      await createOutOfService({
+        fromDateTime,
+        toDateTime,
+        reason: OutOfServiceReason.MAINTENANCE,
+        courtId: 1,
+      });
+
+      expect(notifyCourtUnavailable).not.toHaveBeenCalled();
     });
 
     it("devuelve un error genérico si falla el guardado", async () => {
@@ -194,60 +216,22 @@ describe("outOfService actions", () => {
 
   describe("updateOutOfService", () => {
     it("actualiza los campos escalares provistos", async () => {
-      findOne.mockResolvedValueOnce({
-        id: 1,
-        reason: OutOfServiceReason.MAINTENANCE,
-        fromDateTime,
-        toDateTime,
-        court: { id: 1 },
-      });
+      findOne.mockResolvedValueOnce({ id: 1, reason: OutOfServiceReason.MAINTENANCE });
 
       const result = await updateOutOfService(1, { reason: OutOfServiceReason.OTHER });
 
       expect(result).toEqual({
         success: true,
-        data: {
-          outOfService: {
-            id: 1,
-            reason: OutOfServiceReason.OTHER,
-            fromDateTime,
-            toDateTime,
-            court: { id: 1 },
-          },
-          cancelledBookings: [],
-        },
+        data: { id: 1, reason: OutOfServiceReason.OTHER },
       });
     });
 
     it("reasigna la cancha cuando se provee courtId", async () => {
-      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+      findOne.mockResolvedValueOnce({ id: 1, court: { id: 1 } });
 
       const result = await updateOutOfService(1, { courtId: 2 });
 
-      expect(result).toEqual({
-        success: true,
-        data: expect.objectContaining({
-          outOfService: expect.objectContaining({ id: 1, court: { id: 2 } }),
-        }),
-      });
-    });
-
-    it("cancela sin penalizar las reservas que quedan dentro del nuevo rango", async () => {
-      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
-      getMany.mockResolvedValueOnce([{ id: 20, bookingState: BookingState.RESERVED }]);
-
-      const result = await updateOutOfService(1, { toDateTime: new Date("2026-01-01T15:00:00Z") });
-
-      expect(updateFn).toHaveBeenCalledWith(
-        { id: expect.anything() },
-        { bookingState: BookingState.CANCELLED },
-      );
-      expect(result).toEqual({
-        success: true,
-        data: expect.objectContaining({
-          cancelledBookings: [{ id: 20, bookingState: BookingState.CANCELLED }],
-        }),
-      });
+      expect(result).toEqual({ success: true, data: { id: 1, court: { id: 2 } } });
     });
 
     it("devuelve error si el bloqueo no existe", async () => {
@@ -275,6 +259,62 @@ describe("outOfService actions", () => {
       const result = await deleteOutOfService(999);
 
       expect(result).toEqual({ success: false, error: "El bloqueo de cancha no existe." });
+    });
+  });
+
+  describe("endOutOfService", () => {
+    const now = new Date("2026-01-01T10:30:00Z");
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(now);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("finaliza en este momento un bloqueo activo, conservando el registro", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, reason: OutOfServiceReason.MAINTENANCE });
+
+      const result = await endOutOfService(1);
+
+      expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 1, toDateTime: now }));
+      expect(deleteFn).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        data: { id: 1, fromDateTime, toDateTime: now, reason: OutOfServiceReason.MAINTENANCE },
+      });
+    });
+
+    it("devuelve error si el bloqueo no existe", async () => {
+      findOne.mockResolvedValueOnce(null);
+
+      const result = await endOutOfService(999);
+
+      expect(result).toEqual({ success: false, error: "El bloqueo de cancha no existe." });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("devuelve error si el bloqueo no está activo", async () => {
+      findOne.mockResolvedValueOnce({
+        id: 1,
+        fromDateTime: new Date("2026-01-02T09:00:00Z"),
+        toDateTime: new Date("2026-01-02T12:00:00Z"),
+      });
+
+      const result = await endOutOfService(1);
+
+      expect(result).toEqual({ success: false, error: "El bloqueo de cancha no está activo." });
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("devuelve un error genérico ante cualquier otra falla", async () => {
+      findOne.mockRejectedValueOnce(new Error("boom"));
+
+      const result = await endOutOfService(1);
+
+      expect(result).toEqual({ success: false, error: "No se pudo habilitar la cancha." });
     });
   });
 });

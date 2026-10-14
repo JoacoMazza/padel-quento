@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRegisterForm } from "@/src/lib/register-validation";
 
-function buildFormData(fields: Partial<Record<"names" | "lastnames" | "email" | "password", string>>) {
+function buildFormData(fields: Partial<Record<"names" | "lastnames" | "email" | "password" | "phoneNumber", string>>) {
   const formData = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (value !== undefined) formData.set(key, value);
@@ -17,6 +17,7 @@ describe("parseRegisterForm", () => {
         lastnames: " Gomez ",
         email: " Ana.Gomez@Test.com ",
         password: "secreto123",
+        phoneNumber: " +54 221 555-0101 ",
       }),
     );
 
@@ -26,6 +27,7 @@ describe("parseRegisterForm", () => {
       lastnames: "Gomez",
       email: "ana.gomez@test.com",
       password: "secreto123",
+      phoneNumber: "+542215550101",
     });
   });
 
@@ -38,6 +40,7 @@ describe("parseRegisterForm", () => {
       lastnames: "El apellido es obligatorio.",
       email: "El email es obligatorio.",
       password: "La contraseña es obligatoria.",
+      phoneNumber: "El teléfono es obligatorio.",
     });
   });
 
@@ -48,6 +51,17 @@ describe("parseRegisterForm", () => {
 
     expect(result.errors?.email).toBe("Ingresá un email con formato válido.");
   });
+
+  it.each(["1234567", "2215550101abc", "+54 221 555 0101 0101 01"])(
+    "rechaza un teléfono con formato inválido (%s)",
+    (phoneNumber) => {
+      const result = parseRegisterForm(
+        buildFormData({ names: "Ana", lastnames: "Gomez", email: "ana@test.com", password: "secreto123", phoneNumber }),
+      );
+
+      expect(result.errors?.phoneNumber).toBe("Ingresá un teléfono válido, de 8 a 15 dígitos.");
+    },
+  );
 
   it.each([
     ["12345", "corta"],

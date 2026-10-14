@@ -17,6 +17,8 @@ import { getServerSession } from "next-auth/next";
 import { PlayerCategory } from "@/src/domain/enums";
 import { Player } from "@/src/entities/Player";
 import { getDataSource } from "@/src/lib/db";
+import { createPlayer } from "@/src/actions/player";
+import { uniquePhoneNumber } from "./helpers";
 import {
   getProfileData,
   recordPointsMovement,
@@ -35,21 +37,16 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
 
     playerEmail = `jugador.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
 
-    const dataSource = await getDataSource();
-    const players = dataSource.getRepository<Player>("Player");
-
-    const player = players.create({
+    const created = await createPlayer({
       names: "Esteban",
       lastnames: "Quito",
       email: playerEmail,
-      passwordHash: "hash123",
+      password: "secreto123",
+      phoneNumber: uniquePhoneNumber(),
       category: PlayerCategory.SIXTH,
-      scoring: 0,
-      photoUrl: null,
     });
-
-    const saved = await players.save(player);
-    playerId = saved.id;
+    if (!created.success) throw new Error("no se pudo crear el jugador de prueba");
+    playerId = created.data.id;
   });
 
   afterAll(async () => {
@@ -68,6 +65,16 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     expect(profile?.movements).toEqual([]);
   });
 
+  it("incluye el teléfono del jugador y si su cuenta está bloqueada", async () => {
+    const dataSource = await getDataSource();
+    const player = await dataSource.getRepository<Player>("Player").findOneOrFail({ where: { id: playerId } });
+
+    const profile = await getProfileData(playerEmail);
+
+    expect(profile?.phoneNumber).toBe(player.phoneNumber);
+    expect(profile?.isBlocked).toBe(false);
+  });
+
   it("modifica el nombre y categoría del jugador y los persiste inmediatamente", async () => {
     vi.mocked(getServerSession).mockResolvedValueOnce({
       user: { email: playerEmail, name: "Esteban Quito" },
@@ -77,7 +84,6 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     formData.set("names", "Esteban Modificado");
     formData.set("lastnames", "Quito Nuevo");
     formData.set("category", PlayerCategory.THIRD);
-    formData.set("photoUrl", "https://ejemplo.com/foto.png");
 
     const result = await updatePlayerProfile(initialState, formData);
 
@@ -87,12 +93,14 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     // Verificar persistencia inmediata en la BD
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
-    const updated = await players.findOne({ where: { email: playerEmail } });
+    const updated = await players.findOne({
+      where: { account: { email: playerEmail } },
+      relations: { account: true },
+    });
 
     expect(updated?.names).toBe("Esteban Modificado");
     expect(updated?.lastnames).toBe("Quito Nuevo");
     expect(updated?.category).toBe(PlayerCategory.THIRD);
-    expect(updated?.photoUrl).toBe("https://ejemplo.com/foto.png");
   });
 
   it("registra movimientos de bonificación y penalización y calcula el saldo neto en solo lectura", async () => {
@@ -129,5 +137,57 @@ describe("Profile Server Actions & Points (Integración Postgres)", () => {
     const players = dataSource.getRepository<Player>("Player");
     const playerInDb = await players.findOne({ where: { id: playerId } });
     expect(playerInDb?.scoring).toBe(35);
+  });
+
+  it("solo suma los movimientos del propio jugador, no los de otros", async () => {
+    const dataSource = await getDataSource();
+    const players = dataSource.getRepository<Player>("Player");
+    const created = await createPlayer({
+      names: "Otro",
+      lastnames: "Jugador",
+      email: `otro.perfil.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`,
+      password: "secreto123",
+      phoneNumber: uniquePhoneNumber(),
+    });
+    if (!created.success) throw new Error("no se pudo crear el otro jugador de prueba");
+    const other = created.data;
+
+    expect(await recordPointsMovement(other.id, 100, "bonus", "Bonificación de otro jugador")).toBe(true);
+    expect(await recordPointsMovement(playerId, 20, "bonus", "Bonificación propia")).toBe(true);
+
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(20);
+    expect(profile?.movements.map((m) => m.description)).toEqual(["Bonificación propia"]);
+
+    const otherInDb = await players.findOne({ where: { id: other.id } });
+    expect(otherInDb?.scoring).toBe(100);
+  });
+
+  it("una penalización no deja el saldo por debajo de 0: registra solo lo que efectivamente descuenta", async () => {
+    expect(await recordPointsMovement(playerId, 10, "bonus", "Asistencia a turno reservado")).toBe(true);
+    expect(await recordPointsMovement(playerId, 20, "penalty", "Inasistencia a turno reservado")).toBe(true);
+
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(0);
+    expect(profile?.movements[0]).toMatchObject({ amount: -10, type: "penalty" });
+
+    const dataSource = await getDataSource();
+    const playerInDb = await dataSource.getRepository<Player>("Player").findOne({ where: { id: playerId } });
+    expect(playerInDb?.scoring).toBe(0);
+  });
+
+  it("con saldo 0 la penalización no descuenta nada y una bonificación posterior suma completa", async () => {
+    expect(await recordPointsMovement(playerId, 20, "penalty", "Inasistencia a turno reservado")).toBe(true);
+    const profile = await getProfileData(playerEmail);
+    expect(profile?.scoring).toBe(0);
+    // La penalidad queda registrada igual (por 0 puntos), para el reporte de asistencia.
+    expect(profile?.movements[0]).toMatchObject({
+      amount: 0,
+      type: "penalty",
+      description: "Inasistencia a turno reservado",
+    });
+
+    expect(await recordPointsMovement(playerId, 10, "bonus", "Asistencia a turno reservado")).toBe(true);
+    expect((await getProfileData(playerEmail))?.scoring).toBe(10);
   });
 });

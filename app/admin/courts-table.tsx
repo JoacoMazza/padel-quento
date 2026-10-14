@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
-import { STATE_LABELS, STATE_BADGE_STYLES, type CourtItem } from "@/app/admin/court-status";
-import { CourtModal } from "@/app/admin/court-modal";
+import { Ban, CircleCheck, Eye, LayoutGrid, Lock, Pencil, Tag } from "lucide-react";
+import { courtStatus, summarizeCourts, type CourtItem } from "@/app/admin/court-status";
+import { AllCourtsPriceModal, CourtModal } from "@/app/admin/court-modal";
+import { CourtTag } from "@/app/components/ui/court-tag";
+import { StatCard } from "@/app/components/ui/stat-card";
+import { formatPrice } from "@/app/bookings/slot-utils";
 
 type ModalState =
-  | { mode: "view" | "edit" | "delete"; court: CourtItem }
+  | { mode: "view" | "edit" | "outOfService" | "enable"; court: CourtItem }
+  | { mode: "allPrices" }
   | null;
 
 export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) {
@@ -22,8 +26,8 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
     closeModal();
   }
 
-  function handleDeleted(id: number) {
-    setCourts((prev) => prev.filter((c) => c.id !== id));
+  function handleAllPricesSaved(price: number) {
+    setCourts((prev) => prev.map((c) => ({ ...c, price })));
     closeModal();
   }
 
@@ -31,44 +35,80 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
     return <p className="text-sm text-foreground/60">No hay canchas registradas todavía.</p>;
   }
 
+  const summary = summarizeCourts(courts);
+
   return (
     <>
-      <div className="overflow-x-auto rounded-2xl border border-line bg-card shadow-sm">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Canchas habilitadas"
+          value={summary.enabled}
+          suffix={`/ ${summary.total} en servicio`}
+          icon={<LayoutGrid className="h-4 w-4" />}
+          progress={summary.enabled / summary.total}
+          footer={`Capacidad operativa al ${Math.round((summary.enabled / summary.total) * 100)}%`}
+        />
+        <StatCard
+          label="Bloqueos activos"
+          value={summary.activeBlocks}
+          suffix={summary.activeBlocks === 1 ? "cancha bloqueada" : "canchas bloqueadas"}
+          icon={<Lock className="h-4 w-4" />}
+          progress={summary.activeBlocks / summary.total}
+          tone="primary"
+          footer="Los turnos dentro de un bloqueo se cancelan"
+        />
+        <StatCard
+          label="Total de canchas"
+          value={summary.total}
+          suffix="registradas"
+          footer="Editá precio y estado desde la tabla"
+        />
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <button type="button" onClick={() => setModal({ mode: "allPrices" })} className="btn btn-sm btn-outline">
+          <Tag className="h-4 w-4" />
+          Cambiar precio de todas
+        </button>
+      </div>
+
+      <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-line bg-background/60">
             <tr>
-              <th className="px-5 py-3 font-semibold text-foreground/70">ID</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Número</th>
-              <th className="px-5 py-3 font-semibold text-foreground/70">Estado</th>
-              <th className="px-5 py-3 text-right font-semibold text-foreground/70">Acciones</th>
+              <th className="table-head">Cancha</th>
+              <th className="table-head">Precio</th>
+              <th className="table-head">Estado</th>
+              <th className="table-head text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {courts.map((court) => {
-              const style = STATE_BADGE_STYLES[court.state];
+              const { label: stateLabel, style } = courtStatus(court);
 
               return (
-                <tr key={court.id}>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-foreground/70">{court.id}</td>
-                  <td className="whitespace-nowrap px-5 py-3.5 font-semibold text-foreground">
-                    Cancha {court.number}
+                <tr key={court.id} className="transition-colors hover:bg-background/60">
+                  <td className="table-cell">
+                    <div className="flex items-center gap-3">
+                      <CourtTag number={court.number} size="sm" />
+                      <span className="font-semibold text-foreground">Cancha {court.number}</span>
+                    </div>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.badge}`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-                      {STATE_LABELS[court.state]}
+                  <td className="table-cell text-foreground/70">{formatPrice(court.price)}</td>
+                  <td className="table-cell">
+                    <span className={`badge ${style.badge}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                      {stateLabel}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3.5">
+                  <td className="table-cell">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         type="button"
                         aria-label={`Ver cancha ${court.number}`}
                         title="Ver"
                         onClick={() => setModal({ mode: "view", court })}
-                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-line/40 hover:text-foreground"
+                        className="icon-btn"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -77,19 +117,32 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                         aria-label={`Editar cancha ${court.number}`}
                         title="Editar"
                         onClick={() => setModal({ mode: "edit", court })}
-                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:text-blue-500/80 hover:bg-blue-500/20"
+                        className="icon-btn"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`Eliminar cancha ${court.number}`}
-                        title="Eliminar"
-                        onClick={() => setModal({ mode: "delete", court })}
-                        className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {court.activeOutOfService ? (
+                        <button
+                          type="button"
+                          aria-label={`Habilitar la cancha ${court.number}`}
+                          title="Habilitar"
+                          onClick={() => setModal({ mode: "enable", court })}
+                          className="btn btn-sm btn-dark"
+                        >
+                          <CircleCheck className="h-4 w-4" />
+                          Habilitar
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Poner fuera de servicio la cancha ${court.number}`}
+                          title="Poner fuera de servicio"
+                          onClick={() => setModal({ mode: "outOfService", court })}
+                          className="icon-btn hover:border-danger/40 hover:text-danger"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -103,8 +156,11 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
       {modal?.mode === "edit" ? (
         <CourtModal mode="edit" court={modal.court} onClose={closeModal} onSaved={handleSaved} />
       ) : null}
-      {modal?.mode === "delete" ? (
-        <CourtModal mode="delete" court={modal.court} onClose={closeModal} onDeleted={handleDeleted} />
+      {modal?.mode === "outOfService" || modal?.mode === "enable" ? (
+        <CourtModal mode={modal.mode} court={modal.court} onClose={closeModal} onSaved={handleSaved} />
+      ) : null}
+      {modal?.mode === "allPrices" ? (
+        <AllCourtsPriceModal initialPrice={courts[0].price} onClose={closeModal} onSaved={handleAllPricesSaved} />
       ) : null}
     </>
   );

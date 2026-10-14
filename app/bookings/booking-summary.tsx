@@ -1,86 +1,137 @@
-import { Banknote, Calendar, Clock, LayoutGrid } from "lucide-react";
+import { ArrowRight, UserPlus, Users } from "lucide-react";
+import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   SLOT_DURATION_MINUTES,
   formatLongDate,
-  formatPrice,
-  minutesToTimeLabel,
 } from "@/app/bookings/slot-utils";
+import {
+  GroupSizePicker,
+  SummaryCourt,
+  SummaryFeedback,
+  SummaryField,
+  SummaryHeader,
+  SummaryPanel,
+  SummaryTotal,
+} from "@/app/bookings/summary-parts";
 import type { SelectedSlot } from "@/app/bookings/types";
+import { dateToTimeLabel } from "@/src/domain/time-format";
 
 export function BookingSummary({
   selectedDate,
   selectedSlot,
   feedback,
   isPending,
-  price,
+  isOpenMatch,
+  onIsOpenMatchChange,
+  openMatchGroupSize,
+  onOpenMatchGroupSizeChange,
   onConfirm,
+  onClose,
 }: {
   selectedDate: Date;
-  selectedSlot: SelectedSlot | null;
+  selectedSlot: SelectedSlot;
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
-  price: number;
+  isOpenMatch: boolean;
+  onIsOpenMatchChange: (value: boolean) => void;
+  openMatchGroupSize: number;
+  onOpenMatchGroupSizeChange: (value: number) => void;
   onConfirm: () => void;
+  onClose: () => void;
 }) {
+  const openMatchGroupSizeOptions = Array.from({ length: OPEN_MATCH_MAX_PLAYERS - 1 }, (_, i) => i + 1);
+
   return (
-    <aside className="h-fit rounded-2xl border border-line bg-card p-6 shadow-sm">
-      <h2 className="text-lg font-extrabold text-foreground">Tu reserva</h2>
+    <SummaryPanel label="Resumen de tu turno">
+      <SummaryHeader
+        title="Resumen de tu turno"
+        onClose={onClose}
+      />
 
-      {feedback ? (
-        <p
-          role="alert"
-          className={`mt-3 rounded-lg px-3 py-2 text-sm font-medium ${
-            feedback.type === "error"
-              ? "border border-danger/30 bg-danger-light text-danger"
-              : "border border-primary/30 bg-primary-light text-primary"
-          }`}
-        >
-          {feedback.message}
-        </p>
-      ) : null}
+      <SummaryFeedback feedback={feedback} />
 
-      {selectedSlot ? (
-        <div className="mt-4 flex flex-col gap-4">
-          <SummaryRow icon={<Calendar className="h-5 w-5" />} label="Fecha" value={formatLongDate(selectedDate)} />
-          <SummaryRow
-            icon={<LayoutGrid className="h-5 w-5" />}
-            label="Cancha"
-            value={`Cancha ${selectedSlot.courtNumber}`}
+      <SummaryCourt courtNumber={selectedSlot.courtNumber}/>
+
+      <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
+        <SummaryField label="Día" value={formatLongDate(selectedDate)} />
+        <SummaryField
+          label="Horario"
+          value={`${dateToTimeLabel(selectedSlot.start)} · ${SLOT_DURATION_MINUTES} min`}
+        />
+      </div>
+
+      {/* El padding va en un div: el navegador ubica el legend sobre el borde superior del fieldset e ignora su padding. */}
+      <div className="border-b border-white/10 py-5">
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Modalidad</legend>
+          <ModeOption
+            checked={!isOpenMatch}
+            onChange={() => onIsOpenMatchChange(false)}
+            icon={<Users className="h-4 w-4" />}
+            title="Cancha completa"
+            description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores`}
           />
-          <SummaryRow
-            icon={<Clock className="h-5 w-5" />}
-            label="Horario"
-            value={`${minutesToTimeLabel(selectedSlot.start.getHours() * 60 + selectedSlot.start.getMinutes())} – ${minutesToTimeLabel(selectedSlot.end.getHours() * 60 + selectedSlot.end.getMinutes())}`}
+          <ModeOption
+            checked={isOpenMatch}
+            onChange={() => onIsOpenMatchChange(true)}
+            icon={<UserPlus className="h-4 w-4" />}
+            title="Buscar jugadores"
+            description="Abrí el partido para que se sume gente"
           />
-          <SummaryRow icon={<Clock className="h-5 w-5" />} label="Duración" value={`${SLOT_DURATION_MINUTES} min`} />
-          <SummaryRow icon={<Banknote className="h-5 w-5" />} label="Precio" value={formatPrice(price)} />
+          {isOpenMatch ? (
+            <div className="pt-2">
+              <GroupSizePicker
+                question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
+                options={openMatchGroupSizeOptions}
+                value={openMatchGroupSize}
+                onChange={onOpenMatchGroupSizeChange}
+              />
+            </div>
+          ) : null}
+        </fieldset>
+      </div>
 
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={onConfirm}
-            className="mt-2 h-11 rounded-full bg-primary text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.99] disabled:opacity-60 shadow-sm cursor-pointer"
-          >
-            {isPending ? "Confirmando…" : "Confirmar reserva"}
-          </button>
-        </div>
-      ) : (
-        <p className="mt-4 text-sm leading-relaxed text-foreground/60">
-          Elegí un turno disponible para ver el resumen de tu reserva.
-        </p>
-      )}
-    </aside>
+      <div className="pt-5">
+        <SummaryTotal price={selectedSlot.price} />
+      </div>
+      <p className="mt-3 text-xs text-white/45">
+        Cancelación sin cargo hasta {LATE_CANCELLATION_HOURS} h antes. El pago se abona en la recepción del club.
+      </p>
+
+      <button type="button" disabled={isPending} onClick={onConfirm} className="btn btn-primary btn-lg mt-5 w-full">
+        {isPending ? "Confirmando…" : "Reservar turno"}
+        {!isPending ? <ArrowRight className="h-5 w-5" /> : null}
+      </button>
+    </SummaryPanel>
   );
 }
-
-function SummaryRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ModeOption({
+  checked,
+  onChange,
+  icon,
+  title,
+  description,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 text-foreground/40">{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-xs text-foreground/50">{label}</span>
-        <span className="text-sm font-semibold text-foreground">{value}</span>
-      </div>
-    </div>
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 transition-colors ${
+        checked ? "bg-primary/15 ring-primary" : "bg-white/5 ring-white/10 hover:ring-white/25"
+      }`}
+    >
+      <input type="radio" name="booking-mode" checked={checked} onChange={onChange} className="mt-1 accent-primary" />
+      <span className="flex flex-col gap-0.5">
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          {icon}
+          {title}
+        </span>
+        <span className="text-xs text-white/55">{description}</span>
+      </span>
+    </label>
   );
 }

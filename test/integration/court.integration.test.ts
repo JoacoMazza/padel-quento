@@ -1,47 +1,59 @@
-import { afterAll, describe, expect, it } from "vitest";
-import { CourtState } from "@/src/domain/enums";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { CourtState, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import {
   createCourt,
   getCourts,
   getCourtById,
+  updateAllCourtsPrice,
   updateCourt,
-  deleteCourt,
 } from "@/src/actions/court";
+import { uniqueCourtNumber } from "./helpers";
 
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
+
+import { getServerSession } from "next-auth/next";
 
 describe("court actions (integración con Postgres real)", () => {
+  // Editar canchas es solo para administradores.
+  beforeEach(() => {
+    vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
+  });
+
   afterAll(async () => {
     const dataSource = await getDataSource();
     await dataSource.destroy();
   });
 
+  it("genera números de cancha distintos en llamadas consecutivas", () => {
+    const numbers = Array.from({ length: 1000 }, () => uniqueCourtNumber());
+
+    expect(new Set(numbers).size).toBe(numbers.length);
+  });
+
   it("crea una cancha con el estado AVAILABLE por defecto y la persiste", async () => {
     const number = uniqueCourtNumber();
 
-    const result = await createCourt({ number });
+    const result = await createCourt({ number, price: 10000 });
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE });
+    expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE, price: 10000 });
     expect(result.data.id).toBeDefined();
   });
 
   it("no permite crear dos canchas con el mismo número", async () => {
     const number = uniqueCourtNumber();
-    await createCourt({ number });
+    await createCourt({ number, price: 10000 });
 
-    const result = await createCourt({ number });
+    const result = await createCourt({ number, price: 10000 });
 
     expect(result).toEqual({ success: false, error: "Ya existe una cancha con ese número." });
   });
 
   it("lista las canchas creadas", async () => {
     const number = uniqueCourtNumber();
-    await createCourt({ number, state: CourtState.MAINTENANCE });
+    await createCourt({ number, state: CourtState.MAINTENANCE, price: 10000 });
 
     const result = await getCourts();
 
@@ -52,7 +64,7 @@ describe("court actions (integración con Postgres real)", () => {
 
   it("obtiene una cancha por id y null si no existe", async () => {
     const number = uniqueCourtNumber();
-    const created = await createCourt({ number });
+    const created = await createCourt({ number, price: 10000 });
     if (!created.success) throw new Error("expected success");
 
     const found = await getCourtById(created.data.id);
@@ -63,7 +75,7 @@ describe("court actions (integración con Postgres real)", () => {
   });
 
   it("actualiza el estado de una cancha existente", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber() });
+    const created = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!created.success) throw new Error("expected success");
 
     const result = await updateCourt(created.data.id, { state: CourtState.CLOSED_DOWN });
@@ -80,14 +92,15 @@ describe("court actions (integración con Postgres real)", () => {
     expect(result).toEqual({ success: false, error: "La cancha no existe." });
   });
 
-  it("elimina una cancha existente y falla al eliminarla de nuevo", async () => {
-    const created = await createCourt({ number: uniqueCourtNumber() });
-    if (!created.success) throw new Error("expected success");
+  it("un administrador cambia el precio de todas las canchas a la vez", async () => {
+    await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    await createCourt({ number: uniqueCourtNumber(), state: CourtState.CLOSED_DOWN, price: 12000 });
 
-    const result = await deleteCourt(created.data.id);
+    const result = await updateAllCourtsPrice(17500);
+
     expect(result).toEqual({ success: true, data: null });
-
-    const secondAttempt = await deleteCourt(created.data.id);
-    expect(secondAttempt).toEqual({ success: false, error: "La cancha no existe." });
+    const courts = await getCourts();
+    if (!courts.success) throw new Error("expected success");
+    expect(courts.data.every((court) => court.price === 17500)).toBe(true);
   });
 });

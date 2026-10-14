@@ -7,7 +7,7 @@ export function getBookingEnd(booking: MyBookingItem): Date {
 
 export function getBookingTone(booking: MyBookingItem, now: Date): BookingTone {
   if (booking.bookingState === BookingState.CANCELLED) return "cancelled";
-  if (booking.bookingState === BookingState.PENDING_PLAYERS) return "pending";
+  if (booking.needPlayers) return "pending";
   return getBookingEnd(booking) < now ? "completed" : "confirmed";
 }
 
@@ -23,10 +23,10 @@ export function getBookingStatusLabel(tone: BookingTone): string {
 }
 
 const TONE_BADGE_CLASSES: Record<BookingTone, string> = {
-  confirmed: "bg-green-50 text-green-700",
-  pending: "bg-blue-50 text-blue-700",
-  completed: "bg-line/60 text-foreground/60",
-  cancelled: "bg-danger-light text-danger",
+  confirmed: "badge-success",
+  pending: "badge-warning",
+  completed: "badge-neutral",
+  cancelled: "badge-danger",
 };
 
 export function getBookingBadgeClasses(tone: BookingTone): string {

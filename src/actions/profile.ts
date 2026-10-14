@@ -23,9 +23,10 @@ export type PlayerProfileData = {
   email: string;
   names: string;
   lastnames: string;
+  phoneNumber: string;
   category: string;
   scoring: number;
-  photoUrl: string | null;
+  isBlocked: boolean;
   movements: Array<{
     id: number;
     amount: number;
@@ -40,13 +41,16 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   const playerRepo = dataSource.getRepository<Player>("Player");
   const penaltyRepo = dataSource.getRepository<Penalty>("Penalty");
 
-  const player = await playerRepo.findOne({ where: { email: userEmail } });
+  const player = await playerRepo.findOne({
+    where: { account: { email: userEmail } },
+    relations: { account: true },
+  });
   if (!player) {
     return null;
   }
 
   const penalties = await penaltyRepo.find({
-    where: { playerId: player.id },
+    where: { player: { id: player.id } },
     order: { createdAt: "DESC" },
   });
 
@@ -58,21 +62,23 @@ export async function getProfileData(userEmail: string): Promise<PlayerProfileDa
   // Sincronizar el atributo scoring de la entidad Player
   if (player.scoring !== netScoring) {
     player.scoring = netScoring;
-    await playerRepo.save(player);
+    await playerRepo.update(player.id, { scoring: netScoring });
   }
 
   return {
     id: player.id,
-    email: player.email,
+    email: player.account.email,
     names: player.names,
     lastnames: player.lastnames,
+    phoneNumber: player.phoneNumber,
     category: player.category,
     scoring: netScoring,
-    photoUrl: player.photoUrl,
+    isBlocked: player.account.isBlocked,
     movements: penalties.map((p) => ({
       id: p.id,
       amount: Number(p.penalizedScoring),
-      type: Number(p.penalizedScoring) >= 0 ? "bonus" : "penalty",
+      // Una penalización sin saldo para descontar se registra por 0 puntos.
+      type: Number(p.penalizedScoring) > 0 ? "bonus" : "penalty",
       description: p.reason,
       createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
     })),
@@ -93,23 +99,21 @@ export async function updatePlayerProfile(
     return { errors: parsed.errors };
   }
 
-  const { names, lastnames, category, photoUrl } = parsed.data;
+  const { names, lastnames, category } = parsed.data;
 
   try {
     const dataSource = await getDataSource();
     const playerRepo = dataSource.getRepository<Player>("Player");
 
-    const player = await playerRepo.findOne({ where: { email: session.user.email } });
+    const player = await playerRepo.findOne({
+      where: { account: { email: session.user.email } },
+      relations: { account: true },
+    });
     if (!player) {
       return { message: "No se encontró el perfil de jugador." };
     }
 
-    player.names = names;
-    player.lastnames = lastnames;
-    player.category = category;
-    player.photoUrl = photoUrl;
-
-    await playerRepo.save(player);
+    await playerRepo.update(player.id, { names, lastnames, category });
     console.log(`[Profile] Perfil actualizado exitosamente para: ${session.user.email}`);
 
     revalidatePath("/profile");
@@ -140,20 +144,30 @@ export async function recordPointsMovement(
     if (!player) return false;
 
     // Asegurar que penalización sea negativa y bonificación positiva si fuera necesario
-    const signedAmount = type === "penalty" && amount > 0 ? -amount : amount;
+    let signedAmount = type === "penalty" && amount > 0 ? -amount : amount;
 
-    const penaltyRecord = penaltyRepo.create({
-      playerId,
-      player,
-      penalizedScoring: signedAmount,
-      reason: description,
-    });
-    await penaltyRepo.save(penaltyRecord);
+    const previousPenalties = await penaltyRepo.find({ where: { player: { id: playerId } } });
+    const previousScoring = previousPenalties.reduce((sum, p) => sum + Number(p.penalizedScoring), 0);
+
+    // El saldo nunca baja de 0: una penalización solo descuenta lo que el
+    // jugador tiene, y se registra ese monto real para que el historial sume
+    // igual que el saldo. Sin saldo se registra igual, por 0 puntos, para que
+    // la falta quede en el historial (la usa el reporte de asistencia).
+    if (signedAmount < 0) {
+      signedAmount = -Math.min(-signedAmount, Math.max(previousScoring, 0));
+    }
+
+    if (signedAmount !== 0 || type === "penalty") {
+      const penaltyRecord = penaltyRepo.create({
+        player,
+        penalizedScoring: signedAmount,
+        reason: description,
+      });
+      await penaltyRepo.save(penaltyRecord);
+    }
 
     // Recalcular saldo total de puntos en el jugador
-    const allPenalties = await penaltyRepo.find({ where: { playerId } });
-    const netScoring = allPenalties.reduce((sum, p) => sum + Number(p.penalizedScoring), 0);
-    player.scoring = netScoring;
+    player.scoring = previousScoring + signedAmount;
     await playerRepo.save(player);
 
     revalidatePath("/profile");

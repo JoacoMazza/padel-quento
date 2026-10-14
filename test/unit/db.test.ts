@@ -20,7 +20,9 @@ vi.mock("typeorm", async (importOriginal) => {
 
 const ORIGINAL_ENV = process.env;
 
-describe("getDataSource", () => {
+// After vi.resetModules() the first import loads TypeORM and every entity from scratch,
+// which can exceed the default 5s timeout when the whole suite runs in parallel.
+describe("getDataSource", { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...ORIGINAL_ENV };
@@ -49,5 +51,38 @@ describe("getDataSource", () => {
     expect(
       (first as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize,
     ).toHaveBeenCalledTimes(1);
+  });
+
+  it("con llamadas simultáneas crea e inicializa una sola conexión", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    const { DataSource } = await import("typeorm");
+    const { getDataSource } = await import("@/src/lib/db");
+
+    // Como los procesos en segundo plano al arrancar la app: nadie espera al otro.
+    const [first, second, third] = await Promise.all([getDataSource(), getDataSource(), getDataSource()]);
+
+    expect(DataSource).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+    expect(
+      (first as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it("si la inicialización falla, el próximo pedido vuelve a intentarlo", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    const { DataSource } = await import("typeorm");
+    vi.mocked(DataSource).mockImplementationOnce(function (this: { isInitialized: boolean; initialize: () => Promise<unknown> }) {
+      this.isInitialized = false;
+      this.initialize = vi.fn(async () => {
+        throw new Error("Postgres no disponible");
+      });
+    } as never);
+    const { getDataSource } = await import("@/src/lib/db");
+
+    await expect(getDataSource()).rejects.toThrow("Postgres no disponible");
+    const retried = await getDataSource();
+
+    expect(retried.isInitialized).toBe(true);
   });
 });

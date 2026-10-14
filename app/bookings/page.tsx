@@ -1,78 +1,88 @@
 import { getServerSession } from "next-auth/next";
-import { redirect } from "next/navigation";
-import { AppHeader } from "@/app/components/app-header";
+import { MapPin } from "lucide-react";
+import { PageShell } from "@/app/components/page-shell";
+import { PageHeading } from "@/app/components/ui/page-heading";
+import { CLUB_MAPS_URL, CLUB_SHORT_ADDRESS } from "@/app/components/club-info";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
+import { parseInitialSelection } from "@/app/bookings/initial-selection";
 import { authOptions } from "@/src/lib/auth";
-import { getDataSource } from "@/src/lib/db";
-import { Player } from "@/src/entities/Player";
+import { getSessionPlayerId } from "@/src/lib/session-player";
+import { getPublicBookings } from "@/src/lib/public-bookings";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
-import { getBookings } from "@/src/actions/booking";
 import { getOutOfServices } from "@/src/actions/outOfService";
+import { pageMetadata } from "@/app/site-metadata";
 
-export default async function BookingsPage() {
+export const metadata = pageMetadata("Turnos", "/bookings");
+
+// Se puede ver sin sesión (issue #55): la sesión se pide recién al reservar o sumarse a un partido.
+export default async function BookingsPage({ searchParams }: PageProps<"/bookings">) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const isGuest = !session?.user?.email;
+  const playerId = isGuest ? null : await getSessionPlayerId();
 
-  const dataSource = await getDataSource();
-  const players = dataSource.getRepository<Player>("Player");
-  const player = await players.findOne({ where: { email: session.user.email } });
-
-  const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult] = await Promise.all([
+  // Los turnos salen de getPublicBookings: sin datos de quién reservó ni de quiénes juegan.
+  const [courtsResult, schedulesResult, bookings, outOfServicesResult] = await Promise.all([
     getCourts(),
     getSchedules(),
-    getBookings(),
+    getPublicBookings(playerId),
     getOutOfServices(),
   ]);
 
   const courts = courtsResult.success ? courtsResult.data : [];
   const schedules = schedulesResult.success ? schedulesResult.data : [];
-  const bookings = bookingsResult.success ? bookingsResult.data : [];
   const outOfServices = outOfServicesResult.success ? outOfServicesResult.data : [];
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-background">
-      <AppHeader
-        active="/bookings"
-        userName={session.user.name}
-        userEmail={session.user.email}
-        userRole={session.user.role}
+    <PageShell active="/bookings" user={isGuest ? null : session.user}>
+      <PageHeading
+        eyebrow="Reservas online"
+        title="Disponibilidad de canchas"
+        accentDot={false}
+        description="Elegí el día y encontrá tu turno libre sin rodeos."
+        actions={
+          <a
+            href={CLUB_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ver ubicación en Google Maps"
+            className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-xs font-medium text-foreground/70 transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <MapPin className="h-3.5 w-3.5 text-primary" />
+            {CLUB_SHORT_ADDRESS}
+          </a>
+        }
       />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-10">
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
-          Turnos disponibles
-        </h1>
-        <p className="mt-1.5 text-foreground/60">
-          Elegí una fecha y una cancha para reservar tu turno
-        </p>
 
-        <BookingsBoard
-          playerId={player?.id ?? null}
-          courts={courts.map((c) => ({ id: c.id, number: c.number, state: c.state }))}
-          schedules={schedules.map((s) => ({
-            id: s.id,
-            dayOfWeek: s.dayOfWeek,
-            openingTime: String(s.openingTime),
-            closingTime: String(s.closingTime),
-            courtId: s.court?.id,
-          }))}
-          bookings={bookings.map((b) => ({
-            id: b.id,
-            fromDateTime: b.fromDateTime,
-            durationMinutes: b.durationMinutes,
-            bookingState: b.bookingState,
-            courtId: b.court?.id,
-          }))}
-          outOfServices={outOfServices.map((o) => ({
-            id: o.id,
-            fromDateTime: o.fromDateTime,
-            toDateTime: o.toDateTime,
-            courtId: o.court?.id,
-          }))}
-        />
-      </main>
-    </div>
+      <BookingsBoard
+        playerId={playerId}
+        isGuest={isGuest}
+        initialSelection={parseInitialSelection(await searchParams)}
+        courts={courts.map((c) => ({
+          id: c.id,
+          number: c.number,
+          state: c.state,
+          price: c.price,
+        }))}
+        schedules={schedules.map((s) => ({
+          id: s.id,
+          dayOfWeek: s.dayOfWeek,
+          openingTime: String(s.openingTime),
+          closingTime: String(s.closingTime),
+          courtId: s.court?.id,
+        }))}
+        bookings={bookings.map(({ joinedByViewer, ...b }) => ({
+          ...b,
+          // La grilla marca "ya estás anotado" con el id de quien mira: nunca viajan los ids de los demás.
+          matchPlayerIds: joinedByViewer && playerId !== null ? [playerId] : [],
+        }))}
+        outOfServices={outOfServices.map((o) => ({
+          id: o.id,
+          fromDateTime: o.fromDateTime,
+          toDateTime: o.toDateTime,
+          courtId: o.court?.id,
+        }))}
+      />
+    </PageShell>
   );
 }

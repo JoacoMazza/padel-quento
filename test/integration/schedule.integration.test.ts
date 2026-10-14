@@ -9,10 +9,7 @@ import {
   updateSchedule,
   deleteSchedule,
 } from "@/src/actions/schedule";
-
-function uniqueCourtNumber() {
-  return Math.floor(Date.now() % 1_000_000) + Math.floor(Math.random() * 1000);
-}
+import { uniqueCourtNumber } from "./helpers";
 
 const openingTime = new Date("1970-01-01T09:00:00Z");
 const closingTime = new Date("1970-01-01T23:00:00Z");
@@ -21,7 +18,7 @@ describe("schedule actions (integración con Postgres real)", () => {
   let courtId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber() });
+    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });
