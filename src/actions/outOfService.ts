@@ -1,6 +1,7 @@
 "use server";
 
 import "reflect-metadata";
+import type { EntityManager } from "typeorm";
 import { OutOfService } from "@/src/entities/OutOfService";
 import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
@@ -22,6 +23,34 @@ export type UpdateOutOfServiceInput = Partial<
   courtId?: number;
 };
 
+const INVALID_RANGE_MESSAGE = "La fecha de fin del bloqueo debe ser posterior a la de inicio.";
+
+/**
+ * Cancela los turnos no cancelados de la cancha que se superponen con el período
+ * del bloqueo (OutOfService.cancelAffectedBookings() del diagrama de clases) y
+ * devuelve sus ids. No se penaliza a nadie (HU-13): la cancelación no la pidió
+ * ningún jugador, así que se actualiza el estado directamente, sin pasar por la
+ * penalización por cancelación tardía de updateBooking.
+ */
+async function cancelAffectedBookings(
+  manager: EntityManager,
+  period: { courtId: number; from: Date; to: Date },
+): Promise<number[]> {
+  const cancelled = await manager
+    .createQueryBuilder()
+    .update("Booking")
+    .set({ bookingState: BookingState.CANCELLED })
+    .where('"court_id" = :courtId', { courtId: period.courtId })
+    .andWhere('"booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+    .andWhere('"datetime" < :to', { to: period.to })
+    .andWhere('"datetime" + make_interval(mins => "duration_minutes") > :from', { from: period.from })
+    .returning("id")
+    .execute();
+
+  const rows: { id: number }[] = cancelled.raw ?? [];
+  return rows.map((row) => row.id);
+}
+
 /**
  * Crea el bloqueo y, en la misma transacción, cancela los turnos de la cancha que
  * se superponen con su período (OutOfService.cancelAffectedBookings() del diagrama
@@ -32,7 +61,7 @@ export async function createOutOfService(
   input: CreateOutOfServiceInput,
 ): Promise<ActionResult<OutOfService>> {
   if (new Date(input.toDateTime).getTime() <= new Date(input.fromDateTime).getTime()) {
-    return { success: false, error: "La fecha de fin del bloqueo debe ser posterior a la de inicio." };
+    return { success: false, error: INVALID_RANGE_MESSAGE };
   }
 
   try {
@@ -50,19 +79,12 @@ export async function createOutOfService(
       });
       const created = await outOfServices.save(outOfService);
 
-      const cancelled = await manager
-        .createQueryBuilder()
-        .update("Booking")
-        .set({ bookingState: BookingState.CANCELLED })
-        .where('"court_id" = :courtId', { courtId: input.courtId })
-        .andWhere('"booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-        .andWhere('"datetime" < :to', { to: input.toDateTime })
-        .andWhere('"datetime" + make_interval(mins => "duration_minutes") > :from', { from: input.fromDateTime })
-        .returning("id")
-        .execute();
-
-      const rows: { id: number }[] = cancelled.raw ?? [];
-      return { saved: created, cancelledBookingIds: rows.map((row) => row.id) };
+      const cancelledBookingIds = await cancelAffectedBookings(manager, {
+        courtId: input.courtId,
+        from: input.fromDateTime,
+        to: input.toDateTime,
+      });
+      return { saved: created, cancelledBookingIds };
     });
 
     if (cancelledBookingIds.length > 0) {
@@ -105,27 +127,53 @@ export async function getOutOfServiceById(
   }
 }
 
+/**
+ * Edita el bloqueo y, en la misma transacción, cancela sin penalizar los turnos
+ * que pasan a quedar dentro de él al ampliar su período o moverlo a otra cancha
+ * (HU-13), avisándoles después a sus jugadores igual que al crearlo.
+ */
 export async function updateOutOfService(
   id: number,
   input: UpdateOutOfServiceInput,
 ): Promise<ActionResult<OutOfService>> {
   try {
     const dataSource = await getDataSource();
-    const outOfServices = dataSource.getRepository<OutOfService>("OutOfService");
 
-    const outOfService = await outOfServices.findOne({ where: { id } });
-    if (!outOfService) {
-      return { success: false, error: "El bloqueo de cancha no existe." };
-    }
+    const outcome = await dataSource.transaction(async (manager) => {
+      const outOfServices = manager.getRepository<OutOfService>("OutOfService");
 
-    const { courtId, ...rest } = input;
-    outOfServices.merge(outOfService, {
-      ...rest,
-      ...(courtId ? { court: { id: courtId } } : {}),
+      const outOfService = await outOfServices.findOne({ where: { id }, relations: { court: true } });
+      if (!outOfService) {
+        return { ok: false, error: "El bloqueo de cancha no existe." } as const;
+      }
+
+      const { courtId, ...rest } = input;
+      outOfServices.merge(outOfService, {
+        ...rest,
+        ...(courtId ? { court: { id: courtId } } : {}),
+      });
+      if (new Date(outOfService.toDateTime).getTime() <= new Date(outOfService.fromDateTime).getTime()) {
+        return { ok: false, error: INVALID_RANGE_MESSAGE } as const;
+      }
+
+      const saved = await outOfServices.save(outOfService);
+      const cancelledBookingIds = saved.court?.id
+        ? await cancelAffectedBookings(manager, {
+            courtId: saved.court.id,
+            from: saved.fromDateTime,
+            to: saved.toDateTime,
+          })
+        : [];
+      return { ok: true, saved, cancelledBookingIds } as const;
     });
 
-    const saved = await outOfServices.save(outOfService);
-    return { success: true, data: toPlain(saved) };
+    if (!outcome.ok) {
+      return { success: false, error: outcome.error };
+    }
+    if (outcome.cancelledBookingIds.length > 0) {
+      await notifyCourtUnavailable(outcome.cancelledBookingIds);
+    }
+    return { success: true, data: toPlain(outcome.saved) };
   } catch (error) {
     console.error("updateOutOfService", error);
     return { success: false, error: "No se pudo actualizar el bloqueo de cancha." };
