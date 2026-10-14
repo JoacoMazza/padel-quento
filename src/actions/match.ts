@@ -16,6 +16,7 @@ import {
   PENALTY_POINTS,
 } from "@/src/domain/constants";
 import { LATE_LEAVE_REASON, isLateCancellation } from "@/src/domain/late-cancellation";
+import { categoryMismatchMessage, openMatchCategoryProblem } from "@/src/domain/open-match-category";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import {
@@ -41,6 +42,8 @@ const PLAYER_NOT_FOUND_MESSAGE = "No encontramos un jugador registrado con ese e
 const BLOCKED_TARGET_MESSAGE = "Ese jugador se encuentra bloqueado y no puede sumarse a partidos.";
 const ALREADY_IN_MATCH_MESSAGE = "Ese jugador ya forma parte del partido.";
 const NO_SPOTS_MESSAGE = "No quedan lugares libres en el partido.";
+const TARGET_MISSING_CATEGORY_MESSAGE =
+  "Ese jugador todavía no cargó su categoría en su perfil, así que no se puede sumar a un partido abierto.";
 
 class NotOpenError extends Error {}
 class InvalidPlayersToCloseError extends Error {}
@@ -273,7 +276,8 @@ export async function addPlayerToMatch(
 
     const booking = await dataSource
       .getRepository<Booking>("Booking")
-      .findOne({ where: { id: bookingId }, relations: { match: { matchPlayers: true } } });
+      // booker y matchPlayers.player: para comparar contra la categoría de quien creó el partido.
+      .findOne({ where: { id: bookingId }, relations: { booker: true, match: { matchPlayers: { player: true } } } });
     if (!booking?.match) {
       return { success: false, error: NOT_AN_OPEN_MATCH_MESSAGE };
     }
@@ -296,6 +300,17 @@ export async function addPlayerToMatch(
     }
     if (target.account.isBlocked) {
       return { success: false, error: BLOCKED_TARGET_MESSAGE };
+    }
+
+    // Misma regla de categoría que al sumarse desde la grilla (ver joinOpenMatchForPlayer).
+    const creatorCategory = booking.match.matchPlayers.find((mp) => mp.playerId === booking.booker?.id)?.player
+      ?.category;
+    const categoryProblem = openMatchCategoryProblem(creatorCategory, target.category);
+    if (categoryProblem?.kind === "missing_category") {
+      return { success: false, error: TARGET_MISSING_CATEGORY_MESSAGE };
+    }
+    if (categoryProblem?.kind === "category_mismatch") {
+      return { success: false, error: categoryMismatchMessage(categoryProblem.category) };
     }
 
     const matchId = booking.match.id;

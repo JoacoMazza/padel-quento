@@ -13,7 +13,7 @@ import { Match } from "@/src/entities/Match";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Player } from "@/src/entities/Player";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
-import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
+import { categoryMismatchMessage, openMatchCategoryProblem } from "@/src/domain/open-match-category";
 import { JOIN_MATCH_LOCK_CLASS, OPEN_MATCH_MAX_PLAYERS, OPEN_MATCH_MIN_HOURS_BEFORE_START } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
@@ -64,8 +64,6 @@ export const BOOKER_NOT_FOUND_MESSAGE = "La persona que reserva no existe.";
 export const NO_PLAYER_ACCOUNT_MESSAGE = "Necesitás una cuenta de jugador para reservar turnos.";
 const MISSING_CATEGORY_TO_CREATE_MESSAGE = "Cargá tu categoría en tu perfil para crear un partido abierto.";
 const MISSING_CATEGORY_TO_JOIN_MESSAGE = "Cargá tu categoría en tu perfil para sumarte a un partido abierto.";
-const categoryMismatchMessage = (category: PlayerCategory) =>
-  `Este partido es para jugadores de ${PLAYER_CATEGORY_LABELS[category]}.`;
 const INVALID_PRICE_MESSAGE = "El precio de la reserva es obligatorio y debe ser mayor a 0.";
 const invalidJoinGroupSizeMessage = (remainingSpots: number) =>
   `Elegí entre 1 y ${remainingSpots} jugador${remainingSpots === 1 ? "" : "es"} (los lugares libres que quedan).`;
@@ -310,20 +308,14 @@ export async function joinOpenMatchForPlayer(
         throw new AlreadyJoinedError();
       }
 
-      // Solo se suman jugadores de la misma categoría que quien creó el partido
-      // (su categoría actual). Un partido creado antes de esta validación, por
-      // alguien sin categoría, queda abierto a cualquiera.
-      if (player?.category === PlayerCategory.WITHOUT_CATEGORY) {
+      // Solo se suman jugadores de la misma categoría que quien creó el partido (ver openMatchCategoryProblem).
+      const creatorCategory = match.matchPlayers.find((mp) => mp.playerId === booking.booker?.id)?.player?.category;
+      const categoryProblem = player ? openMatchCategoryProblem(creatorCategory, player.category) : null;
+      if (categoryProblem?.kind === "missing_category") {
         throw new MissingCategoryToJoinError();
       }
-      const creatorCategory = match.matchPlayers.find((mp) => mp.playerId === booking.booker?.id)?.player?.category;
-      if (
-        player &&
-        creatorCategory &&
-        creatorCategory !== PlayerCategory.WITHOUT_CATEGORY &&
-        player.category !== creatorCategory
-      ) {
-        throw new CategoryMismatchError(creatorCategory);
+      if (categoryProblem?.kind === "category_mismatch") {
+        throw new CategoryMismatchError(categoryProblem.category);
       }
 
       const confirmedPlayers = match.matchPlayers.reduce(

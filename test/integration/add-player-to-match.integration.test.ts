@@ -30,6 +30,8 @@ describe("addPlayerToMatch (integración con Postgres real)", () => {
   async function newPlayer(prefix: string, overrides: Record<string, unknown> = {}) {
     const email = uniqueEmail(prefix);
     const player = await createPlayer({
+      // Los partidos abiertos exigen categoría: todos comparten la misma, salvo que la sobreescriban.
+      category: PlayerCategory.FOURTH,
       phoneNumber: uniquePhoneNumber(),
       email,
       password: "secreto123",
@@ -82,7 +84,7 @@ describe("addPlayerToMatch (integración con Postgres real)", () => {
 
     expect(result).toEqual({
       success: true,
-      data: { id: added.id, names: "Caro", lastnames: "Agregado", category: PlayerCategory.WITHOUT_CATEGORY },
+      data: { id: added.id, names: "Caro", lastnames: "Agregado", category: PlayerCategory.FOURTH },
     });
     expect(await matchState(bookingId)).toMatchObject({
       needPlayers: true,
@@ -95,6 +97,31 @@ describe("addPlayerToMatch (integración con Postgres real)", () => {
     const found = await getBookingById(bookingId);
     if (!found.success || !found.data?.match?.chat) throw new Error("expected chat");
     expect((await getChatMessages(found.data.match.chat.id)).success).toBe(true);
+  });
+
+  it("rejects adding a player of a different category than the creator, without adding them", async () => {
+    const { creator, bookingId } = await newOpenMatch(1);
+    const added = await newPlayer("OtraCategoria", { category: PlayerCategory.SECOND });
+
+    actAs(creator.email);
+    const result = await addPlayerToMatch(bookingId, added.email);
+
+    expect(result).toEqual({ success: false, error: "Este partido es para jugadores de 4ª Categoría." });
+    expect((await matchState(bookingId)).players).toEqual({ [creator.id]: 1 });
+  });
+
+  it("rejects adding a player without a category, without adding them", async () => {
+    const { creator, bookingId } = await newOpenMatch(1);
+    const added = await newPlayer("SinCategoria", { category: PlayerCategory.WITHOUT_CATEGORY });
+
+    actAs(creator.email);
+    const result = await addPlayerToMatch(bookingId, added.email);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Ese jugador todavía no cargó su categoría en su perfil, así que no se puede sumar a un partido abierto.",
+    });
+    expect((await matchState(bookingId)).players).toEqual({ [creator.id]: 1 });
   });
 
   it("any member can add players, not only the creator", async () => {
