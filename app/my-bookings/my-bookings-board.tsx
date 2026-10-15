@@ -6,6 +6,7 @@ import { BookingRow } from "@/app/my-bookings/booking-row";
 import { FiltersPanel } from "@/app/my-bookings/filters-panel";
 import { getBookingEnd, matchesDateFilter, matchesStatusFilter, getBookingTone } from "@/app/my-bookings/booking-status";
 import type { DateFilter, MyBookingItem, StatusFilter } from "@/app/my-bookings/types";
+import { MY_BOOKINGS_PAST_LIMIT } from "@/src/domain/constants";
 
 export function MyBookingsBoard({
   userName,
@@ -72,6 +73,8 @@ export function MyBookingsBoard({
             Turnos anteriores
             <span className="badge badge-neutral">{past.length}</span>
           </h2>
+          {/* La página solo trae los últimos turnos pasados (ver getPlayerBookings). */}
+          <p className="mt-1 text-sm text-foreground/50">Se muestran tus últimos {MY_BOOKINGS_PAST_LIMIT} turnos.</p>
           <div className="mt-4 flex flex-col gap-3">
             {past.length === 0 ? (
               <p className="card p-6 text-sm text-foreground/50">No tenés turnos anteriores con estos filtros.</p>
