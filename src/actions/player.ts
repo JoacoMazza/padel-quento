@@ -11,7 +11,7 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { requireAdmin } from "@/src/lib/rbac";
+import { adminOnly, requireAdmin } from "@/src/lib/rbac";
 
 export type CreatePlayerInput = {
   email: string;
@@ -72,6 +72,9 @@ export async function createPlayer(
 }
 
 export async function getPlayers(): Promise<ActionResult<Player[]>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -86,6 +89,9 @@ export async function getPlayers(): Promise<ActionResult<Player[]>> {
 export async function getPlayerById(
   id: number,
 ): Promise<ActionResult<Player | null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -102,6 +108,9 @@ export async function updatePlayer(
   id: number,
   input: UpdatePlayerInput,
 ): Promise<ActionResult<Player>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
 
@@ -143,6 +152,9 @@ export async function updatePlayer(
  * CASCADE). Si el jugador tiene turnos, la FK de bookings impide borrarlo.
  */
 export async function deletePlayer(id: number): Promise<ActionResult<null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");

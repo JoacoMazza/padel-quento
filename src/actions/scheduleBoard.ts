@@ -11,6 +11,7 @@ import type { Booking } from "@/src/entities/Booking";
 import type { OutOfService } from "@/src/entities/OutOfService";
 import type { ActionResult } from "@/src/lib/action-result";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
+import { adminOnly } from "@/src/lib/rbac";
 
 export type ScheduleBoardData = {
   courts: Court[];
@@ -28,6 +29,9 @@ export type ScheduleBoardData = {
  * estados a medio mezclar (RNF-08).
  */
 export async function getScheduleBoardData(): Promise<ActionResult<ScheduleBoardData>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   const [courtsResult, schedulesResult, bookingsResult, outOfServicesResult] = await Promise.all([
     getCourts(),
     getSchedules(),
