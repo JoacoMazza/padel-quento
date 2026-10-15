@@ -6,7 +6,7 @@ import { MyBookingsBoard } from "@/app/my-bookings/my-bookings-board";
 import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
-import { getBookings } from "@/src/actions/booking";
+import { getPlayerBookings } from "@/src/lib/player-bookings";
 import { canReviewMatch } from "@/src/domain/reputation";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
@@ -23,15 +23,8 @@ export default async function MyBookingsPage() {
   const players = dataSource.getRepository<Player>("Player");
   const player = await players.findOne({ where: { account: { email: session.user.email } } });
 
-  const bookingsResult = await getBookings();
-  const allBookings = bookingsResult.success ? bookingsResult.data : [];
-
-  const ownBookings = allBookings.filter((b) => {
-    if (!player) return false;
-    const isOwner = b.booker?.id === player.id;
-    const isMatchPlayer = (b.match?.matchPlayers ?? []).some((mp) => mp.playerId === player.id);
-    return isOwner || isMatchPlayer;
-  });
+  // Solo los turnos del jugador: todos los próximos y los últimos pasados (issue #68).
+  const ownBookings = player ? await getPlayerBookings(player.id) : [];
   const fixedDates = await findFixedBookingDates(ownBookings.map((b) => b.id));
 
   const myBookings = ownBookings

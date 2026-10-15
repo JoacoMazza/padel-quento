@@ -58,3 +58,6 @@ export const REVIEW_COMMENT_MAX_LENGTH = 500;
  * (HU-41). Un proceso en segundo plano va generando las fechas nuevas.
  */
 export const FIXED_BOOKING_HORIZON_DAYS = 182;
+
+/** Turnos pasados que se muestran en Mis turnos, los más recientes (issue #68). */
+export const MY_BOOKINGS_PAST_LIMIT = 3;

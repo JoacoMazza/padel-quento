@@ -38,6 +38,13 @@ describe("MyBookingsBoard", () => {
     cleanup();
   });
 
+  it("aclara que de los turnos anteriores solo se muestran los últimos 3", () => {
+    render(<MyBookingsBoard bookings={[booking(1, 2), booking(2, -2)]} playerId={7} />);
+
+    expect(screen.getByText("Turno 2")).toBeTruthy();
+    expect(screen.getByText("Se muestran tus últimos 3 turnos.")).toBeTruthy();
+  });
+
   it("muestra primero, arriba de los próximos turnos, los partidos que se pueden calificar", () => {
     const toReview = booking(3, -1, { matchId: 30, canReview: true });
     render(<MyBookingsBoard bookings={[booking(1, 2), booking(2, -3), toReview]} playerId={7} />);
