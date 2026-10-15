@@ -61,7 +61,7 @@ async function main() {
     `Horarios creados: ${schedulesCreated} (${existingKeys.size}/${allCourts.length * ALL_DAYS.length} en total)`,
   );
 
-  // Crear cuentas de prueba (Admin y Jugador)
+  // Crear cuentas de prueba (dueño, trabajador y jugador)
   const bcrypt = await import("bcrypt");
   const accounts = dataSource.getRepository(Account);
   const admins = dataSource.getRepository(Admin);
@@ -77,6 +77,18 @@ async function main() {
       admins.create({ account, names: "Administrador", lastnames: "Quento", dni: 30111222, accessLevel: AdminAccessLevel.OWNER }),
     );
     console.log("Usuario Administrador creado: admin@quento.com / admin123");
+  }
+
+  // Un trabajador (admin con nivel staff) para probar lo que ve y puede hacer sin ser el dueño.
+  const staffEmail = "trabajador@quento.com";
+  const existingStaff = await accounts.findOne({ where: { email: staffEmail } });
+  if (!existingStaff) {
+    const passwordHash = await bcrypt.hash("trabajador123", 12);
+    const account = await accounts.save(accounts.create({ email: staffEmail, passwordHash }));
+    await admins.save(
+      admins.create({ account, names: "Rocío", lastnames: "Fernández", dni: 35123456, accessLevel: AdminAccessLevel.STAFF }),
+    );
+    console.log("Usuario Trabajador creado: trabajador@quento.com / trabajador123");
   }
 
   const playerEmail = "jugador@quento.com";
