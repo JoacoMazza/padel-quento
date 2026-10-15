@@ -7,6 +7,7 @@ import { authOptions } from "@/src/lib/auth";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getBookings } from "@/src/actions/booking";
+import { canReviewMatch } from "@/src/domain/reputation";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
 
@@ -50,6 +51,19 @@ export default async function MyBookingsPage() {
       chatId: b.match?.chat?.id ?? null,
       // Turno creado por otro jugador al que este jugador se sumó (no es quien reservó).
       joinedAsParticipant: player ? b.booker?.id !== player.id : false,
+      canReview:
+        player !== null &&
+        b.match !== undefined &&
+        b.match !== null &&
+        canReviewMatch(
+          {
+            fromDateTime: b.fromDateTime,
+            durationMinutes: b.durationMinutes,
+            bookingState: b.bookingState,
+            attendedPlayerIds: (b.match.matchPlayers ?? []).filter((mp) => mp.attended).map((mp) => mp.playerId),
+          },
+          player.id,
+        ),
       isFixed: fixedDates.has(b.id),
     }));
 

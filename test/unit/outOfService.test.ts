@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Estas acciones son solo para administradores (ver adminOnly): los tests corren con una
+// sesión de admin; el rechazo sin ella se prueba en admin-only-actions.integration.test.ts.
+vi.mock("next-auth/next", () => ({
+  getServerSession: async () => ({ user: { email: "admin@test.com", role: "admin" } }),
+}));
 import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 
 const { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSource } = vi.hoisted(() => {
@@ -241,6 +247,64 @@ describe("outOfService actions", () => {
 
       expect(result).toEqual({ success: false, error: "El bloqueo de cancha no existe." });
       expect(save).not.toHaveBeenCalled();
+    });
+
+    it("cancels the bookings that the edited block now overlaps (HU-13), without penalties", async () => {
+      const newTo = new Date("2026-01-01T15:00:00Z");
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+
+      const result = await updateOutOfService(1, { toDateTime: newTo });
+
+      expect(result.success).toBe(true);
+      expect(bookingsUpdate.set).toHaveBeenCalledWith({ bookingState: BookingState.CANCELLED });
+      const conditions = [...bookingsUpdate.where.mock.calls, ...bookingsUpdate.andWhere.mock.calls];
+      expect(conditions).toEqual(
+        expect.arrayContaining([
+          [expect.stringContaining("court_id"), { courtId: 1 }],
+          [expect.stringContaining("booking_state"), { cancelled: BookingState.CANCELLED }],
+          [expect.stringContaining("datetime"), { to: newTo }],
+          [expect.stringContaining("duration_minutes"), { from: fromDateTime }],
+        ]),
+      );
+    });
+
+    it("cancels the overlapping bookings of the new court when the block is moved to another one", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+
+      await updateOutOfService(1, { courtId: 2 });
+
+      const conditions = [...bookingsUpdate.where.mock.calls, ...bookingsUpdate.andWhere.mock.calls];
+      expect(conditions).toEqual(expect.arrayContaining([[expect.stringContaining("court_id"), { courtId: 2 }]]));
+    });
+
+    it("notifies the players of the bookings cancelled by the edit", async () => {
+      bookingsUpdate.execute.mockResolvedValueOnce({ affected: 1, raw: [{ id: 7 }] });
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+
+      await updateOutOfService(1, { toDateTime: new Date("2026-01-01T15:00:00Z") });
+
+      expect(notifyCourtUnavailable).toHaveBeenCalledWith([7]);
+    });
+
+    it("does not notify anyone if the edit cancelled no booking", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+
+      await updateOutOfService(1, { reason: OutOfServiceReason.OTHER });
+
+      expect(notifyCourtUnavailable).not.toHaveBeenCalled();
+    });
+
+    it("rejects an edit that leaves the end of the block not after its start", async () => {
+      findOne.mockResolvedValueOnce({ id: 1, fromDateTime, toDateTime, court: { id: 1 } });
+
+      const result = await updateOutOfService(1, { toDateTime: fromDateTime });
+
+      expect(result).toEqual({
+        success: false,
+        error: "La fecha de fin del bloqueo debe ser posterior a la de inicio.",
+      });
+      expect(save).not.toHaveBeenCalled();
+      expect(bookingsUpdate.execute).not.toHaveBeenCalled();
     });
   });
 

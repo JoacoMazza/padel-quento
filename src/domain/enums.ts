@@ -47,6 +47,13 @@ export enum OutOfServiceReason {
   OTHER = "other",
 }
 
+/** Cómo vio un compañero el nivel del jugador respecto de la categoría que declaró (HU-36). */
+export enum ReviewLevel {
+  LOWER = "lower",
+  AS_DECLARED = "as_declared",
+  HIGHER = "higher",
+}
+
 export enum FixedBookingFrequency {
   WEEKLY = "weekly",
   BIWEEKLY = "biweekly",

@@ -65,6 +65,23 @@ export async function requireOwner() {
 }
 
 /**
+ * Para Server Actions de administración: null si quien llama es admin; si no,
+ * el resultado de error con el motivo ("No autenticado" o "Acceso denegado").
+ * Se usa al principio de la acción: `const denied = await adminOnly(); if (denied) return denied;`
+ */
+export async function adminOnly(): Promise<{ success: false; error: string } | null> {
+  try {
+    await requireAdmin();
+    return null;
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      return { success: false, error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
  * Verifica si el usuario actual posee alguno de los roles permitidos.
  */
 export async function requireRole(allowedRoles: Role | Role[]) {

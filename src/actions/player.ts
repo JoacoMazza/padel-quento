@@ -11,7 +11,10 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { requireAdmin } from "@/src/lib/rbac";
+import { ForbiddenError, UnauthorizedError, adminOnly, requireAdmin } from "@/src/lib/rbac";
+import { getReputations, getReviewsOf, type ReviewForAdmin } from "@/src/lib/player-reviews";
+import { reputationAlerts, summarizeReputation, type ReputationSummary } from "@/src/domain/reputation";
+import { recordPointsMovement } from "@/src/actions/profile";
 
 export type CreatePlayerInput = {
   email: string;
@@ -72,6 +75,9 @@ export async function createPlayer(
 }
 
 export async function getPlayers(): Promise<ActionResult<Player[]>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -86,6 +92,9 @@ export async function getPlayers(): Promise<ActionResult<Player[]>> {
 export async function getPlayerById(
   id: number,
 ): Promise<ActionResult<Player | null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -102,6 +111,9 @@ export async function updatePlayer(
   id: number,
   input: UpdatePlayerInput,
 ): Promise<ActionResult<Player>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
 
@@ -143,6 +155,9 @@ export async function updatePlayer(
  * CASCADE). Si el jugador tiene turnos, la FK de bookings impide borrarlo.
  */
 export async function deletePlayer(id: number): Promise<ActionResult<null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -212,6 +227,10 @@ export type PlayerRecordAdmin = PlayerAdminItem & {
   noShows: number;
   bookings: PlayerRecordBooking[];
   movements: Array<{ id: number; amount: number; description: string; createdAt: string }>;
+  /** Reputación según las reseñas de sus compañeros (HU-36), con sus alertas y las reseñas completas. */
+  reputation: ReputationSummary;
+  reputationAlerts: string[];
+  reviews: ReviewForAdmin[];
 };
 
 function toRecordBooking(booking: Booking, isOpenMatch: boolean, attended: boolean): PlayerRecordBooking {
@@ -269,6 +288,7 @@ export async function getPlayerRecordAdmin(id: number): Promise<ActionResult<Pla
       }
     }
     const bookings = [...recordBookings.values()].sort((a, b) => b.fromDateTime.localeCompare(a.fromDateTime));
+    const reputation = (await getReputations([id])).get(id) ?? summarizeReputation([]);
 
     return {
       success: true,
@@ -289,6 +309,9 @@ export async function getPlayerRecordAdmin(id: number): Promise<ActionResult<Pla
           description: p.reason,
           createdAt: new Date(p.createdAt).toISOString(),
         })),
+        reputation,
+        reputationAlerts: reputationAlerts(reputation),
+        reviews: await getReviewsOf(id),
       },
     };
   } catch (error) {
@@ -333,5 +356,51 @@ export async function unblockPlayer(id: number): Promise<ActionResult<null>> {
   } catch (error) {
     console.error("unblockPlayer", error);
     return { success: false, error: "No se pudo desbloquear el jugador." };
+  }
+}
+
+function adminErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ForbiddenError || error instanceof UnauthorizedError ? error.message : fallback;
+}
+
+/** Cambia la categoría de un jugador, por ejemplo a partir de su reputación (HU-36). Solo administradores. */
+export async function changePlayerCategoryAdmin(id: number, category: PlayerCategory): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin();
+    if (!Object.values(PlayerCategory).includes(category)) {
+      return { success: false, error: "La categoría no es válida." };
+    }
+    const dataSource = await getDataSource();
+    const result = await dataSource.getRepository<Player>("Player").update(id, { category });
+    if (!result.affected) {
+      return { success: false, error: "El jugador no existe." };
+    }
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("changePlayerCategoryAdmin", error);
+    return { success: false, error: adminErrorMessage(error, "No se pudo cambiar la categoría.") };
+  }
+}
+
+/**
+ * Descuenta puntos de fidelidad a un jugador con un motivo, que queda en su
+ * historial (HU-36). El saldo nunca baja de 0 (ver recordPointsMovement). Solo administradores.
+ */
+export async function deductPlayerPointsAdmin(id: number, points: number, reason: string): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin();
+    if (!Number.isFinite(points) || points <= 0) {
+      return { success: false, error: "Indicá una cantidad de puntos mayor a 0." };
+    }
+    if (!reason.trim()) {
+      return { success: false, error: "Indicá el motivo del descuento." };
+    }
+    if (!(await recordPointsMovement(id, points, "penalty", reason.trim()))) {
+      return { success: false, error: "El jugador no existe." };
+    }
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("deductPlayerPointsAdmin", error);
+    return { success: false, error: adminErrorMessage(error, "No se pudieron descontar los puntos.") };
   }
 }

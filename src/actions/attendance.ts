@@ -9,6 +9,7 @@ import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { requireAdmin } from "@/src/lib/rbac";
 import { recordPointsMovement } from "@/src/actions/profile";
+import { notifyReviewInvite } from "@/src/lib/match-notifications";
 
 const BOOKING_NOT_FOUND_MESSAGE = "El turno no existe.";
 const MATCH_PLAYER_NOT_FOUND_MESSAGE = "El jugador no forma parte de este partido.";
@@ -140,6 +141,11 @@ export async function awardAttendancePoints(): Promise<ActionResult<number>> {
       }
 
       await bookings.update(booking.id, { pointsAwarded: true });
+
+      // Terminado el partido abierto, se invita a calificar a los compañeros (HU-36).
+      if (booking.match) {
+        await notifyReviewInvite(booking.id);
+      }
     }
 
     return { success: true, data: awarded };

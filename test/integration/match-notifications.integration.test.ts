@@ -178,6 +178,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       if (!untouched.success) throw new Error("no se pudo crear el turno de prueba");
       notify.mockClear();
 
+      // Crear un bloqueo es una acción de administrador.
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
       const blocked = await createOutOfService({
         fromDateTime,
         toDateTime: new Date(fromDateTime.getTime() + 60 * 60_000),
@@ -201,6 +203,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       if (!booked.success) throw new Error("no se pudo crear el turno de prueba");
       notify.mockClear();
 
+      // Crear un bloqueo es una acción de administrador.
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
       await createOutOfService({
         fromDateTime,
         toDateTime: new Date(fromDateTime.getTime() + 60 * 60_000),
@@ -215,6 +219,8 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     it("no avisa nada si el bloqueo no cancela ningún turno", async () => {
       const fromDateTime = uniqueFromDateTime();
 
+      // Crear un bloqueo es una acción de administrador.
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
       await createOutOfService({
         fromDateTime,
         toDateTime: new Date(fromDateTime.getTime() + 60 * 60_000),

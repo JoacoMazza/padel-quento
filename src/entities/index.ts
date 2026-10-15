@@ -12,6 +12,7 @@ import { Message } from "@/src/entities/Message";
 import { OutOfService } from "@/src/entities/OutOfService";
 import { Penalty } from "@/src/entities/Penalty";
 import { Player } from "@/src/entities/Player";
+import { PlayerReview } from "@/src/entities/PlayerReview";
 import { Schedule } from "@/src/entities/Schedule";
 
-export { Account, Admin, Booker, Booking, Chat, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, Schedule };
+export { Account, Admin, Booker, Booking, Chat, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, PlayerReview, Schedule };
