@@ -210,6 +210,20 @@ describe("BookingRow", () => {
       expect(screen.getByRole("dialog").textContent).toBe("Calificando el partido 7");
     });
 
+    it("abre el modal fuera de la fila, que en un partido terminado se ve apagada", () => {
+      // Partido ya jugado: la fila se muestra con opacidad reducida.
+      const played = booking({ matchId: 7, canReview: true, fromDateTime: new Date("2026-09-30T18:00:00") });
+      const { container } = render(<BookingRow booking={played} now={NOW} />);
+      expect(container.querySelector(".opacity-75")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Calificar compañeros" }));
+
+      // Si quedara adentro heredaría la opacidad y se vería lo de atrás a través del modal.
+      const dialog = screen.getByRole("dialog");
+      expect(container.contains(dialog)).toBe(false);
+      expect(dialog.closest(".opacity-75")).toBeNull();
+    });
+
     it("no lo ofrece si el partido no se puede calificar", () => {
       render(<BookingRow booking={booking({ matchId: 7, canReview: false })} now={NOW} />);
 

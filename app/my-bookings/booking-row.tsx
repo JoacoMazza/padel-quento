@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, Star, UserPlus, Users, X } from "lucide-react";
@@ -299,9 +300,14 @@ export function BookingRow({
         ) : null}
       </div>
 
-      {isReviewing && booking.matchId !== null ? (
-        <ReviewTeammatesModal matchId={booking.matchId} onClose={() => setIsReviewing(false)} />
-      ) : null}
+      {/* En el body y no dentro de la fila: un partido terminado se muestra apagado
+          (opacity) y el modal heredaría esa transparencia. */}
+      {isReviewing && booking.matchId !== null
+        ? createPortal(
+            <ReviewTeammatesModal matchId={booking.matchId} onClose={() => setIsReviewing(false)} />,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
