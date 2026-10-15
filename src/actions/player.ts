@@ -11,7 +11,7 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
-import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
+import { ForbiddenError, UnauthorizedError, adminOnly, requireAdmin } from "@/src/lib/rbac";
 import { getReputations, getReviewsOf, type ReviewForAdmin } from "@/src/lib/player-reviews";
 import { reputationAlerts, summarizeReputation, type ReputationSummary } from "@/src/domain/reputation";
 import { recordPointsMovement } from "@/src/actions/profile";
@@ -75,6 +75,9 @@ export async function createPlayer(
 }
 
 export async function getPlayers(): Promise<ActionResult<Player[]>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -89,6 +92,9 @@ export async function getPlayers(): Promise<ActionResult<Player[]>> {
 export async function getPlayerById(
   id: number,
 ): Promise<ActionResult<Player | null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
@@ -105,6 +111,9 @@ export async function updatePlayer(
   id: number,
   input: UpdatePlayerInput,
 ): Promise<ActionResult<Player>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
 
@@ -146,6 +155,9 @@ export async function updatePlayer(
  * CASCADE). Si el jugador tiene turnos, la FK de bookings impide borrarlo.
  */
 export async function deletePlayer(id: number): Promise<ActionResult<null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const players = dataSource.getRepository<Player>("Player");
