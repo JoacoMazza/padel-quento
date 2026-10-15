@@ -5,6 +5,7 @@ import { Schedule } from "@/src/entities/Schedule";
 import { DayOfWeek } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
+import { adminOnly } from "@/src/lib/rbac";
 
 export type CreateScheduleInput = {
   dayOfWeek: DayOfWeek;
@@ -22,6 +23,9 @@ export type UpdateScheduleInput = Partial<
 export async function createSchedule(
   input: CreateScheduleInput,
 ): Promise<ActionResult<Schedule>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const schedules = dataSource.getRepository<Schedule>("Schedule");
@@ -74,6 +78,9 @@ export async function updateSchedule(
   id: number,
   input: UpdateScheduleInput,
 ): Promise<ActionResult<Schedule>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const schedules = dataSource.getRepository<Schedule>("Schedule");
@@ -98,6 +105,9 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(id: number): Promise<ActionResult<null>> {
+  const denied = await adminOnly();
+  if (denied) return denied;
+
   try {
     const dataSource = await getDataSource();
     const schedules = dataSource.getRepository<Schedule>("Schedule");
