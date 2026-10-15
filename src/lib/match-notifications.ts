@@ -16,6 +16,7 @@ import {
   playerJoinedNotice,
   playerLeftLateNotice,
   playerLeftNotice,
+  reviewInviteNotice,
   type NoticeBooking,
   type NotificationMessage,
   type NotificationRecipient,
@@ -195,6 +196,25 @@ export async function notifyCourtUnavailable(bookingIds: number[]): Promise<void
     }
   } catch (error) {
     console.error("notifyCourtUnavailable", error);
+  }
+}
+
+/**
+ * Terminado el partido abierto, invita a calificar a sus compañeros a los que
+ * asistieron (HU-36), siempre que hayan sido al menos dos.
+ */
+export async function notifyReviewInvite(bookingId: number): Promise<void> {
+  try {
+    const booking = await findBooking(bookingId);
+    const attended = (booking?.match?.matchPlayers ?? []).filter((mp) => mp.attended);
+    if (!booking || attended.length < 2) return;
+
+    await send(
+      attended.map((mp) => toRecipient(mp.player)),
+      (recipient) => reviewInviteNotice(recipient.names, noticeBookingOf(booking)),
+    );
+  } catch (error) {
+    console.error("notifyReviewInvite", error);
   }
 }
 

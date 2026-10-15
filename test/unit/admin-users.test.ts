@@ -17,6 +17,22 @@ const { find, findOne, update, getDataSource } = vi.hoisted(() => {
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
 
+// La reputación (HU-36) tiene sus propios tests: acá se fija sin reseñas.
+vi.mock("@/src/lib/player-reviews", () => ({
+  getReputations: vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, NO_REVIEWS]))),
+  getReviewsOf: vi.fn(async () => []),
+}));
+
+const NO_REVIEWS = vi.hoisted(() => ({
+  reviews: 0,
+  enough: false,
+  onTimePct: 0,
+  goodAttitudePct: 0,
+  levelAsDeclaredPct: 0,
+  levelLowerPct: 0,
+  levelHigherPct: 0,
+}));
+
 // ── imports bajo test ─────────────────────────────────────────────────────────
 import { getServerSession } from "next-auth/next";
 import { BookingState, Role } from "@/src/domain/enums";
@@ -310,6 +326,9 @@ describe("admin player actions", () => {
             { id: 9, amount: -5, description: "Inasistencia a turno reservado", createdAt: "2026-10-02T00:00:00.000Z" },
             { id: 8, amount: 20, description: "Asistencia a turno reservado", createdAt: "2026-09-30T00:00:00.000Z" },
           ],
+          reputation: NO_REVIEWS,
+          reputationAlerts: [],
+          reviews: [],
         },
       });
     });
