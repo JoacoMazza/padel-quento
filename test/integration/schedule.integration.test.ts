@@ -1,4 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Estas acciones son solo para administradores (ver adminOnly): los tests corren con una
+// sesión de admin; el rechazo sin ella se prueba en admin-only-actions.integration.test.ts.
+vi.mock("next-auth/next", () => ({
+  getServerSession: async () => ({ user: { email: "admin@test.com", role: "admin" } }),
+}));
 import { DayOfWeek } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import {
