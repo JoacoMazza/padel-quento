@@ -7,11 +7,10 @@ vi.mock("next-auth/next", () => ({
 import { getServerSession } from "next-auth/next";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById, updateBooking } from "@/src/actions/booking";
 import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
@@ -45,7 +44,7 @@ describe("chat actions (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({
+    const court = await createTestCourt({
       number: uniqueCourtNumber(),
       price: 10000,
     });
@@ -117,7 +116,7 @@ describe("chat actions (integración con Postgres real)", () => {
   });
 
   it("una vez finalizado el horario del turno la sala queda en solo lectura", async () => {
-    const court = await createCourt({
+    const court = await createTestCourt({
       number: uniqueCourtNumber(),
       price: 10000,
     });
@@ -164,7 +163,7 @@ describe("chat actions (integración con Postgres real)", () => {
   });
 
   it("al cancelar el turno la sala queda en solo lectura y conserva el historial", async () => {
-    const court = await createCourt({
+    const court = await createTestCourt({
       number: uniqueCourtNumber(),
       price: 10000,
     });

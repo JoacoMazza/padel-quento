@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { Column, Entity, Index, JoinColumn, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import type { Account } from "@/src/entities/Account";
+import { AdminAccessLevel } from "@/src/domain/enums";
 
 @Entity({ name: "admins" })
 @Index("UQ_admins_dni", ["dni"], { unique: true })
@@ -25,4 +26,8 @@ export class Admin {
 
   @Column({ type: "varchar", name: "last_names" })
   lastnames!: string;
+
+  /** Dueño o trabajador (ver requireOwner en src/lib/rbac.ts). */
+  @Column({ type: "enum", enum: AdminAccessLevel, name: "access_level", default: AdminAccessLevel.STAFF })
+  accessLevel!: AdminAccessLevel;
 }

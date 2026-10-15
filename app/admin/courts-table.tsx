@@ -13,7 +13,11 @@ type ModalState =
   | { mode: "allPrices" }
   | null;
 
-export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) {
+/**
+ * isOwner: editar una cancha (número, precio, baja) y cambiar el precio de
+ * todas es solo para el dueño; un trabajador ve las canchas y maneja los bloqueos.
+ */
+export function CourtsTable({ courts: initialCourts, isOwner }: { courts: CourtItem[]; isOwner: boolean }) {
   const [courts, setCourts] = useState(initialCourts);
   const [modal, setModal] = useState<ModalState>(null);
 
@@ -61,16 +65,18 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
           label="Total de canchas"
           value={summary.total}
           suffix="registradas"
-          footer="Editá precio y estado desde la tabla"
+          footer={isOwner ? "Editá precio y estado desde la tabla" : "Poné fuera de servicio o habilitá desde la tabla"}
         />
       </div>
 
-      <div className="mb-3 flex justify-end">
-        <button type="button" onClick={() => setModal({ mode: "allPrices" })} className="btn btn-sm btn-outline">
-          <Tag className="h-4 w-4" />
-          Cambiar precio de todas
-        </button>
-      </div>
+      {isOwner ? (
+        <div className="mb-3 flex justify-end">
+          <button type="button" onClick={() => setModal({ mode: "allPrices" })} className="btn btn-sm btn-outline">
+            <Tag className="h-4 w-4" />
+            Cambiar precio de todas
+          </button>
+        </div>
+      ) : null}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -112,15 +118,17 @@ export function CourtsTable({ courts: initialCourts }: { courts: CourtItem[] }) 
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`Editar cancha ${court.number}`}
-                        title="Editar"
-                        onClick={() => setModal({ mode: "edit", court })}
-                        className="icon-btn"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          aria-label={`Editar cancha ${court.number}`}
+                          title="Editar"
+                          onClick={() => setModal({ mode: "edit", court })}
+                          className="icon-btn"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      ) : null}
                       {court.activeOutOfService ? (
                         <button
                           type="button"

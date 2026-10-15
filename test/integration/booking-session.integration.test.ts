@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBooking, getBookingById, joinOpenMatch } from "@/src/actions/booking";
 import { createBookingForPlayer } from "@/src/lib/bookings";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 import { getServerSession } from "next-auth/next";
@@ -47,7 +46,7 @@ describe("reservar y sumarse a partidos con la sesión (integración con Postgre
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
     ana = await newPlayer("Ana");

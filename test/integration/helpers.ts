@@ -1,3 +1,9 @@
+import { AdminAccessLevel, CourtState } from "@/src/domain/enums";
+import type { Account } from "@/src/entities/Account";
+import type { Admin } from "@/src/entities/Admin";
+import type { Court } from "@/src/entities/Court";
+import { getDataSource } from "@/src/lib/db";
+
 // Test files run serially against the same database, so each file starts from the current
 // timestamp and increments: numbers never repeat within a file nor overlap with earlier files.
 let lastCourtNumber = Date.now() % 1_000_000_000;
@@ -14,4 +20,32 @@ let lastPhoneNumber = Date.now() % 1_000_000_000;
 export function uniquePhoneNumber() {
   lastPhoneNumber += 1;
   return `221${lastPhoneNumber}`;
+}
+
+let lastAdminSeq = Date.now() % 1_000_000;
+
+/**
+ * Crea un administrador directo en la base (sin pasar por createAdmin, que es
+ * solo para el dueño). Devuelve el email con el que simular su sesión.
+ */
+export async function createTestAdmin(accessLevel: AdminAccessLevel = AdminAccessLevel.OWNER) {
+  lastAdminSeq += 1;
+  const dataSource = await getDataSource();
+  const accounts = dataSource.getRepository<Account>("Account");
+  const admins = dataSource.getRepository<Admin>("Admin");
+  const email = `${accessLevel}.${lastAdminSeq}@test.com`;
+  const account = await accounts.save(accounts.create({ email, passwordHash: "x" }));
+  const admin = await admins.save(admins.create({ account, names: "Admin", lastnames: accessLevel, dni: null, accessLevel }));
+  return { id: admin.id, email };
+}
+
+/**
+ * Crea una cancha directo en la base para preparar un test (createCourt es solo
+ * para el dueño). Devuelve lo mismo que createCourt.
+ */
+export async function createTestCourt(input: { number: number; price: number; state?: CourtState }) {
+  const dataSource = await getDataSource();
+  const courts = dataSource.getRepository<Court>("Court");
+  const data = await courts.save(courts.create({ state: CourtState.AVAILABLE, ...input }));
+  return { success: true as const, data };
 }

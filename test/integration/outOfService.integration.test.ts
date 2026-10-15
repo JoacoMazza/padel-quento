@@ -7,7 +7,6 @@ vi.mock("next-auth/next", () => ({
 }));
 import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById } from "@/src/actions/booking";
 import {
@@ -18,7 +17,7 @@ import {
   deleteOutOfService,
   endOutOfService,
 } from "@/src/actions/outOfService";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer } from "@/src/lib/bookings";
 
 const fromDateTime = new Date("2026-01-01T09:00:00Z");
@@ -28,7 +27,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
   let courtId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });
@@ -134,7 +133,7 @@ describe("outOfService actions (integración con Postgres real)", () => {
   });
 
   it("al crear el bloqueo cancela solo los turnos de esa cancha que se superponen", async () => {
-    const otherCourt = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const otherCourt = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!otherCourt.success) throw new Error("no se pudo crear la cancha de prueba");
     const player = await createPlayer({
       phoneNumber: uniquePhoneNumber(),

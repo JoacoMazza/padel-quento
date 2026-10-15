@@ -12,14 +12,13 @@ vi.mock("next/cache", () => ({
 
 import { BookingState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById } from "@/src/actions/booking";
 import { createOutOfService, updateOutOfService } from "@/src/actions/outOfService";
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const INITIAL_POINTS = 50;
 
@@ -33,7 +32,7 @@ describe("maintenance cancellation without penalties (HU-13, integración con Po
   let dayOffset = 70;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });

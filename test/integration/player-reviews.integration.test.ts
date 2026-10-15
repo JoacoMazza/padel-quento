@@ -5,7 +5,6 @@ import { getDataSource } from "@/src/lib/db";
 import { getReputations } from "@/src/lib/player-reviews";
 import { Booking } from "@/src/entities/Booking";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
-import { createCourt } from "@/src/actions/court";
 import {
   changePlayerCategoryAdmin,
   createPlayer,
@@ -17,7 +16,7 @@ import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookin
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import { getReviewableTeammates, submitPlayerReview } from "@/src/actions/review";
 import { recordPointsMovement } from "@/src/actions/profile";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -98,7 +97,7 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
     ana = await newPlayer("Ana");

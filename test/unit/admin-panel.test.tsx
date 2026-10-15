@@ -13,8 +13,10 @@ const {
   getAttendanceReport,
   createBookingAdmin,
   getAvailableSlotsAdmin,
+  getTeam,
 } = vi.hoisted(() => ({
   createBookingAdmin: vi.fn(),
+  getTeam: vi.fn(),
   getAvailableSlotsAdmin: vi.fn(),
   createFixedBooking: vi.fn(),
   getScheduleBoardData: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), 
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
+vi.mock("@/src/actions/admin", () => ({ getTeam, createAdmin: vi.fn(), updateAdmin: vi.fn(), deleteAdmin: vi.fn() }));
 vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin, getAvailableSlotsAdmin }));
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
@@ -78,6 +81,7 @@ describe("AdminPanel", () => {
     });
     getOutOfServices.mockResolvedValue({ success: true, data: [] });
     getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [] });
+    getTeam.mockResolvedValue({ success: true, data: [] });
     getAvailableSlotsAdmin.mockResolvedValue({ success: true, data: ["09:30", "18:00"] });
     getOccupancyReportData.mockResolvedValue({
       success: true,
@@ -110,7 +114,7 @@ describe("AdminPanel", () => {
   });
 
   it("al entrar solo pide los datos de la Turnera Global y de sus turnos fijos", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(1);
@@ -124,7 +128,7 @@ describe("AdminPanel", () => {
   });
 
   it("los turnos fijos están en la Turnera Global, debajo de la grilla, y no en una sección aparte", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     const nav = within(screen.getByRole("navigation"));
@@ -134,7 +138,7 @@ describe("AdminPanel", () => {
   });
 
   it("el botón Registrar turno fijo está junto a Actualizar y abre el alta", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     const refreshButton = screen.getByRole("button", { name: "Actualizar turnera" });
@@ -146,7 +150,7 @@ describe("AdminPanel", () => {
   });
 
   it("los botones de la turnera van en orden: Actualizar, Agendar turno y Registrar turno fijo", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     const refreshButton = screen.getByRole("button", { name: "Actualizar turnera" });
@@ -156,7 +160,7 @@ describe("AdminPanel", () => {
   });
 
   it("Agendar turno abre el alta de un turno común", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
@@ -167,7 +171,7 @@ describe("AdminPanel", () => {
 
   it("al agendar un turno cierra el alta, actualiza la grilla y avisa", async () => {
     createBookingAdmin.mockResolvedValue({ success: true, data: { id: 9 } });
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     fireEvent.click(screen.getByRole("button", { name: "Agendar turno" }));
@@ -195,7 +199,7 @@ describe("AdminPanel", () => {
         ],
       },
     });
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     fireEvent.click(screen.getAllByTitle("Agendar turno")[0]);
@@ -209,7 +213,7 @@ describe("AdminPanel", () => {
 
   it("al crear un turno fijo actualiza la grilla para que aparezcan sus fechas", async () => {
     createFixedBooking.mockResolvedValue({ success: true, data: { id: 2, conflicts: [] } });
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     fireEvent.click(screen.getByRole("button", { name: "Registrar turno fijo" }));
@@ -224,7 +228,7 @@ describe("AdminPanel", () => {
   });
 
   it("pide las métricas de ocupación recién al abrir su sección", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     openSection("Métricas del Complejo");
@@ -235,7 +239,7 @@ describe("AdminPanel", () => {
   });
 
   it("pide el reporte de asistencia recién al abrir su sección", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     openSection("Reportes de Asistencia");
@@ -246,7 +250,7 @@ describe("AdminPanel", () => {
   });
 
   it("el menú tiene una sola sección de canchas, sin el Bloqueo de Canchas obsoleto", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     const nav = within(screen.getByRole("navigation"));
@@ -256,7 +260,7 @@ describe("AdminPanel", () => {
   });
 
   it("pide las canchas recién al abrir su sección y las muestra", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     getCourts.mockClear();
@@ -304,7 +308,7 @@ describe("AdminPanel", () => {
         },
       ],
     });
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     openSection("Canchas");
@@ -316,7 +320,7 @@ describe("AdminPanel", () => {
   });
 
   it("pide los usuarios recién al abrir su sección y los muestra", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     getCourts.mockClear();
@@ -330,7 +334,7 @@ describe("AdminPanel", () => {
   });
 
   it("mantiene en memoria lo ya obtenido al volver a una sección visitada", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
     getCourts.mockClear();
     getPlayersAdmin.mockClear();
@@ -350,7 +354,7 @@ describe("AdminPanel", () => {
   });
 
   it("muestra el error si no se pudieron obtener las canchas", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
     getCourts.mockResolvedValueOnce({ success: false, error: "No se pudieron obtener las canchas." });
 
@@ -361,7 +365,7 @@ describe("AdminPanel", () => {
   });
 
   it("pausa el refresco en vivo de la turnera mientras no está visible", async () => {
-    render(<AdminPanel />);
+    render(<AdminPanel isOwner />);
     await flush();
 
     openSection("Canchas");
@@ -371,5 +375,46 @@ describe("AdminPanel", () => {
     });
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(1);
+  });
+
+  describe("dueño y trabajador", () => {
+    it("al dueño le muestra Métricas, Reportes y Equipo", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      const nav = within(screen.getByRole("navigation"));
+      for (const label of ["Métricas del Complejo", "Reportes de Asistencia", "Equipo"]) {
+        expect(nav.getByRole("button", { name: label })).toBeTruthy();
+      }
+    });
+
+    it("a un trabajador le oculta Métricas, Reportes y Equipo", async () => {
+      render(<AdminPanel isOwner={false} />);
+      await flush();
+
+      const nav = within(screen.getByRole("navigation"));
+      for (const label of ["Métricas del Complejo", "Reportes de Asistencia", "Equipo"]) {
+        expect(nav.queryByRole("button", { name: label })).toBeNull();
+      }
+      expect(nav.getByRole("button", { name: "Turnera Global" })).toBeTruthy();
+      expect(nav.getByRole("button", { name: "Canchas" })).toBeTruthy();
+      expect(nav.getByRole("button", { name: "Gestión de Usuarios" })).toBeTruthy();
+    });
+
+    it("pide el equipo recién al abrir su sección y lo muestra", async () => {
+      getTeam.mockResolvedValue({
+        success: true,
+        data: [{ id: 1, names: "Mario", lastnames: "Dueño", dni: 30111222, email: "m@q.com", accessLevel: "owner", isSelf: true }],
+      });
+      render(<AdminPanel isOwner />);
+      await flush();
+      expect(getTeam).not.toHaveBeenCalled();
+
+      openSection("Equipo");
+      await flush();
+
+      expect(getTeam).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Mario Dueño")).toBeTruthy();
+    });
   });
 });

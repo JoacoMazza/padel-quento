@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
+import { AdminAccessLevel } from "@/src/domain/enums";
 
 vi.mock("bcrypt", () => ({
   default: { hash: vi.fn(async () => "hashed-password") },
@@ -22,6 +23,11 @@ const { repos, getDataSource } = vi.hoisted(() => {
 });
 
 vi.mock("@/src/lib/db", () => ({ getDataSource }));
+// La sesión es la del dueño (id 99); el chequeo real contra la base se prueba en integración.
+vi.mock("@/src/lib/rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/src/lib/rbac")>();
+  return { ...actual, requireOwner: vi.fn(async () => ({ email: "owner@test.com", adminId: 99 })) };
+});
 
 import bcrypt from "bcrypt";
 import { createAdmin, getAdmins, getAdminById, updateAdmin, deleteAdmin } from "@/src/actions/admin";
@@ -66,6 +72,7 @@ describe("admin actions", () => {
         names: "Admin",
         lastnames: "Uno",
         dni: 30111222,
+        accessLevel: AdminAccessLevel.STAFF,
       });
       expect(result).toEqual({ success: true, data: expect.objectContaining({ names: "Admin" }) });
     });

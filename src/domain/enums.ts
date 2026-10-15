@@ -3,6 +3,15 @@ export enum Role {
   PLAYER = "player",
 }
 
+/**
+ * Nivel de un administrador: el dueño del complejo, que además maneja el
+ * equipo, los precios, las canchas y las métricas, o un trabajador.
+ */
+export enum AdminAccessLevel {
+  OWNER = "owner",
+  STAFF = "staff",
+}
+
 export enum PlayerCategory {
   FIRST = "1st",
   SECOND = "2nd",
