@@ -198,7 +198,7 @@ pnpm db:seed
 
 Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
-También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite) y una de jugador (`jugador@quento.com` / `jugador123`).
+También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
 Para tener datos con los que revisar las métricas de ocupación del panel admin, hay un seed aparte de turnos (requiere haber corrido antes `pnpm db:seed`):
 
