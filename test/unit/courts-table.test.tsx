@@ -36,20 +36,35 @@ describe("CourtsTable", () => {
     cleanup();
   });
 
+  it("al dueño le ofrece editar la cancha y cambiar el precio de todas", () => {
+    render(<CourtsTable isOwner courts={[court]} />);
+
+    expect(screen.getByRole("button", { name: "Editar cancha 3" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cambiar precio de todas/ })).toBeTruthy();
+  });
+
+  it("a un trabajador no le ofrece editar ni cambiar precios, pero sí ponerla fuera de servicio", () => {
+    render(<CourtsTable isOwner={false} courts={[court]} />);
+
+    expect(screen.queryByRole("button", { name: "Editar cancha 3" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Cambiar precio de todas/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Poner fuera de servicio la cancha 3" })).toBeTruthy();
+  });
+
   it("no ofrece la opción de eliminar canchas", () => {
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
 
     expect(screen.queryByRole("button", { name: /eliminar/i })).toBeNull();
   });
 
   it("muestra la cancha con un bloqueo activo como fuera de servicio, con su motivo", () => {
-    render(<CourtsTable courts={[blockedCourt]} />);
+    render(<CourtsTable isOwner courts={[blockedCourt]} />);
 
     expect(screen.getByText("Fuera de Servicio (Mantenimiento)")).toBeTruthy();
   });
 
   it("el modal ofrece como motivos Mantenimiento, Día libre, Limpieza y Otro", () => {
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
     openOutOfServiceModal();
 
     const options = Array.from((screen.getByLabelText("Motivo") as HTMLSelectElement).options).map((o) => o.text);
@@ -66,7 +81,7 @@ describe("CourtsTable", () => {
         reason: OutOfServiceReason.CLEANING,
       },
     });
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
     openOutOfServiceModal();
 
     fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2099-01-01T20:00" } });
@@ -97,7 +112,7 @@ describe("CourtsTable", () => {
         reason: OutOfServiceReason.FREE_DAY,
       },
     });
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
     openOutOfServiceModal();
 
     fireEvent.click(screen.getByLabelText("Programado"));
@@ -124,7 +139,7 @@ describe("CourtsTable", () => {
       success: false,
       error: "La fecha de fin del bloqueo debe ser posterior a la de inicio.",
     });
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
     openOutOfServiceModal();
 
     fireEvent.change(screen.getByLabelText("Hasta"), { target: { value: "2000-01-01T20:00" } });
@@ -134,7 +149,7 @@ describe("CourtsTable", () => {
   });
 
   it("ofrece habilitar la cancha en lugar de ponerla fuera de servicio si tiene un bloqueo activo", () => {
-    render(<CourtsTable courts={[blockedCourt]} />);
+    render(<CourtsTable isOwner courts={[blockedCourt]} />);
 
     expect(screen.queryByRole("button", { name: "Poner fuera de servicio la cancha 3" })).toBeNull();
     expect(screen.getByRole("button", { name: "Habilitar la cancha 3" })).toBeTruthy();
@@ -142,7 +157,7 @@ describe("CourtsTable", () => {
 
   it("habilita la cancha finalizando el bloqueo activo y la muestra disponible", async () => {
     endOutOfService.mockResolvedValueOnce({ success: true, data: { id: 20 } });
-    render(<CourtsTable courts={[blockedCourt]} />);
+    render(<CourtsTable isOwner courts={[blockedCourt]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Habilitar la cancha 3" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -154,7 +169,7 @@ describe("CourtsTable", () => {
 
   it("muestra el error si no se pudo habilitar la cancha", async () => {
     endOutOfService.mockResolvedValueOnce({ success: false, error: "No se pudo habilitar la cancha." });
-    render(<CourtsTable courts={[blockedCourt]} />);
+    render(<CourtsTable isOwner courts={[blockedCourt]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Habilitar la cancha 3" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
@@ -164,7 +179,7 @@ describe("CourtsTable", () => {
 
   it("cambia el precio de todas las canchas a la vez y lo muestra en la tabla", async () => {
     updateAllCourtsPrice.mockResolvedValueOnce({ success: true, data: null });
-    render(<CourtsTable courts={[court, { ...court, id: 2, number: 4, price: 12000 }]} />);
+    render(<CourtsTable isOwner courts={[court, { ...court, id: 2, number: 4, price: 12000 }]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cambiar precio de todas" }));
     fireEvent.change(screen.getByLabelText("Nuevo precio ($)"), { target: { value: "15000" } });
@@ -180,7 +195,7 @@ describe("CourtsTable", () => {
       success: false,
       error: "No se pudo actualizar el precio de las canchas.",
     });
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cambiar precio de todas" }));
     fireEvent.change(screen.getByLabelText("Nuevo precio ($)"), { target: { value: "15000" } });
@@ -191,7 +206,7 @@ describe("CourtsTable", () => {
   });
 
   it("al editar solo permite elegir entre Disponible y Dada de Baja", () => {
-    render(<CourtsTable courts={[court]} />);
+    render(<CourtsTable isOwner courts={[court]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Editar cancha 3" }));
 

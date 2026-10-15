@@ -15,6 +15,9 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
 vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch, addPlayerToMatch: vi.fn() }));
+vi.mock("@/app/my-bookings/review-teammates-modal", () => ({
+  ReviewTeammatesModal: ({ matchId }: { matchId: number }) => <div role="dialog">Calificando el partido {matchId}</div>,
+}));
 
 import { BookingState } from "@/src/domain/enums";
 import { BookingRow } from "@/app/my-bookings/booking-row";
@@ -35,6 +38,7 @@ function booking(overrides: Partial<MyBookingItem> = {}): MyBookingItem {
     confirmedPlayers: 4,
     chatId: null,
     joinedAsParticipant: false,
+    canReview: false,
     isFixed: false,
     ...overrides,
   };
@@ -194,6 +198,36 @@ describe("BookingRow", () => {
       );
 
       expect(screen.queryByRole("button", { name: "Darme de baja del partido" })).toBeNull();
+    });
+  });
+
+  describe("calificar compañeros", () => {
+    it("en un partido terminado que se puede calificar ofrece calificar a los compañeros", () => {
+      render(<BookingRow booking={booking({ matchId: 7, canReview: true })} now={NOW} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Calificar compañeros" }));
+
+      expect(screen.getByRole("dialog").textContent).toBe("Calificando el partido 7");
+    });
+
+    it("abre el modal fuera de la fila, que en un partido terminado se ve apagada", () => {
+      // Partido ya jugado: la fila se muestra con opacidad reducida.
+      const played = booking({ matchId: 7, canReview: true, fromDateTime: new Date("2026-09-30T18:00:00") });
+      const { container } = render(<BookingRow booking={played} now={NOW} />);
+      expect(container.querySelector(".opacity-75")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Calificar compañeros" }));
+
+      // Si quedara adentro heredaría la opacidad y se vería lo de atrás a través del modal.
+      const dialog = screen.getByRole("dialog");
+      expect(container.contains(dialog)).toBe(false);
+      expect(dialog.closest(".opacity-75")).toBeNull();
+    });
+
+    it("no lo ofrece si el partido no se puede calificar", () => {
+      render(<BookingRow booking={booking({ matchId: 7, canReview: false })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: "Calificar compañeros" })).toBeNull();
     });
   });
 

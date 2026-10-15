@@ -7,7 +7,6 @@ vi.mock("next-auth/next", () => ({
 }));
 import { DayOfWeek } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import {
   createSchedule,
   getSchedules,
@@ -15,7 +14,7 @@ import {
   updateSchedule,
   deleteSchedule,
 } from "@/src/actions/schedule";
-import { uniqueCourtNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber } from "./helpers";
 
 const openingTime = new Date("1970-01-01T09:00:00Z");
 const closingTime = new Date("1970-01-01T23:00:00Z");
@@ -24,7 +23,7 @@ describe("schedule actions (integración con Postgres real)", () => {
   let courtId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });

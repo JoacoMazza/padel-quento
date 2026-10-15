@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { Booker } from "@/src/entities/Booker";
 import {
@@ -11,7 +10,7 @@ import {
   updateBooking,
   deleteBooking,
 } from "@/src/actions/booking";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
@@ -52,7 +51,7 @@ describe("booking actions (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 
@@ -560,7 +559,7 @@ describe("booking actions (integración con Postgres real)", () => {
     });
 
     it("no permite mover una reserva a un horario ya ocupado en otra cancha", async () => {
-      const otherCourt = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+      const otherCourt = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
       if (!otherCourt.success) throw new Error("no se pudo crear la segunda cancha de prueba");
 
       const fromDateTime = uniqueFromDateTime();

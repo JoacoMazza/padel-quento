@@ -3,6 +3,15 @@ export enum Role {
   PLAYER = "player",
 }
 
+/**
+ * Nivel de un administrador: el dueño del complejo, que además maneja el
+ * equipo, los precios, las canchas y las métricas, o un trabajador.
+ */
+export enum AdminAccessLevel {
+  OWNER = "owner",
+  STAFF = "staff",
+}
+
 export enum PlayerCategory {
   FIRST = "1st",
   SECOND = "2nd",
@@ -36,6 +45,13 @@ export enum OutOfServiceReason {
   FREE_DAY = "free_day",
   CLEANING = "cleaning",
   OTHER = "other",
+}
+
+/** Cómo vio un compañero el nivel del jugador respecto de la categoría que declaró (HU-36). */
+export enum ReviewLevel {
+  LOWER = "lower",
+  AS_DECLARED = "as_declared",
+  HIGHER = "higher",
 }
 
 export enum FixedBookingFrequency {

@@ -7,7 +7,7 @@ import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
-import { requireAdmin } from "@/src/lib/rbac";
+import { ForbiddenError, UnauthorizedError, requireAdmin, requireOwner } from "@/src/lib/rbac";
 
 export type CreateCourtInput = {
   number: number;
@@ -23,14 +23,21 @@ function isValidPrice(price: unknown): price is number {
   return typeof price === "number" && !isNaN(price) && price > 0;
 }
 
+/** Errores de permisos: se muestran tal cual. */
+function authErrorMessage(error: unknown): string | null {
+  return error instanceof ForbiddenError || error instanceof UnauthorizedError ? error.message : null;
+}
+
+/** Alta de una cancha: solo el dueño del complejo. */
 export async function createCourt(
   input: CreateCourtInput,
 ): Promise<ActionResult<Court>> {
-  if (!isValidPrice(input.price)) {
-    return { success: false, error: INVALID_PRICE_ERROR };
-  }
-
   try {
+    await requireOwner();
+    if (!isValidPrice(input.price)) {
+      return { success: false, error: INVALID_PRICE_ERROR };
+    }
+
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
 
@@ -43,6 +50,8 @@ export async function createCourt(
     const saved = await courts.save(court);
     return { success: true, data: toPlain(saved) };
   } catch (error) {
+    const authError = authErrorMessage(error);
+    if (authError) return { success: false, error: authError };
     if (isUniqueViolation(error)) {
       return { success: false, error: "Ya existe una cancha con ese número." };
     }
@@ -89,6 +98,17 @@ export async function updateCourt(
       return { success: false, error: "La cancha no existe." };
     }
 
+    // Cambiar el precio y dar de baja (o volver a habilitar) una cancha es solo
+    // para el dueño; el resto de los estados los maneja cualquier admin.
+    const changesPrice = input.price !== undefined && input.price !== court.price;
+    const changesClosedDown =
+      input.state !== undefined &&
+      input.state !== court.state &&
+      (input.state === CourtState.CLOSED_DOWN || court.state === CourtState.CLOSED_DOWN);
+    if (changesPrice || changesClosedDown) {
+      await requireOwner();
+    }
+
     const closingDown = input.state === CourtState.CLOSED_DOWN && court.state !== CourtState.CLOSED_DOWN;
     courts.merge(court, input);
     if (!closingDown) {
@@ -118,6 +138,8 @@ export async function updateCourt(
     }
     return { success: true, data: toPlain(saved) };
   } catch (error) {
+    const authError = authErrorMessage(error);
+    if (authError) return { success: false, error: authError };
     if (isUniqueViolation(error)) {
       return { success: false, error: "Ya existe una cancha con ese número." };
     }
@@ -129,15 +151,15 @@ export async function updateCourt(
 /**
  * Aplica el mismo precio a todas las canchas, incluidas las dadas de baja.
  * Las reservas ya hechas conservan el precio con el que se tomaron.
- * Solo accesible por administradores.
+ * Solo accesible por el dueño del complejo.
  */
 export async function updateAllCourtsPrice(price: number): Promise<ActionResult<null>> {
-  if (!isValidPrice(price)) {
-    return { success: false, error: INVALID_PRICE_ERROR };
-  }
-
   try {
-    await requireAdmin();
+    await requireOwner();
+    if (!isValidPrice(price)) {
+      return { success: false, error: INVALID_PRICE_ERROR };
+    }
+
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
 
@@ -145,6 +167,8 @@ export async function updateAllCourtsPrice(price: number): Promise<ActionResult<
     await courts.save(all.map((court) => ({ ...court, price })));
     return { success: true, data: null };
   } catch (error) {
+    const authError = authErrorMessage(error);
+    if (authError) return { success: false, error: authError };
     console.error("updateAllCourtsPrice", error);
     return { success: false, error: "No se pudo actualizar el precio de las canchas." };
   }

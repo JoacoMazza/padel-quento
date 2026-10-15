@@ -6,13 +6,12 @@ vi.mock("next-auth/next", () => ({
 
 import { getServerSession } from "next-auth/next";
 import { PlayerCategory } from "@/src/domain/enums";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById } from "@/src/actions/booking";
 import { addPlayerToMatch } from "@/src/actions/match";
 import { getChatMessages } from "@/src/actions/chat";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 // En minúsculas, como quedan guardados los emails al registrarse.
 function uniqueEmail(prefix: string) {
@@ -65,7 +64,7 @@ describe("addPlayerToMatch (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });

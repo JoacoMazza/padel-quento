@@ -1,11 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById } from "@/src/actions/booking";
 import { closeMatch, cancelExpiredMatches } from "@/src/actions/match";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
@@ -29,7 +28,7 @@ describe("match actions (integración con Postgres real)", () => {
   let bookerId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 

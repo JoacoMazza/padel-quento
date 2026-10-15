@@ -2,12 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { Booking } from "@/src/entities/Booking";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { MY_BOOKINGS_PAST_LIMIT } from "@/src/domain/constants";
 import { getPlayerBookings } from "@/src/lib/player-bookings";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const DAY = 24 * 60 * 60_000;
 
@@ -52,7 +51,7 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
   }
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error(court.error);
     courtId = court.data.id;
     ana = await newPlayer("Ana");

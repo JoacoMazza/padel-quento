@@ -1,7 +1,11 @@
 import "reflect-metadata";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
-import { Role } from "@/src/domain/enums";
+import { AdminAccessLevel, Role } from "@/src/domain/enums";
+import type { Admin } from "@/src/entities/Admin";
+import { getDataSource } from "@/src/lib/db";
+
+export const OWNER_ONLY_MESSAGE = "Solo el dueño del complejo puede hacer esto.";
 
 export class UnauthorizedError extends Error {
   readonly status = 401;
@@ -41,6 +45,23 @@ export async function requireAdmin() {
   }
 
   return session.user;
+}
+
+/**
+ * Verifica que el usuario sea el dueño del complejo (un admin con nivel OWNER).
+ * El nivel se lee de la base y no de la sesión, así un cambio de nivel aplica
+ * en el momento. Devuelve además el id del administrador.
+ */
+export async function requireOwner() {
+  const user = await requireAdmin();
+  const dataSource = await getDataSource();
+  const admin = await dataSource
+    .getRepository<Admin>("Admin")
+    .findOne({ where: { account: { email: user.email! } } });
+  if (admin?.accessLevel !== AdminAccessLevel.OWNER) {
+    throw new ForbiddenError(OWNER_ONLY_MESSAGE);
+  }
+  return { ...user, adminId: admin.id };
 }
 
 /**

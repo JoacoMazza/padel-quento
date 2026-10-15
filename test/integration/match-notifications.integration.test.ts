@@ -13,13 +13,13 @@ import {
   type NotificationRecipient,
 } from "@/src/domain/notifications";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt, updateCourt } from "@/src/actions/court";
+import { updateCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById, updateBooking } from "@/src/actions/booking";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { cancelExpiredMatches, closeMatch, leaveMatch } from "@/src/actions/match";
 import { createOutOfService } from "@/src/actions/outOfService";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestAdmin, createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 const { notify } = vi.hoisted(() => ({ notify: vi.fn(async () => {}) }));
 vi.mock("@/src/lib/notifications", () => ({ notify }));
@@ -76,7 +76,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
 
   beforeAll(async () => {
     courtNumber = uniqueCourtNumber();
-    const court = await createCourt({ number: courtNumber, price: 10000 });
+    const court = await createTestCourt({ number: courtNumber, price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 
@@ -337,7 +337,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
   describe("cuando la cancha se da de baja", () => {
     it("cancela los turnos futuros de esa cancha y avisa a sus jugadores", async () => {
       const otherNumber = uniqueCourtNumber();
-      const other = await createCourt({ number: otherNumber, price: 10000 });
+      const other = await createTestCourt({ number: otherNumber, price: 10000 });
       if (!other.success) throw new Error("no se pudo crear la cancha de prueba");
       const fromDateTime = uniqueFromDateTime();
       const { bookingId } = await createOpenMatch(fromDateTime, 2, ana, other.data.id);
@@ -345,7 +345,9 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
       notify.mockClear();
 
       // Dar de baja una cancha es solo para administradores.
-      vi.mocked(getServerSession).mockResolvedValue({ user: { email: "admin@test.com", role: Role.ADMIN } } as never);
+      // Dar de baja una cancha es solo para el dueño.
+      const owner = await createTestAdmin();
+      vi.mocked(getServerSession).mockResolvedValue({ user: { email: owner.email, role: Role.ADMIN } } as never);
       const closedDown = await updateCourt(other.data.id, { state: CourtState.CLOSED_DOWN });
 
       expect(closedDown.success).toBe(true);
@@ -361,7 +363,7 @@ describe("avisos de cambios en turnos y partidos (integración con Postgres real
     });
 
     it("no cancela ni avisa nada si se edita la cancha sin darla de baja", async () => {
-      const other = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+      const other = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
       if (!other.success) throw new Error("no se pudo crear la cancha de prueba");
       const { bookingId } = await createOpenMatch(uniqueFromDateTime(), 2, ana, other.data.id);
       notify.mockClear();

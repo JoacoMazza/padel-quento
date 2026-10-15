@@ -4,22 +4,28 @@ import { addDaysISO, occurrenceStart, todayISO } from "@/src/domain/fixed-bookin
 import { getDataSource } from "@/src/lib/db";
 import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
-import { createCourt, updateCourt } from "@/src/actions/court";
+import { updateCourt } from "@/src/actions/court";
 import { createSchedule } from "@/src/actions/schedule";
 import { blockPlayer, createPlayer } from "@/src/actions/player";
 import { createBookingForPlayer } from "@/src/lib/bookings";
 import { createOutOfService } from "@/src/actions/outOfService";
 import { createBookingAdmin, getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestAdmin, createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("@/src/lib/notifications", () => ({ notify: vi.fn(async () => {}) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 import { getServerSession } from "next-auth/next";
 
+// El admin de la sesión es un dueño real: dar de baja una cancha es solo para el dueño.
+let adminEmail = "";
+beforeAll(async () => {
+  adminEmail = (await createTestAdmin()).email;
+});
+
 function mockSession(role: Role | null) {
   vi.mocked(getServerSession).mockResolvedValue(
-    role ? ({ user: { email: "admin@test.com", role } } as never) : null,
+    role ? ({ user: { email: adminEmail, role } } as never) : null,
   );
 }
 
@@ -34,7 +40,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
   let player: { id: number; phoneNumber: string };
 
   async function newCourt(price = 20000) {
-    const court = await createCourt({ number: uniqueCourtNumber(), price });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     for (const dayOfWeek of ALL_DAYS) {
       await createSchedule({

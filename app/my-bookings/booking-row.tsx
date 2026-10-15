@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, UserPlus, Users, X } from "lucide-react";
+import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, Star, UserPlus, Users, X } from "lucide-react";
 import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { ShareLinkButton } from "@/app/components/share-link-button";
 import { AddPlayerForm } from "@/app/open-matches/add-player-form";
@@ -21,6 +22,7 @@ import {
   getBookingTone,
 } from "@/app/my-bookings/booking-status";
 import type { MyBookingItem } from "@/app/my-bookings/types";
+import { ReviewTeammatesModal } from "@/app/my-bookings/review-teammates-modal";
 
 const SHORT_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short" });
 
@@ -49,6 +51,7 @@ export function BookingRow({
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<"cancel" | "close" | "leave" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
 
   const end = getBookingEnd(booking);
@@ -231,6 +234,12 @@ export function BookingRow({
                 Ver detalle
               </Link>
             ) : null}
+            {booking.canReview && booking.matchId !== null ? (
+              <button type="button" onClick={() => setIsReviewing(true)} className="btn btn-primary btn-sm">
+                <Star className="h-4 w-4" />
+                Calificar compañeros
+              </button>
+            ) : null}
             {canShare ? <ShareLinkButton path={`/open-matches/${booking.id}`} /> : null}
             {canAddPlayer ? (
               <button
@@ -290,6 +299,15 @@ export function BookingRow({
           </div>
         ) : null}
       </div>
+
+      {/* En el body y no dentro de la fila: un partido terminado se muestra apagado
+          (opacity) y el modal heredaría esa transparencia. */}
+      {isReviewing && booking.matchId !== null
+        ? createPortal(
+            <ReviewTeammatesModal matchId={booking.matchId} onClose={() => setIsReviewing(false)} />,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import "reflect-metadata";
 import bcrypt from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { Role } from "@/src/domain/enums";
+import { AdminAccessLevel, Role } from "@/src/domain/enums";
 import { Account } from "@/src/entities/Account";
 import { getDataSource } from "@/src/lib/db";
 
@@ -54,6 +54,9 @@ export const authOptions: NextAuthOptions = {
             email: account.email,
             name: person ? `${person.names} ${person.lastnames}` : account.email,
             role: account.admin ? Role.ADMIN : Role.PLAYER,
+            // Solo para mostrar u ocultar secciones del panel: los permisos del dueño se
+            // verifican contra la base en cada acción (ver requireOwner).
+            isOwner: account.admin?.accessLevel === AdminAccessLevel.OWNER,
           };
         } catch (error) {
           console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);
@@ -75,6 +78,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.role = user.role;
+        token.isOwner = user.isOwner;
       }
       return token;
     },
@@ -84,6 +88,7 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email ?? session.user.email;
         session.user.name = token.name ?? session.user.name;
         session.user.role = token.role ?? session.user.role;
+        session.user.isOwner = token.isOwner ?? false;
       }
       return session;
     },

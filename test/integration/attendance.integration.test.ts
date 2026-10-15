@@ -17,7 +17,6 @@ import {
   PENALTY_POINTS,
 } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById } from "@/src/actions/booking";
 import { getProfileData, recordPointsMovement } from "@/src/actions/profile";
@@ -26,7 +25,7 @@ import {
   setMatchPlayerAttendance,
   awardAttendancePoints,
 } from "@/src/actions/attendance";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
 function uniqueEmail(prefix: string) {
@@ -71,7 +70,7 @@ describe("attendance actions (integración con Postgres real)", () => {
   let courtId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
   });

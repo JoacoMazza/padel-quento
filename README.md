@@ -58,6 +58,14 @@ docs/
   der/                Diagrama Entidad-Relación (imagen + fuente editable)
 ```
 
+## Reseñas y reputación de los jugadores
+
+Después de un partido abierto, cada jugador que asistió puede calificar a sus compañeros que también asistieron (HU-36), hasta 48 horas después de terminado: si su nivel coincide con la categoría que declaró (más bajo / acorde / más alto), si tuvo buena actitud y si llegó a horario, más un comentario opcional. Al terminar el partido se los invita con un aviso, y la calificación se hace desde "Mis turnos".
+
+- La reputación se muestra en porcentajes (puntualidad, buena actitud, nivel acorde) desde las 3 reseñas, en el detalle de los partidos abiertos y en el perfil del propio jugador. Es anónima: los jugadores no ven quién dijo qué.
+- El admin ve en la ficha del jugador la reputación, alertas cuando algo baja del 70% y cada reseña con su comentario y quién la dejó. Desde ahí puede cambiarle la categoría o descontarle puntos con un motivo.
+- Las reseñas no tocan los puntos de fidelidad. La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
+
 ## Acceso sin sesión
 
 La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-matches`) se pueden ver sin iniciar sesión (ver `proxy.ts`). El login se pide recién al reservar o sumarse a un partido: el visitante va a `/login` y, al volver, encuentra elegido el turno que había seleccionado. Las rutas personales (`/my-bookings`, `/profile`, `/chats/*`) y las de admin siguen protegidas, y el admin con sesión sigue encerrado en su panel.
@@ -74,6 +82,14 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
+
+## Administradores: dueño y trabajador
+
+Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) o **trabajador** (`staff`).
+
+- Solo el dueño puede gestionar el equipo (sección **Equipo** del panel: alta, edición y baja de administradores), cambiar precios, dar de alta canchas o darlas de baja, y ver Métricas del Complejo y Reportes de Asistencia. El trabajador maneja la turnera, los turnos y turnos fijos, los bloqueos de canchas y los jugadores.
+- El servidor lo exige con `requireOwner()` ([src/lib/rbac.ts](src/lib/rbac.ts)), que lee el nivel de la base en cada acción: un cambio de nivel aplica en el momento. La sesión trae `isOwner` solo para mostrar u ocultar secciones.
+- El dueño no puede darse de baja ni cambiarse el nivel a sí mismo. Los administradores creados antes de este cambio quedaron como dueños; los nuevos arrancan como trabajadores.
 
 ## Configuración del proyecto
 
@@ -132,6 +148,7 @@ WhatsApp no permite mandar texto libre en mensajes que inicia el club, así que 
 | `quento_partido_sin_cupo` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} se canceló porque no se completó el cupo de jugadores. No se aplicó ninguna penalización. |
 | `quento_partido_completo` | Hola {{1}}, ¡el partido del {{2}} a las {{3}} en la cancha {{4}} está completo! {{5}} se sumó y ya son 4 jugadores. |
 | `quento_partido_cerrado` | Hola {{1}}, el partido del {{2}} a las {{3}} en la cancha {{4}} ya no busca más jugadores. Se juega con los que están anotados. |
+| `quento_calificar_companeros` | Hola {{1}}, ¡gracias por venir a jugar con nosotros! Ya podés calificar a tus compañeros del partido del {{2}} en la cancha {{3}} desde Mis turnos. Tenés 48 horas. |
 | `quento_turno_fijo_liberado` | Hola {{1}}, liberamos tu turno fijo del {{2}} a las {{3}} en la cancha {{4}}. Tus próximos turnos fijos siguen reservados. |
 | `quento_turno_fijo_cancelado` | Hola {{1}}, se dio de baja tu turno fijo de los {{2}} a las {{3}} en la cancha {{4}}. Se cancelaron todas sus próximas fechas. |
 
@@ -181,7 +198,7 @@ pnpm db:seed
 
 Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
-También crea, si no existen, una cuenta de administrador (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite) y una de jugador (`jugador@quento.com` / `jugador123`).
+También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
 Para tener datos con los que revisar las métricas de ocupación del panel admin, hay un seed aparte de turnos (requiere haber corrido antes `pnpm db:seed`):
 

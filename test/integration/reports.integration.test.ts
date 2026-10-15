@@ -9,19 +9,26 @@ vi.mock("next-auth/next", () => ({
 }));
 
 import { getServerSession } from "next-auth/next";
-import { BookingState, Role } from "@/src/domain/enums";
+import { AdminAccessLevel, BookingState, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { deleteBooking, updateBooking } from "@/src/actions/booking";
 import { setBookingAttendance } from "@/src/actions/attendance";
 import { getAttendanceReport } from "@/src/actions/reports";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestAdmin, createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer } from "@/src/lib/bookings";
 
-function mockAdminSession() {
+// Métricas y reportes son solo para el dueño del complejo.
+let ownerEmail = "";
+let staffEmail = "";
+beforeAll(async () => {
+  ownerEmail = (await createTestAdmin(AdminAccessLevel.OWNER)).email;
+  staffEmail = (await createTestAdmin(AdminAccessLevel.STAFF)).email;
+});
+
+function mockAdminSession(email = ownerEmail) {
   vi.mocked(getServerSession).mockResolvedValue({
-    user: { email: "admin@test.com", name: "Admin", role: Role.ADMIN },
+    user: { email, name: "Admin", role: Role.ADMIN },
   } as never);
 }
 
@@ -36,7 +43,7 @@ describe("getAttendanceReport (integración con Postgres real)", () => {
   const range = { from: new Date(now - 48 * HOUR), to: new Date(now + 24 * HOUR) };
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     const courtId = court.data.id;
 
@@ -133,5 +140,13 @@ describe("getAttendanceReport (integración con Postgres real)", () => {
     const result = await getAttendanceReport(range);
 
     expect(result.success).toBe(false);
+  });
+
+  it("rechaza el acceso a un trabajador (es solo para el dueño)", async () => {
+    mockAdminSession(staffEmail);
+
+    const result = await getAttendanceReport(range);
+
+    expect(result).toEqual({ success: false, error: "Solo el dueño del complejo puede hacer esto." });
   });
 });

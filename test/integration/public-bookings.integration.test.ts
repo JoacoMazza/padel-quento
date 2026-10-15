@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { getPublicBookings } from "@/src/lib/public-bookings";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 function uniqueEmail(prefix: string) {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2)}@test.com`;
@@ -30,7 +29,7 @@ describe("turnos para la vista pública (integración con Postgres real)", () =>
   let openMatchId: number;
 
   beforeAll(async () => {
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 15000 });
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 15000 });
     if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
     courtId = court.data.id;
 

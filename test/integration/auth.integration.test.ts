@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import bcrypt from "bcrypt";
 import { authOptions } from "@/src/lib/auth";
-import { Role } from "@/src/domain/enums";
+import { AdminAccessLevel, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createAdmin } from "@/src/actions/admin";
 import { createPlayer } from "@/src/actions/player";
 import { uniquePhoneNumber } from "./helpers";
 
@@ -19,6 +19,7 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
   const email = `auth.${Date.now()}@test.com`;
   const emailBlocked = `blocked.${Date.now()}@test.com`;
   const emailAdmin = `admin.${Date.now()}@test.com`;
+  const emailStaff = `staff.${Date.now()}@test.com`;
   const password = "claveSegura123";
 
   beforeAll(async () => {
@@ -35,8 +36,17 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
     if (!blocked.success) throw new Error("no se pudo crear el jugador bloqueado de prueba");
     const dataSource = await getDataSource();
     await dataSource.getRepository("Account").update(blocked.data.account.id, { isBlocked: true });
-    // administrador
-    await createAdmin({ email: emailAdmin, password, names: "Admin", lastnames: "Login", dni: 30999888 });
+    // administradores: el dueño y un trabajador (createAdmin es solo para el dueño, así que van directo a la base)
+    const passwordHash = await bcrypt.hash(password, 4);
+    const accounts = dataSource.getRepository("Account");
+    const admins = dataSource.getRepository("Admin");
+    for (const [adminEmail, lastnames, accessLevel] of [
+      [emailAdmin, "Login", AdminAccessLevel.OWNER],
+      [emailStaff, "Staff", AdminAccessLevel.STAFF],
+    ] as const) {
+      const account = await accounts.save(accounts.create({ email: adminEmail, passwordHash }));
+      await admins.save(admins.create({ account, names: "Admin", lastnames, dni: null, accessLevel }));
+    }
   });
 
   afterAll(async () => {
@@ -54,6 +64,21 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
     const result = await getAuthorize()({ email: emailAdmin, password });
 
     expect(result).toMatchObject({ email: emailAdmin, name: "Admin Login", role: Role.ADMIN });
+  });
+
+  it("indica si el administrador es el dueño o un trabajador", async () => {
+    expect(await getAuthorize()({ email: emailAdmin, password })).toMatchObject({ role: Role.ADMIN, isOwner: true });
+    expect(await getAuthorize()({ email: emailStaff, password })).toMatchObject({ role: Role.ADMIN, isOwner: false });
+    expect(await getAuthorize()({ email, password })).toMatchObject({ role: Role.PLAYER, isOwner: false });
+  });
+
+  it("lleva isOwner del login a la sesión", async () => {
+    const user = await getAuthorize()({ email: emailAdmin, password });
+    const callbacks = authOptions.callbacks!;
+    const token = await callbacks.jwt!({ token: {}, user } as never);
+    const session = await callbacks.session!({ session: { user: {}, expires: "" }, token } as never);
+
+    expect((session as { user: { isOwner?: boolean } }).user.isOwner).toBe(true);
   });
 
   it("rechaza una contraseña incorrecta", async () => {

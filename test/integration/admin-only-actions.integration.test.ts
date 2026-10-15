@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DayOfWeek, OutOfServiceReason, Role } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
-import { createCourt } from "@/src/actions/court";
 import {
   createOutOfService,
   deleteOutOfService,
@@ -11,7 +10,7 @@ import {
 import { createSchedule, deleteSchedule, updateSchedule } from "@/src/actions/schedule";
 import { createPlayer, deletePlayer, getPlayerById, getPlayers, updatePlayer } from "@/src/actions/player";
 import { getScheduleBoardData } from "@/src/actions/scheduleBoard";
-import { uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
+import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 import { getServerSession } from "next-auth/next";
@@ -35,8 +34,7 @@ describe("acciones solo para administradores (integración con Postgres real)", 
 
   beforeAll(async () => {
     signInAs(Role.ADMIN);
-    const court = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
-    if (!court.success) throw new Error(court.error);
+    const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
     courtId = court.data.id;
     const schedule = await createSchedule({
       dayOfWeek: DayOfWeek.MONDAY,

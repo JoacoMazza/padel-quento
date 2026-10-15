@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
@@ -10,6 +10,8 @@ import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/f
 import { CreateBookingModal, type BookingCourtOption, type BookingDraft } from "@/app/admin/create-booking-modal";
 import { OccupancyMetrics } from "@/app/admin/occupancy-metrics";
 import { AttendanceReport } from "@/app/admin/attendance-report";
+import { TeamPanel } from "@/app/admin/team-panel";
+import { getTeam } from "@/src/actions/admin";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
 import { getOutOfServices } from "@/src/actions/outOfService";
@@ -19,12 +21,14 @@ import { getFixedBookingsAdmin, type FixedBookingAdminItem } from "@/src/actions
 import { CourtState } from "@/src/domain/enums";
 import type { ActionResult } from "@/src/lib/action-result";
 
+// ownerOnly: secciones solo para el dueño del complejo (el servidor también lo exige).
 const SECTIONS = [
-  { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true },
-  { id: "courts", label: "Canchas", icon: MapPin, available: true },
-  { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true },
-  { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true },
-  { id: "users", label: "Gestión de Usuarios", icon: Users, available: true },
+  { id: "schedule", label: "Turnera Global", icon: CalendarClock, available: true, ownerOnly: false },
+  { id: "courts", label: "Canchas", icon: MapPin, available: true, ownerOnly: false },
+  { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true, ownerOnly: true },
+  { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true, ownerOnly: true },
+  { id: "users", label: "Gestión de Usuarios", icon: Users, available: true, ownerOnly: false },
+  { id: "team", label: "Equipo", icon: UserCog, available: true, ownerOnly: true },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -84,9 +88,9 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
   };
 }
 
-function CourtsSection() {
+function CourtsSection({ isOwner }: { isOwner: boolean }) {
   const state = useSectionData(loadCourts);
-  return state.status === "ready" ? <CourtsTable courts={state.data} /> : <SectionStatus state={state} />;
+  return state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />;
 }
 
 type FixedBookingsData = {
@@ -209,10 +213,17 @@ function UsersSection() {
   return state.status === "ready" ? <UsersTable players={state.data} /> : <SectionStatus state={state} />;
 }
 
-export function AdminPanel() {
+function TeamSection() {
+  const state = useSectionData(getTeam);
+  return state.status === "ready" ? <TeamPanel team={state.data} /> : <SectionStatus state={state} />;
+}
+
+/** isOwner (de la sesión): muestra las secciones del dueño; los permisos los verifica el servidor. */
+export function AdminPanel({ isOwner }: { isOwner: boolean }) {
   const [activeSection, setActiveSection] = useState<SectionId>("schedule");
   const [visitedSections, setVisitedSections] = useState<SectionId[]>(["schedule"]);
-  const activeLabel = SECTIONS.find((s) => s.id === activeSection)?.label ?? "";
+  const sections = SECTIONS.filter((section) => isOwner || !section.ownerOnly);
+  const activeLabel = sections.find((s) => s.id === activeSection)?.label ?? "";
 
   function openSection(id: SectionId) {
     setActiveSection(id);
@@ -224,7 +235,7 @@ export function AdminPanel() {
       <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-line bg-card">
         <p className="label-caps px-6 pt-6 pb-2">Panel operativo</p>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {SECTIONS.map(({ id, label, icon: Icon, available }) => {
+          {sections.map(({ id, label, icon: Icon, available }) => {
             const isActive = id === activeSection;
             if (!available) {
               return (
@@ -282,7 +293,7 @@ export function AdminPanel() {
         ) : null}
         {visitedSections.includes("courts") ? (
           <div hidden={activeSection !== "courts"}>
-            <CourtsSection />
+            <CourtsSection isOwner={isOwner} />
           </div>
         ) : null}
         {visitedSections.includes("metrics") ? (
@@ -298,6 +309,11 @@ export function AdminPanel() {
         {visitedSections.includes("users") ? (
           <div hidden={activeSection !== "users"}>
             <UsersSection />
+          </div>
+        ) : null}
+        {visitedSections.includes("team") ? (
+          <div hidden={activeSection !== "team"}>
+            <TeamSection />
           </div>
         ) : null}
       </main>

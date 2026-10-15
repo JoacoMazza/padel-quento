@@ -7,12 +7,15 @@ declare module "next-auth" {
     user: {
       id?: string;
       role?: Role;
+      /** Admin dueño del complejo (ver AdminAccessLevel). */
+      isOwner?: boolean;
     } & DefaultSession["user"];
   }
 
   interface User extends DefaultUser {
     id: string;
     role?: Role;
+    isOwner?: boolean;
   }
 }
 
@@ -20,5 +23,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     role?: Role;
+    isOwner?: boolean;
   }
 }

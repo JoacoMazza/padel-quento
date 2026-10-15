@@ -17,6 +17,8 @@ import {
   PENALTY_POINTS,
 } from "@/src/domain/constants";
 import { pageMetadata } from "@/app/site-metadata";
+import { getReputations } from "@/src/lib/player-reviews";
+import { ReputationBadge } from "@/app/components/reputation-badge";
 
 export const metadata = pageMetadata("Mi perfil", "/profile");
 
@@ -39,6 +41,7 @@ export default async function ProfilePage() {
   }
 
   const fullName = `${profile.names} ${profile.lastnames}`;
+  const reputation = (await getReputations([profile.id])).get(profile.id);
   const penalties = profile.movements.filter((m) => m.type === "penalty").length;
   const categoryLabel = PLAYER_CATEGORY_LABELS[profile.category as PlayerCategory] ?? profile.category;
 
@@ -106,6 +109,17 @@ export default async function ProfilePage() {
             : "Cuenta al día para reservar y sumarse a partidos."}
         </StatusCard>
       </div>
+
+      {reputation ? (
+        <section className="card mt-6 flex flex-col gap-2 p-6">
+          <span className="label-caps">Tu reputación</span>
+          <ReputationBadge summary={reputation} />
+          <p className="text-sm text-foreground/60">
+            Sale de lo que opinan tus compañeros después de cada partido abierto, de forma anónima. La ven los
+            demás jugadores en el detalle de los partidos.
+          </p>
+        </section>
+      ) : null}
 
       {/* Mismas columnas y separación que las tarjetas de arriba: el historial ocupa dos y las reglas, la última. */}
       <div className="mt-6 grid grid-cols-1 items-start gap-6 md:grid-cols-3">
