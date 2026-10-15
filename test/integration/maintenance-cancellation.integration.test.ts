@@ -4,7 +4,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { BookingState, OutOfServiceReason } from "@/src/domain/enums";
+import { BookingState, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createCourt } from "@/src/actions/court";
 import { createPlayer } from "@/src/actions/player";
@@ -46,6 +46,8 @@ describe("maintenance cancellation without penalties (HU-13, integración con Po
       password: "secreto123",
       names: "Jugador",
       lastnames: prefix,
+      // Para crear o sumarse a un partido abierto hace falta tener la categoría cargada (#54).
+      category: PlayerCategory.FOURTH,
     });
     if (!player.success) throw new Error("no se pudo crear el jugador de prueba");
     await recordPointsMovement(player.data.id, INITIAL_POINTS, "bonus", "Puntos iniciales de prueba");
