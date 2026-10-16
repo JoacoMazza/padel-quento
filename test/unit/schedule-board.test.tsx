@@ -181,6 +181,77 @@ describe("ScheduleBoard - turnos fijos", () => {
     expect(screen.getAllByText("Turno fijo").some((el) => el.getAttribute("role") !== "button")).toBe(true);
   });
 
+  it("muestra como Finalizado un turno cuyo horario ya terminó, con un estilo propio", async () => {
+    // A las 9:00 el turno de 7:00 a 8:30 ya terminó y el de 18:00 todavía no empezó.
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [bookingAt(5, 7), bookingAt(6, 18)],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const finishedCell = screen.getAllByText("Finalizado").find((el) => el.getAttribute("role") === "button")!;
+    const reservedCell = screen.getAllByText("Reservado").find((el) => el.getAttribute("role") === "button")!;
+    expect(finishedCell.dataset.state).toBe("finished");
+    expect(reservedCell.dataset.state).toBe("reserved");
+    expect(finishedCell.className).not.toBe(reservedCell.className);
+    // La referencia de colores también lo incluye.
+    expect(screen.getAllByText("Finalizado").some((el) => el.getAttribute("role") !== "button")).toBe(true);
+  });
+
+  it("un turno en curso no se muestra como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: { ...BOARD.data, bookings: [bookingAt(5, 8)] },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("08:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).toBe("reserved");
+  });
+
+  it("un turno fijo que ya terminó también se muestra como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [bookingAt(5, 7)],
+        fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("07:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).toBe("finished");
+  });
+
+  it("un turno cancelado que ya pasó no se marca como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [{ ...bookingAt(5, 7), bookingState: BookingState.CANCELLED }],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("07:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).not.toBe("finished");
+  });
+
   it("muestra las acciones extra junto al botón Actualizar", async () => {
     getScheduleBoardData.mockResolvedValue(BOARD);
     render(<ScheduleBoard toolbarActions={<button type="button">Registrar turno fijo</button>} />);
