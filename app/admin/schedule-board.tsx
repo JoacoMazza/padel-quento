@@ -19,15 +19,18 @@ import type { CourtProp, OutOfServiceProp, ScheduleProp } from "@/app/bookings/t
 import { mapBookingToAdminProp, type AdminBookingProp } from "@/app/admin/types";
 import { AttendanceModal } from "@/app/admin/attendance-modal";
 import { getNextSlotChange } from "@/app/admin/schedule-refresh";
+import { getAdminBookingStatus } from "@/app/admin/admin-booking-status";
 import { dateToClockLabel } from "@/src/domain/time-format";
 
-type CellState = "available" | "reserved" | "fixed" | "pending" | "blocked" | "closed";
+type CellState = "available" | "reserved" | "fixed" | "pending" | "finished" | "unbooked" | "blocked" | "closed";
 
 const CELL_STYLES: Record<CellState, string> = {
   available: "border border-line bg-card text-success",
   reserved: "bg-ink text-white hover:bg-ink-soft",
   fixed: "bg-occupied text-white hover:bg-occupied/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
+  finished: "bg-foreground/70 text-white hover:bg-foreground/80",
+  unbooked: "bg-foreground/55 text-white/80 line-through",
   blocked: "bg-danger-light text-danger",
   closed: "border border-dashed border-line text-foreground/30",
 };
@@ -37,6 +40,8 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
   { state: "reserved", label: "Reservado", swatch: "bg-ink" },
   { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
+  { state: "finished", label: "Finalizado", swatch: "bg-foreground/70" },
+  { state: "unbooked", label: "No reservado", swatch: "bg-foreground/55" },
   { state: "blocked", label: "Bloqueado", swatch: "bg-danger-light border border-danger/30" },
 ];
 
@@ -208,6 +213,9 @@ export function ScheduleBoard({
       return rangesOverlap(start, end, bookingStart, bookingEnd);
     });
 
+    if (overlappingBooking && getAdminBookingStatus(overlappingBooking, new Date()) === "finished") {
+      return { state: "finished", booking: overlappingBooking };
+    }
     if (overlappingBooking?.needPlayers) return { state: "pending", booking: overlappingBooking };
     if (
       overlappingBooking?.bookingState === BookingState.RESERVED ||
@@ -215,6 +223,9 @@ export function ScheduleBoard({
     ) {
       return { state: overlappingBooking.fixedBookingDateId ? "fixed" : "reserved", booking: overlappingBooking };
     }
+
+    // Horario que terminó sin que nadie lo tomara (o cuyo turno se canceló).
+    if (end < new Date()) return { state: "unbooked" };
 
     return { state: "available" };
   }

@@ -181,6 +181,77 @@ describe("ScheduleBoard - turnos fijos", () => {
     expect(screen.getAllByText("Turno fijo").some((el) => el.getAttribute("role") !== "button")).toBe(true);
   });
 
+  it("muestra como Finalizado un turno cuyo horario ya terminó, con un estilo propio", async () => {
+    // A las 9:00 el turno de 7:00 a 8:30 ya terminó y el de 18:00 todavía no empezó.
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [bookingAt(5, 7), bookingAt(6, 18)],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const finishedCell = screen.getAllByText("Finalizado").find((el) => el.getAttribute("role") === "button")!;
+    const reservedCell = screen.getAllByText("Reservado").find((el) => el.getAttribute("role") === "button")!;
+    expect(finishedCell.dataset.state).toBe("finished");
+    expect(reservedCell.dataset.state).toBe("reserved");
+    expect(finishedCell.className).not.toBe(reservedCell.className);
+    // La referencia de colores también lo incluye.
+    expect(screen.getAllByText("Finalizado").some((el) => el.getAttribute("role") !== "button")).toBe(true);
+  });
+
+  it("un turno en curso no se muestra como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: { ...BOARD.data, bookings: [bookingAt(5, 8)] },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("08:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).toBe("reserved");
+  });
+
+  it("un turno fijo que ya terminó también se muestra como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [bookingAt(5, 7)],
+        fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("07:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).toBe("finished");
+  });
+
+  it("un turno cancelado que ya pasó no se marca como Finalizado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [{ ...bookingAt(5, 7), bookingState: BookingState.CANCELLED }],
+      },
+    });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const cell = screen.getByText("07:00").closest("tr")!.querySelector("[data-state]") as HTMLElement;
+    expect(cell.dataset.state).not.toBe("finished");
+  });
+
   it("muestra las acciones extra junto al botón Actualizar", async () => {
     getScheduleBoardData.mockResolvedValue(BOARD);
     render(<ScheduleBoard toolbarActions={<button type="button">Registrar turno fijo</button>} />);
@@ -249,6 +320,61 @@ describe("ScheduleBoard - agendar desde una celda libre", () => {
     expect(cell.textContent).toBe("Disponible");
     fireEvent.click(cell);
     expect(onAvailableSlotClick).not.toHaveBeenCalled();
+  });
+
+  it("los horarios que ya terminaron sin reservarse se muestran como No reservado, con un estilo propio", async () => {
+    // A las 9:00 el turno de 7:00 a 8:30 ya terminó sin que nadie lo tome.
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: { ...BOARD.data, schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }] },
+    });
+    const onAvailableSlotClick = vi.fn();
+    render(<ScheduleBoard onAvailableSlotClick={onAvailableSlotClick} />);
+    await advance(0);
+
+    const cell = cellAt("07:00");
+    expect(cell.dataset.state).toBe("unbooked");
+    expect(cell.textContent).toBe("No reservado");
+    expect(cell.getAttribute("role")).toBeNull();
+    expect(cell.className).not.toBe(cellAt("08:30").className);
+    fireEvent.click(cell);
+    expect(onAvailableSlotClick).not.toHaveBeenCalled();
+    // La referencia de colores también lo incluye.
+    expect(screen.getAllByText("No reservado").length).toBe(2);
+  });
+
+  it("un horario pasado con un turno cancelado se muestra como No reservado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [
+          {
+            id: 5,
+            fromDateTime: new Date(2026, 9, 12, 7, 0),
+            durationMinutes: 90,
+            bookingState: BookingState.CANCELLED,
+            price: 10000,
+            attended: false,
+            court: { id: 1 },
+            booker: { id: 3, names: "Grupo", lastnames: "Lunes" },
+            match: null,
+          },
+        ],
+      },
+    });
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(cellAt("07:00").dataset.state).toBe("unbooked");
+  });
+
+  it("un horario en curso sin reservar sigue como Disponible", async () => {
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(cellAt("08:00").dataset.state).toBe("available");
   });
 
   it("sin onAvailableSlotClick las celdas disponibles no son clickeables", async () => {
