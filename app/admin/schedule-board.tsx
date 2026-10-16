@@ -22,7 +22,7 @@ import { getNextSlotChange } from "@/app/admin/schedule-refresh";
 import { getAdminBookingStatus } from "@/app/admin/admin-booking-status";
 import { dateToClockLabel } from "@/src/domain/time-format";
 
-type CellState = "available" | "reserved" | "fixed" | "pending" | "finished" | "blocked" | "closed";
+type CellState = "available" | "reserved" | "fixed" | "pending" | "finished" | "unbooked" | "blocked" | "closed";
 
 const CELL_STYLES: Record<CellState, string> = {
   available: "border border-line bg-card text-success",
@@ -30,6 +30,7 @@ const CELL_STYLES: Record<CellState, string> = {
   fixed: "bg-occupied text-white hover:bg-occupied/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
   finished: "border border-line bg-line/60 text-foreground/60 hover:bg-line",
+  unbooked: "border border-line bg-background text-foreground/40 line-through",
   blocked: "bg-danger-light text-danger",
   closed: "border border-dashed border-line text-foreground/30",
 };
@@ -40,6 +41,7 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
   { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
   { state: "finished", label: "Finalizado", swatch: "border border-line bg-line/60" },
+  { state: "unbooked", label: "No reservado", swatch: "border border-line bg-background" },
   { state: "blocked", label: "Bloqueado", swatch: "bg-danger-light border border-danger/30" },
 ];
 
@@ -221,6 +223,9 @@ export function ScheduleBoard({
     ) {
       return { state: overlappingBooking.fixedBookingDateId ? "fixed" : "reserved", booking: overlappingBooking };
     }
+
+    // Horario que terminó sin que nadie lo tomara (o cuyo turno se canceló).
+    if (end < new Date()) return { state: "unbooked" };
 
     return { state: "available" };
   }

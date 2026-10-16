@@ -322,6 +322,61 @@ describe("ScheduleBoard - agendar desde una celda libre", () => {
     expect(onAvailableSlotClick).not.toHaveBeenCalled();
   });
 
+  it("los horarios que ya terminaron sin reservarse se muestran como No reservado, con un estilo propio", async () => {
+    // A las 9:00 el turno de 7:00 a 8:30 ya terminó sin que nadie lo tome.
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: { ...BOARD.data, schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }] },
+    });
+    const onAvailableSlotClick = vi.fn();
+    render(<ScheduleBoard onAvailableSlotClick={onAvailableSlotClick} />);
+    await advance(0);
+
+    const cell = cellAt("07:00");
+    expect(cell.dataset.state).toBe("unbooked");
+    expect(cell.textContent).toBe("No reservado");
+    expect(cell.getAttribute("role")).toBeNull();
+    expect(cell.className).not.toBe(cellAt("08:30").className);
+    fireEvent.click(cell);
+    expect(onAvailableSlotClick).not.toHaveBeenCalled();
+    // La referencia de colores también lo incluye.
+    expect(screen.getAllByText("No reservado").length).toBe(2);
+  });
+
+  it("un horario pasado con un turno cancelado se muestra como No reservado", async () => {
+    getScheduleBoardData.mockResolvedValue({
+      ...BOARD,
+      data: {
+        ...BOARD.data,
+        schedules: [{ ...BOARD.data.schedules[0], openingTime: "07:00:00" }],
+        bookings: [
+          {
+            id: 5,
+            fromDateTime: new Date(2026, 9, 12, 7, 0),
+            durationMinutes: 90,
+            bookingState: BookingState.CANCELLED,
+            price: 10000,
+            attended: false,
+            court: { id: 1 },
+            booker: { id: 3, names: "Grupo", lastnames: "Lunes" },
+            match: null,
+          },
+        ],
+      },
+    });
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(cellAt("07:00").dataset.state).toBe("unbooked");
+  });
+
+  it("un horario en curso sin reservar sigue como Disponible", async () => {
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    expect(cellAt("08:00").dataset.state).toBe("available");
+  });
+
   it("sin onAvailableSlotClick las celdas disponibles no son clickeables", async () => {
     render(<ScheduleBoard />);
     await advance(0);
