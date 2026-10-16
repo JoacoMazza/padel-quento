@@ -29,8 +29,8 @@ const CELL_STYLES: Record<CellState, string> = {
   reserved: "bg-ink text-white hover:bg-ink-soft",
   fixed: "bg-occupied text-white hover:bg-occupied/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
-  finished: "border border-line bg-line/60 text-foreground/60 hover:bg-line",
-  unbooked: "border border-line bg-background text-foreground/40 line-through",
+  finished: "bg-foreground/70 text-white hover:bg-foreground/80",
+  unbooked: "bg-foreground/55 text-white/80 line-through",
   blocked: "bg-danger-light text-danger",
   closed: "border border-dashed border-line text-foreground/30",
 };
@@ -40,8 +40,8 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
   { state: "reserved", label: "Reservado", swatch: "bg-ink" },
   { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
-  { state: "finished", label: "Finalizado", swatch: "border border-line bg-line/60" },
-  { state: "unbooked", label: "No reservado", swatch: "border border-line bg-background" },
+  { state: "finished", label: "Finalizado", swatch: "bg-foreground/70" },
+  { state: "unbooked", label: "No reservado", swatch: "bg-foreground/55" },
   { state: "blocked", label: "Bloqueado", swatch: "bg-danger-light border border-danger/30" },
 ];
 
