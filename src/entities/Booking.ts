@@ -38,7 +38,7 @@ export class Booking {
   @JoinColumn({ name: "booker_phone_number", referencedColumnName: "phoneNumber" })
   booker!: Booker;
 
-  @ManyToOne("Court", (court: any) => court.bookings)
+  @ManyToOne("Court", "bookings")
   @JoinColumn({ name: "court_id" })
   court!: Court;
 

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
 import { CourtState, Role } from "@/src/domain/enums";
 
-const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoisted(() => {
+const { create, save, find, findOne, merge, getDataSource } = vi.hoisted(() => {
   const create = vi.fn((data: unknown) => data);
   const save = vi.fn(async (entity: unknown) => entity);
   const find = vi.fn();
   const findOne = vi.fn();
-  const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+  const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
   const deleteFn = vi.fn();
   const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
   const getDataSource = vi.fn(async () => ({ getRepository }));
@@ -44,7 +44,7 @@ describe("court actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
     // Por defecto, un admin (que en estos tests pasa también como dueño; ver el mock de rbac).
     signInAs(Role.ADMIN);
   });
@@ -64,7 +64,7 @@ describe("court actions", () => {
     });
 
     it("devuelve error si el precio no se proporciona o no es mayor a 0", async () => {
-      const missingPrice = await createCourt({ number: 2 } as any);
+      const missingPrice = await createCourt({ number: 2 } as Parameters<typeof createCourt>[0]);
       expect(missingPrice).toEqual({
         success: false,
         error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",

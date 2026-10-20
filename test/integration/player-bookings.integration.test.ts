@@ -52,7 +52,6 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
 
   beforeAll(async () => {
     const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
-    if (!court.success) throw new Error(court.error);
     courtId = court.data.id;
     ana = await newPlayer("Ana");
     bruno = await newPlayer("Bruno");

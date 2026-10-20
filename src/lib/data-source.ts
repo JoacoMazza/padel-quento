@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("Falta DATABASE_URL. Copiá .env.example a .env y levantá Postgres.");
 }
 
-export default new DataSource({
+const dataSource = new DataSource({
   type: "postgres",
   url: process.env.DATABASE_URL,
   entities: Object.values(entities),
@@ -18,3 +18,5 @@ export default new DataSource({
   synchronize: false,
   logging: true,
 });
+
+export default dataSource;
