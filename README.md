@@ -82,6 +82,7 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
+- Las fechas y horas se calculan en el servidor con la zona horaria del club (`America/Argentina/Buenos_Aires`, ver [src/lib/club-time-zone.ts](src/lib/club-time-zone.ts)), que se fija al arrancar en `instrumentation.ts`: un turno fijo de las 18:00 cae a las 18:00 de City Bell aunque el servidor esté desplegado en otra zona.
 
 ## Administradores: dueño y trabajador
 

@@ -55,7 +55,8 @@ const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfS
  * click en Actualizar: oculta en el panel conserva lo último obtenido sin seguir consultando.
  * También se refresca cuando cambia refreshKey (por ejemplo, al crear o liberar
  * un turno fijo). toolbarActions se muestra junto al botón Actualizar. Con
- * onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
+ * onFixedBookingDateReleased avisa cuando se libera una fecha de turno fijo
+ * desde el detalle de un turno. Con onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
  * pueden clickear para agendar un turno en esa cancha, día y hora.
  */
 export function ScheduleBoard({
@@ -63,11 +64,13 @@ export function ScheduleBoard({
   refreshKey = 0,
   toolbarActions,
   onAvailableSlotClick,
+  onFixedBookingDateReleased,
 }: {
   isActive?: boolean;
   refreshKey?: number;
   toolbarActions?: ReactNode;
   onAvailableSlotClick?: (slot: { courtId: number; date: string; startTime: string }) => void;
+  onFixedBookingDateReleased?: () => void;
 }) {
   const [data, setData] = useState<BoardData>(EMPTY_BOARD);
   const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
@@ -397,6 +400,7 @@ export function ScheduleBoard({
           onReleased={() => {
             setSelectedBooking(null);
             refresh();
+            onFixedBookingDateReleased?.();
           }}
         />
       ) : null}
