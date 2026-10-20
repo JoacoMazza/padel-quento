@@ -76,49 +76,57 @@ export function ScheduleBoard({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingProp | null>(null);
   const isFetchingRef = useRef(false);
+  // Pedido de refresco que llegó con otro en curso (por ejemplo, al crear un
+  // turno fijo): se repite al terminar para no mostrar datos de antes del cambio.
+  const pendingRefreshRef = useRef(false);
   const hasLoadedRef = useRef(false);
   const lastAttemptRef = useRef<Date | null>(null);
   const lastRefreshKeyRef = useRef(refreshKey);
 
   const refresh = useCallback(async () => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-    lastAttemptRef.current = new Date();
-    setIsRefreshing(true);
-    try {
-      const result = await getScheduleBoardData();
-      if (result.success) {
-        const fixedDates = new Map(
-          result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
-        );
-        setData({
-          courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
-          schedules: result.data.schedules.map((s) => ({
-            id: s.id,
-            dayOfWeek: s.dayOfWeek,
-            openingTime: String(s.openingTime),
-            closingTime: String(s.closingTime),
-            courtId: s.court?.id,
-          })),
-          bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
-          outOfServices: result.data.outOfServices.map((o) => ({
-            id: o.id,
-            fromDateTime: new Date(o.fromDateTime),
-            toDateTime: new Date(o.toDateTime),
-            courtId: o.court?.id,
-          })),
-        });
-        setLastUpdated(new Date());
-        setRefreshError(null);
-      } else {
-        setRefreshError(result.error);
-      }
-    } catch {
-      setRefreshError("No se pudo actualizar la turnera.");
-    } finally {
-      isFetchingRef.current = false;
-      setIsRefreshing(false);
+    if (isFetchingRef.current) {
+      pendingRefreshRef.current = true;
+      return;
     }
+    isFetchingRef.current = true;
+    setIsRefreshing(true);
+    do {
+      pendingRefreshRef.current = false;
+      lastAttemptRef.current = new Date();
+      try {
+        const result = await getScheduleBoardData();
+        if (result.success) {
+          const fixedDates = new Map(
+            result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
+          );
+          setData({
+            courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
+            schedules: result.data.schedules.map((s) => ({
+              id: s.id,
+              dayOfWeek: s.dayOfWeek,
+              openingTime: String(s.openingTime),
+              closingTime: String(s.closingTime),
+              courtId: s.court?.id,
+            })),
+            bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
+            outOfServices: result.data.outOfServices.map((o) => ({
+              id: o.id,
+              fromDateTime: new Date(o.fromDateTime),
+              toDateTime: new Date(o.toDateTime),
+              courtId: o.court?.id,
+            })),
+          });
+          setLastUpdated(new Date());
+          setRefreshError(null);
+        } else {
+          setRefreshError(result.error);
+        }
+      } catch {
+        setRefreshError("No se pudo actualizar la turnera.");
+      }
+    } while (pendingRefreshRef.current);
+    isFetchingRef.current = false;
+    setIsRefreshing(false);
   }, []);
 
   useEffect(() => {
