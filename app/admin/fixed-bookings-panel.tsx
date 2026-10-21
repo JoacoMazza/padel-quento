@@ -83,24 +83,35 @@ export function FixedBookingsPanel({
 }) {
   const [fixedBookings, setFixedBookings] = useState(initialFixedBookings);
   const lastRefreshKeyRef = useRef(refreshKey);
+  const lastRequestIdRef = useRef(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Si se superponen dos pedidos del listado, solo cuenta la respuesta del último.
+  async function fetchFixedBookings() {
+    const requestId = ++lastRequestIdRef.current;
+    try {
+      const result = await getFixedBookingsAdmin();
+      if (requestId !== lastRequestIdRef.current) return;
+      if (result.success) setFixedBookings(result.data);
+      else setError(result.error);
+    } catch {
+      if (requestId === lastRequestIdRef.current) setError("No se pudo actualizar el listado de turnos fijos.");
+    }
+  }
+
   useEffect(() => {
     if (refreshKey === lastRefreshKeyRef.current) return;
     lastRefreshKeyRef.current = refreshKey;
-    getFixedBookingsAdmin().then((result) => {
-      if (result.success) setFixedBookings(result.data);
-    });
+    fetchFixedBookings();
   }, [refreshKey]);
 
   async function reload() {
     onChanged();
-    const result = await getFixedBookingsAdmin();
-    if (result.success) setFixedBookings(result.data);
+    await fetchFixedBookings();
   }
 
   async function run(action: () => Promise<{ success: boolean; error?: string }>) {

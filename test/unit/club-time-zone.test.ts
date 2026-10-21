@@ -47,4 +47,14 @@ describe("zona horaria del club", () => {
 
     expect(process.env.TZ).toBe(CLUB_TIME_ZONE);
   });
+
+  it("la conexión que usan los seeds y los comandos de TypeORM también la aplica", async () => {
+    vi.stubEnv("DATABASE_URL", process.env.DATABASE_URL ?? "postgres://user:pass@localhost:5432/db");
+    vi.resetModules();
+
+    await import("@/src/lib/data-source");
+
+    expect(process.env.TZ).toBe(CLUB_TIME_ZONE);
+    vi.unstubAllEnvs();
+  });
 });
