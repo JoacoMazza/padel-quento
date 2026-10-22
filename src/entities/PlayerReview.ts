@@ -6,8 +6,10 @@ import type { Player } from "@/src/entities/Player";
 
 /**
  * Reseña que deja un jugador sobre un compañero después de un partido abierto
- * (HU-36). De las reseñas sale la reputación del jugador, en porcentajes; los
- * puntos de fidelidad no se tocan.
+ * (HU-36). De las reseñas sale la reputación del jugador, en porcentajes. Una
+ * reseña negativa (mala actitud, llegar tarde o nivel distinto a su categoría)
+ * además le descuenta puntos de fidelidad al reseñado (issue #73, ver
+ * negativeReviewPoints).
  */
 @Entity({ name: "player_reviews" })
 @Unique("UQ_player_reviews_match_reviewer_reviewed", ["match", "reviewer", "reviewed"])
