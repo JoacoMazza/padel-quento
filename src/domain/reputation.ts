@@ -1,4 +1,9 @@
-import { REPUTATION_ALERT_PCT, REPUTATION_MIN_REVIEWS, REVIEW_WINDOW_HOURS } from "@/src/domain/constants";
+import {
+  NEGATIVE_REVIEW_POINTS,
+  REPUTATION_ALERT_PCT,
+  REPUTATION_MIN_REVIEWS,
+  REVIEW_WINDOW_HOURS,
+} from "@/src/domain/constants";
 import { BookingState, ReviewLevel } from "@/src/domain/enums";
 
 export type ReviewAnswers = { level: ReviewLevel; goodAttitude: boolean; onTime: boolean };
@@ -52,6 +57,18 @@ export function reputationAlerts(summary: ReputationSummary): string[] {
     );
   }
   return alerts;
+}
+
+/** Motivo del movimiento de puntos que descuenta una reseña negativa. */
+export const NEGATIVE_REVIEW_REASON = "Reseña negativa en partido abierto";
+
+/**
+ * Puntos a descontar por una reseña: NEGATIVE_REVIEW_POINTS por cada aspecto
+ * negativo (mala actitud, llegar tarde, nivel distinto a la categoría declarada).
+ */
+export function negativeReviewPoints(review: ReviewAnswers): number {
+  const aspects = [review.goodAttitude, review.onTime, review.level === ReviewLevel.AS_DECLARED];
+  return aspects.filter((ok) => !ok).length * NEGATIVE_REVIEW_POINTS;
 }
 
 /** Se puede calificar desde que termina el partido hasta REVIEW_WINDOW_HOURS después. */
