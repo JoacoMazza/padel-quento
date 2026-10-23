@@ -116,7 +116,7 @@ export function PlayerRecordModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Ficha de ${fullName}`}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-line bg-card p-6 shadow-lg"
+        className="flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-2xl border border-line bg-card p-6 shadow-lg"
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

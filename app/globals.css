@@ -167,8 +167,9 @@ body {
     @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 backdrop-blur-[2px];
   }
 
+  /* dvh y no vh: en el celular 100vh incluye la barra del navegador y el panel quedaría cortado. */
   .modal-panel {
-    @apply w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl;
+    @apply max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-2xl;
   }
 
   .table-head {
