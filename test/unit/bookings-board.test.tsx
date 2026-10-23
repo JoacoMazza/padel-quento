@@ -132,6 +132,66 @@ describe("BookingsBoard", () => {
     expect(grid.style.gridTemplateColumns).toBe("5.5rem repeat(1, minmax(7.5rem, 1fr))");
   });
 
+  describe("resumen en pantallas chicas", () => {
+    let scrollIntoView: ReturnType<typeof vi.fn>;
+
+    function mockScreen(isLarge: boolean) {
+      window.matchMedia = vi.fn((query: string) => ({ matches: isLarge && query === "(min-width: 64rem)" })) as never;
+    }
+
+    beforeEach(() => {
+      scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView as never;
+    });
+
+    afterEach(() => {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it("al elegir un turno lleva la vista al resumen, que queda debajo de la grilla", () => {
+      mockScreen(false);
+      renderBoard();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+      const target = scrollIntoView.mock.contexts[0] as HTMLElement;
+      expect(target.textContent).toContain("Reservar turno");
+      // Deja lugar para el header fijo.
+      expect(target.className.split(" ")).toContain("scroll-mt-20");
+    });
+
+    it("al elegir un partido abierto también lleva la vista al panel para sumarse", () => {
+      mockScreen(false);
+      renderBoard();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" }));
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it("desde lg no mueve la vista: el resumen se ve al costado de la grilla", () => {
+      mockScreen(true);
+      renderBoard();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("al deseleccionar el turno no mueve la vista", () => {
+      mockScreen(false);
+      renderBoard();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, seleccionado" }));
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("muestra el título Filtrar antes de los botones de fecha", () => {
     renderBoard();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Users, Zap } from "lucide-react";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
@@ -124,6 +124,15 @@ export function BookingsBoard({
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
+
+  // Debajo de lg el resumen queda debajo de la grilla, fuera de la vista: al elegir
+  // un turno o un partido se lleva la vista hasta él.
+  const summaryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectedSlot && !selectedOpenMatch) return;
+    if (window.matchMedia?.("(min-width: 64rem)").matches) return;
+    summaryRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [selectedSlot, selectedOpenMatch]);
 
   const selectedDate = useMemo(() => parseISODate(dateInput), [dateInput]);
 
@@ -317,33 +326,37 @@ export function BookingsBoard({
       >
         <AvailabilityGrid courtSlots={courtSlots} onSlotClick={handleSlotClick} />
 
-        {selectedOpenMatch ? (
-          <JoinMatchPanel
-            selectedDate={selectedDate}
-            selectedMatch={selectedOpenMatch}
-            feedback={feedback}
-            isPending={isPending}
-            alreadyJoined={selectedOpenMatch.alreadyJoined}
-            hasCategory={hasCategory}
-            groupSize={joinGroupSize}
-            onGroupSizeChange={setJoinGroupSize}
-            onConfirm={handleJoinConfirm}
-            onClose={handleSummaryClose}
-          />
-        ) : selectedSlot ? (
-          <BookingSummary
-            selectedDate={selectedDate}
-            selectedSlot={selectedSlot}
-            feedback={feedback}
-            isPending={isPending}
-            isOpenMatch={isOpenMatch}
-            onIsOpenMatchChange={setIsOpenMatch}
-            hasCategory={hasCategory}
-            openMatchGroupSize={openMatchGroupSize}
-            onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
-            onConfirm={handleConfirm}
-            onClose={handleSummaryClose}
-          />
+        {selectedSlot || selectedOpenMatch ? (
+          <div ref={summaryRef} className="scroll-mt-20">
+            {selectedOpenMatch ? (
+              <JoinMatchPanel
+                selectedDate={selectedDate}
+                selectedMatch={selectedOpenMatch}
+                feedback={feedback}
+                isPending={isPending}
+                alreadyJoined={selectedOpenMatch.alreadyJoined}
+                hasCategory={hasCategory}
+                groupSize={joinGroupSize}
+                onGroupSizeChange={setJoinGroupSize}
+                onConfirm={handleJoinConfirm}
+                onClose={handleSummaryClose}
+              />
+            ) : selectedSlot ? (
+              <BookingSummary
+                selectedDate={selectedDate}
+                selectedSlot={selectedSlot}
+                feedback={feedback}
+                isPending={isPending}
+                isOpenMatch={isOpenMatch}
+                onIsOpenMatchChange={setIsOpenMatch}
+                hasCategory={hasCategory}
+                openMatchGroupSize={openMatchGroupSize}
+                onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
+                onConfirm={handleConfirm}
+                onClose={handleSummaryClose}
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
 
