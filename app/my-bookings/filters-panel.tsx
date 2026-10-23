@@ -93,7 +93,7 @@ export function FiltersPanel({
               type="button"
               aria-pressed={statusFilter === option.value}
               onClick={() => onStatusFilterChange(option.value)}
-              className={`chip h-9 ${statusFilter === option.value ? "chip-active" : ""}`}
+              className={`chip h-9 pointer-coarse:h-11 ${statusFilter === option.value ? "chip-active" : ""}`}
             >
               {option.label}
             </button>

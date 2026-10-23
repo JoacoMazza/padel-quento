@@ -64,6 +64,14 @@ describe("MyBookingsBoard", () => {
     expect(panel.className.split(" ")).toEqual(expect.arrayContaining(["order-first", "lg:order-none"]));
   });
 
+  it("los chips de estado, más bajos que un chip común, llegan a 44 px en pantallas táctiles", () => {
+    render(<MyBookingsBoard bookings={[booking(1, 2)]} playerId={7} />);
+
+    expect(screen.getByRole("button", { name: "Confirmados" }).className.split(" ")).toEqual(
+      expect.arrayContaining(["h-9", "pointer-coarse:h-11"]),
+    );
+  });
+
   it("sin partidos para calificar no muestra esa sección", () => {
     render(<MyBookingsBoard bookings={[booking(1, 2), booking(2, -3)]} playerId={7} />);
 

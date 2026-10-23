@@ -131,6 +131,15 @@ describe("OccupancyMetrics", () => {
     expect(column.parentElement!.parentElement!.className.split(" ")).toContain("overflow-x-auto");
   });
 
+  it("los chips de período llegan a 44 px en pantallas táctiles", async () => {
+    render(<OccupancyMetrics />);
+    await screen.findByTestId("kpi-occupancy");
+
+    expect(screen.getByRole("button", { name: "Últimos 7 días" }).className.split(" ")).toEqual(
+      expect.arrayContaining(["h-9", "pointer-coarse:h-11"]),
+    );
+  });
+
   it("muestra el mapa de los turnos más solicitados por día y turno", async () => {
     await renderLastWeek();
 

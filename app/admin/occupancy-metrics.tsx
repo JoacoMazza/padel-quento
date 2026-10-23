@@ -165,7 +165,7 @@ export function OccupancyMetrics() {
               type="button"
               aria-pressed={preset.id === presetId}
               onClick={() => selectPreset(preset.id)}
-              className={`chip h-9 ${preset.id === presetId ? "chip-active" : ""}`}
+              className={`chip h-9 pointer-coarse:h-11 ${preset.id === presetId ? "chip-active" : ""}`}
             >
               {preset.label}
             </button>

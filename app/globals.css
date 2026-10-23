@@ -149,7 +149,7 @@ body {
   }
 
   .field {
-    @apply w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none;
+    @apply w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none pointer-coarse:min-h-11;
   }
 
   .field-label {

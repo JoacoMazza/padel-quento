@@ -22,4 +22,8 @@ describe("Áreas táctiles", () => {
   it("los chips llegan a 44 px de alto en pantallas táctiles", () => {
     expect(cssRule(".chip")).toContain("pointer-coarse:h-11");
   });
+
+  it("los campos de formulario llegan a 44 px de alto en pantallas táctiles", () => {
+    expect(cssRule(".field")).toContain("pointer-coarse:min-h-11");
+  });
 });
