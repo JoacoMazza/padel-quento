@@ -80,30 +80,36 @@ function ChartCard({ id, title, children }: { id: string; title: string; childre
 
 type ColumnItem = { key: string; label: string; name: string; stat: OccupancyStat };
 
-/** Columnas verticales con el porcentaje arriba; sin horario se muestra "—". */
+/**
+ * Columnas verticales con el porcentaje arriba; sin horario se muestra "—".
+ * Cada columna tiene un ancho mínimo para que sus textos no se encimen: si no
+ * entran todas (pantallas chicas), el gráfico scrollea en horizontal.
+ */
 function ColumnChart({ items }: { items: ColumnItem[] }) {
   return (
-    <div className="flex h-48 items-end gap-0.5 border-b border-line">
-      {items.map(({ key, label, name, stat }) => {
-        const hasSchedule = stat.availableMinutes > 0;
-        return (
-          <div key={key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-            <span className="text-[11px] font-semibold text-foreground/70 tabular-nums">
-              {hasSchedule ? formatPercent(stat.occupancy) : "—"}
-            </span>
-            <div className="flex h-36 w-full items-end justify-center">
-              <div
-                role="img"
-                aria-label={hasSchedule ? `${name}: ${formatPercent(stat.occupancy)}` : `${name}: sin horarios`}
-                title={hasSchedule ? `${name}: ${statDetail(stat)}` : `${name}: sin horarios`}
-                className="w-full max-w-10 rounded-t-lg bg-occupied"
-                style={{ height: `${stat.occupancy * 100}%` }}
-              />
+    <div className="overflow-x-auto">
+      <div className="flex h-48 items-end gap-0.5 border-b border-line">
+        {items.map(({ key, label, name, stat }) => {
+          const hasSchedule = stat.availableMinutes > 0;
+          return (
+            <div key={key} className="flex h-full min-w-11 flex-1 flex-col items-center justify-end gap-1">
+              <span className="text-[11px] font-semibold text-foreground/70 tabular-nums">
+                {hasSchedule ? formatPercent(stat.occupancy) : "—"}
+              </span>
+              <div className="flex h-36 w-full items-end justify-center">
+                <div
+                  role="img"
+                  aria-label={hasSchedule ? `${name}: ${formatPercent(stat.occupancy)}` : `${name}: sin horarios`}
+                  title={hasSchedule ? `${name}: ${statDetail(stat)}` : `${name}: sin horarios`}
+                  className="w-full max-w-10 rounded-t-lg bg-occupied"
+                  style={{ height: `${stat.occupancy * 100}%` }}
+                />
+              </div>
+              <span className="pb-1.5 text-[11px] font-semibold text-foreground/50 tabular-nums">{label}</span>
             </div>
-            <span className="pb-1.5 text-[11px] font-semibold text-foreground/50 tabular-nums">{label}</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -259,7 +265,7 @@ export function OccupancyMetrics() {
             )}
           </ChartCard>
 
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <ChartCard id="metrics-by-day" title="Ocupación por día de la semana">
               <ColumnChart
                 items={metrics.byDayOfWeek.map((day) => ({
