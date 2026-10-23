@@ -22,7 +22,7 @@ export function MobileNav({ items, active }: { items: NavItem[]; active: string 
         aria-expanded={open}
         aria-controls="mobile-nav"
         aria-label={open ? "Cerrar menú" : "Abrir menú"}
-        className="icon-btn h-10 w-10 lg:hidden"
+        className="icon-btn lg:hidden"
       >
         {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
