@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
@@ -13,9 +13,24 @@ export type NavItem = { href: string; label: string };
  */
 export function MobileNav({ items, active }: { items: NavItem[]; active: string }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Tocar fuera del botón y del menú lo cierra. pointerdown y no mousedown: en
+  // iOS el mousedown no llega al tocar zonas que no son clickeables.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDownOutside(event: PointerEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDownOutside);
+    return () => document.removeEventListener("pointerdown", onPointerDownOutside);
+  }, [open]);
 
   return (
-    <>
+    // contents: el menú se sigue posicionando respecto del header.
+    <div ref={ref} className="contents">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -50,6 +65,6 @@ export function MobileNav({ items, active }: { items: NavItem[]; active: string 
           })}
         </nav>
       ) : null}
-    </>
+    </div>
   );
 }

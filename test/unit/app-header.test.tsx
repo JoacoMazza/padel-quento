@@ -127,6 +127,25 @@ describe("AppHeader", () => {
       expect(screen.getByRole("button", { name: "Cerrar menú" }).getAttribute("aria-expanded")).toBe("true");
     });
 
+    it("se cierra al tocar fuera del menú", () => {
+      render(<AppHeader active="/" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+      fireEvent.pointerDown(document.body);
+
+      expect(screen.queryByRole("navigation", { name: "Menú principal" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Abrir menú" }).getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("tocar dentro del menú no lo cierra", () => {
+      render(<AppHeader active="/" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+      fireEvent.pointerDown(screen.getByRole("navigation", { name: "Menú principal" }));
+
+      expect(screen.getByRole("navigation", { name: "Menú principal" })).toBeTruthy();
+    });
+
     it("el menú se despliega de arriba hacia abajo", () => {
       render(<AppHeader active="/" />);
 

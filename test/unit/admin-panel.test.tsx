@@ -165,6 +165,19 @@ describe("AdminPanel", () => {
       expect(screen.getByRole("button", { name: "Cerrar secciones" }).getAttribute("aria-expanded")).toBe("true");
     });
 
+    it("el menú de secciones se cierra al tocar fuera de él, pero no al tocar adentro", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+      fireEvent.pointerDown(screen.getByRole("navigation"));
+      expect(classesOf(screen.getByRole("navigation"))).not.toContain("hidden");
+
+      fireEvent.pointerDown(screen.getByRole("main"));
+      expect(classesOf(screen.getByRole("navigation"))).toContain("hidden");
+      expect(screen.getByRole("button", { name: "Abrir secciones" }).getAttribute("aria-expanded")).toBe("false");
+    });
+
     it("al elegir una sección el menú se cierra y el botón pasa a mostrarla", async () => {
       render(<AdminPanel isOwner />);
       await flush();

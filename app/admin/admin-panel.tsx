@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
@@ -228,6 +228,19 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
   const ActiveIcon = activeSectionItem?.icon;
   // Debajo de lg las secciones van en un menú hamburguesa; desde lg se ven siempre en la barra lateral.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Tocar fuera del menú lo cierra (pointerdown, como en MobileNav, para que funcione en iOS).
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    function onPointerDownOutside(event: PointerEvent) {
+      if (asideRef.current && !asideRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDownOutside);
+    return () => document.removeEventListener("pointerdown", onPointerDownOutside);
+  }, [isMenuOpen]);
 
   function openSection(id: SectionId) {
     setActiveSection(id);
@@ -238,7 +251,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
   return (
     // Debajo de lg la barra lateral pasa a ser un menú hamburguesa arriba del contenido.
     <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-      <aside className="relative flex shrink-0 flex-col border-b border-line bg-card lg:w-64 lg:overflow-hidden lg:border-r lg:border-b-0">
+      <aside ref={asideRef} className="relative flex shrink-0 flex-col border-b border-line bg-card lg:w-64 lg:overflow-hidden lg:border-r lg:border-b-0">
         <p className="label-caps hidden px-6 pt-6 pb-2 lg:block">Panel operativo</p>
         <button
           type="button"
