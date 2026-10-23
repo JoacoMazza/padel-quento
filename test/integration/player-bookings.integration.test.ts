@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PlayerCategory } from "@/src/domain/enums";
+import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { Booking } from "@/src/entities/Booking";
+import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { createPlayer } from "@/src/actions/player";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 import { MY_BOOKINGS_PAST_LIMIT } from "@/src/domain/constants";
@@ -52,7 +53,6 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
 
   beforeAll(async () => {
     const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
-    if (!court.success) throw new Error(court.error);
     courtId = court.data.id;
     ana = await newPlayer("Ana");
     bruno = await newPlayer("Bruno");
@@ -101,6 +101,82 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
     const bookings = await getPlayerBookings(ana);
 
     expect(bookings.some((b) => b.id === ids.brunoOnly)).toBe(false);
+  });
+
+  describe("partidos que todavía se pueden calificar (issue #77)", () => {
+    const HOUR = 60 * 60_000;
+    let carla: number;
+    let dario: number;
+    const reviewIds: Record<string, number> = {};
+
+    /** Partido abierto de Carla con Darío que terminó hace `hoursAgo` horas (los dos asistieron). */
+    async function matchEndedHoursAgo(hoursAgo: number) {
+      const id = await booking(carla, 0, 1);
+      const joined = await joinOpenMatchForPlayer({ bookingId: id, playerId: dario });
+      if (!joined.success) throw new Error(joined.error);
+      const dataSource = await getDataSource();
+      await dataSource
+        .getRepository<Booking>("Booking")
+        .update(id, { fromDateTime: new Date(Date.now() - hoursAgo * HOUR - 90 * 60_000) });
+      return id;
+    }
+
+    /** Turno común de Carla que terminó hace `hoursAgo` horas. */
+    async function bookingEndedHoursAgo(hoursAgo: number) {
+      const id = await booking(carla, 0);
+      const dataSource = await getDataSource();
+      await dataSource
+        .getRepository<Booking>("Booking")
+        .update(id, { fromDateTime: new Date(Date.now() - hoursAgo * HOUR - 90 * 60_000) });
+      return id;
+    }
+
+    beforeAll(async () => {
+      carla = await newPlayer("Carla");
+      dario = await newPlayer("Dario");
+      const dataSource = await getDataSource();
+
+      // Calificable: terminó hace 10 horas y los dos asistieron.
+      reviewIds.reviewable = await matchEndedHoursAgo(10);
+      // Tres turnos que terminaron después: son "los últimos 3".
+      reviewIds.latest1 = await bookingEndedHoursAgo(1);
+      reviewIds.latest2 = await bookingEndedHoursAgo(2);
+      reviewIds.latest3 = await bookingEndedHoursAgo(3);
+      // Ya pasaron las 48 horas: no se puede calificar.
+      reviewIds.expired = await matchEndedHoursAgo(60);
+      // Dentro de las 48 horas, pero Carla no asistió.
+      reviewIds.notAttended = await matchEndedHoursAgo(20);
+      const matchPlayers = dataSource.getRepository<MatchPlayer>("MatchPlayer");
+      const carlaInMatch = await matchPlayers.findOneOrFail({
+        where: { match: { booking: { id: reviewIds.notAttended } }, player: { id: carla } },
+      });
+      await matchPlayers.update(carlaInMatch.id, { attended: false });
+      // Dentro de las 48 horas, pero cancelado.
+      reviewIds.cancelled = await matchEndedHoursAgo(30);
+      await dataSource.getRepository<Booking>("Booking").update(reviewIds.cancelled, { bookingState: BookingState.CANCELLED });
+    });
+
+    it("trae el partido calificable aunque haya 3 turnos terminados después", async () => {
+      const ids = (await getPlayerBookings(carla)).map((b) => b.id);
+
+      expect(ids).toContain(reviewIds.reviewable);
+    });
+
+    it("los demás turnos pasados siguen limitados a los últimos 3", async () => {
+      const ids = (await getPlayerBookings(carla)).map((b) => b.id).sort();
+
+      expect(ids).toEqual(
+        [reviewIds.latest1, reviewIds.latest2, reviewIds.latest3, reviewIds.reviewable].sort(),
+      );
+    });
+
+    it("no trae los partidos de hace más de 48 horas, en los que no asistió o cancelados", async () => {
+      const ids = (await getPlayerBookings(carla)).map((b) => b.id);
+
+      expect(ids).not.toContain(reviewIds.expired);
+      expect(ids).not.toContain(reviewIds.notAttended);
+      expect(ids).not.toContain(reviewIds.cancelled);
+    });
   });
 
   it("un jugador sin turnos no recibe nada", async () => {
