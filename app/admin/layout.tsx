@@ -36,7 +36,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
+    // dvh y no vh (h-screen): en el celular 100vh incluye la barra del navegador y corta el final del panel.
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <AppHeader
         active="/admin"
         userName={session.user.name}

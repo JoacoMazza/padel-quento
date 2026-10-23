@@ -127,6 +127,44 @@ describe("AdminPanel", () => {
     expect(getAttendanceReport).not.toHaveBeenCalled();
   });
 
+  describe("en pantallas chicas", () => {
+    function classesOf(element: Element) {
+      return element.className.split(" ");
+    }
+
+    it("las secciones pasan a una fila con scroll horizontal arriba del contenido, y al costado desde lg", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      const nav = screen.getByRole("navigation");
+      const aside = nav.closest("aside")!;
+      expect(classesOf(aside.parentElement!)).toEqual(expect.arrayContaining(["flex-col", "lg:flex-row"]));
+      expect(classesOf(aside)).toEqual(expect.arrayContaining(["border-b", "lg:w-64", "lg:border-r"]));
+      expect(classesOf(aside)).not.toContain("w-64");
+      expect(classesOf(nav)).toEqual(expect.arrayContaining(["overflow-x-auto", "lg:flex-col"]));
+      expect(classesOf(within(nav).getByRole("button", { name: "Canchas" }))).toEqual(
+        expect.arrayContaining(["shrink-0", "whitespace-nowrap", "lg:w-full"]),
+      );
+    });
+
+    it("ocultan el rótulo del panel y Cerrar sesión, que queda en el menú de usuario del header", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByText("Panel operativo"))).toEqual(expect.arrayContaining(["hidden", "lg:block"]));
+      expect(classesOf(screen.getByRole("button", { name: "Cerrar sesión" }).parentElement!)).toEqual(
+        expect.arrayContaining(["hidden", "lg:block"]),
+      );
+    });
+
+    it("el contenido usa el mismo margen lateral que el header", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByRole("main"))).toEqual(expect.arrayContaining(["px-6", "lg:px-8"]));
+    });
+  });
+
   it("los turnos fijos están en la Turnera Global, debajo de la grilla, y no en una sección aparte", async () => {
     render(<AdminPanel isOwner />);
     await flush();
