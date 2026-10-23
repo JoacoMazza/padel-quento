@@ -81,7 +81,9 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
         </div>
         <div className="card flex items-baseline gap-3 px-6 py-4">
           <span className="label-caps">Valor cancha</span>
-          <span className="text-3xl font-extrabold tracking-tight text-foreground">{formatPrice(detail.price)}</span>
+          <span className="text-3xl font-extrabold tracking-tight whitespace-nowrap text-foreground">
+            {formatPrice(detail.price)}
+          </span>
           <span className="text-sm text-foreground/50">/ turno</span>
         </div>
       </div>
