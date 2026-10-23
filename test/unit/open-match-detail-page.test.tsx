@@ -59,4 +59,14 @@ describe("OpenMatchDetailPage", () => {
 
     expect(screen.getByText(formatPrice(18000)).className.split(" ")).toContain("whitespace-nowrap");
   });
+
+  it("en pantallas chicas el estado de cada participante pasa debajo del nombre, y al costado desde sm", async () => {
+    getBookingById.mockResolvedValue({ success: true, data: BOOKING });
+
+    render(await OpenMatchDetailPage({ params: Promise.resolve({ bookingId: "10" }) }));
+
+    const status = screen.getByText(/Confirmado \(2 plazas\)/);
+    expect(status.className.split(" ")).toEqual(expect.arrayContaining(["basis-full", "sm:basis-auto"]));
+    expect(status.closest("li")!.className.split(" ")).toContain("flex-wrap");
+  });
 });

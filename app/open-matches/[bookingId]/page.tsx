@@ -119,10 +119,10 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
               {detail.participants.map((participant) => (
                 <li
                   key={participant.playerId}
-                  className="flex items-center gap-4 rounded-xl border border-line bg-background/60 p-4"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-background/60 p-4"
                 >
                   <Avatar initials={participant.initials} tone={participant.isOrganizer ? "dark" : "light"} />
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
                       {participant.name}
                       {participant.isOrganizer ? (
@@ -141,7 +141,8 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
                       </div>
                     ) : null}
                   </div>
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-success">
+                  {/* En pantallas chicas va debajo del nombre (alineado con él, pasando el avatar). */}
+                  <span className="flex basis-full items-center gap-1.5 pl-15 text-sm font-semibold text-success sm:basis-auto sm:pl-0">
                     <Check className="h-4 w-4" />
                     Confirmado ({participant.playersCount} plaza{participant.playersCount === 1 ? "" : "s"})
                   </span>
