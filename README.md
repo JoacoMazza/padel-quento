@@ -64,7 +64,7 @@ Después de un partido abierto, cada jugador que asistió puede calificar a sus 
 
 - La reputación se muestra en porcentajes (puntualidad, buena actitud, nivel acorde) desde las 3 reseñas, en el detalle de los partidos abiertos y en el perfil del propio jugador. Es anónima: los jugadores no ven quién dijo qué.
 - El admin ve en la ficha del jugador la reputación, alertas cuando algo baja del 70% y cada reseña con su comentario y quién la dejó. Desde ahí puede cambiarle la categoría o descontarle puntos con un motivo.
-- Las reseñas no tocan los puntos de fidelidad. La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
+- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
 
 ## Acceso sin sesión
 

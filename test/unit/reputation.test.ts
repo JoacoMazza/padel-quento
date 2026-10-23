@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BookingState, ReviewLevel } from "@/src/domain/enums";
-import { canReviewMatch, isWithinReviewWindow, reputationAlerts, summarizeReputation } from "@/src/domain/reputation";
+import { NEGATIVE_REVIEW_POINTS } from "@/src/domain/constants";
+import {
+  canReviewMatch,
+  isWithinReviewWindow,
+  negativeReviewPoints,
+  reputationAlerts,
+  summarizeReputation,
+} from "@/src/domain/reputation";
 
 function review(overrides: Partial<{ level: ReviewLevel; goodAttitude: boolean; onTime: boolean }> = {}) {
   return { level: ReviewLevel.AS_DECLARED, goodAttitude: true, onTime: true, ...overrides };
@@ -114,5 +121,25 @@ describe("canReviewMatch", () => {
     expect(canReviewMatch({ ...match, bookingState: BookingState.CANCELLED }, 1, afterEnd)).toBe(false);
     expect(canReviewMatch(match, 1, new Date(2026, 9, 12, 20, 0))).toBe(false);
     expect(canReviewMatch(match, 1, new Date(2026, 9, 15, 0, 0))).toBe(false);
+  });
+});
+
+describe("negativeReviewPoints", () => {
+  it("una reseña sin aspectos negativos no descuenta puntos", () => {
+    expect(negativeReviewPoints(review())).toBe(0);
+  });
+
+  it("descuenta por la mala actitud, por llegar tarde o por un nivel distinto a la categoría declarada", () => {
+    expect(negativeReviewPoints(review({ goodAttitude: false }))).toBe(NEGATIVE_REVIEW_POINTS);
+    expect(negativeReviewPoints(review({ onTime: false }))).toBe(NEGATIVE_REVIEW_POINTS);
+    expect(negativeReviewPoints(review({ level: ReviewLevel.LOWER }))).toBe(NEGATIVE_REVIEW_POINTS);
+    expect(negativeReviewPoints(review({ level: ReviewLevel.HIGHER }))).toBe(NEGATIVE_REVIEW_POINTS);
+  });
+
+  it("cada aspecto negativo descuenta por separado", () => {
+    expect(negativeReviewPoints(review({ goodAttitude: false, onTime: false }))).toBe(2 * NEGATIVE_REVIEW_POINTS);
+    expect(
+      negativeReviewPoints(review({ goodAttitude: false, onTime: false, level: ReviewLevel.LOWER })),
+    ).toBe(3 * NEGATIVE_REVIEW_POINTS);
   });
 });

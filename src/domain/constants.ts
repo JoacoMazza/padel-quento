@@ -41,6 +41,13 @@ export const ATTENDANCE_POINTS = 10;
  */
 export const OPEN_MATCH_JOIN_BONUS_POINTS = 5;
 
+/**
+ * Puntos que se le descuentan a un jugador por cada aspecto negativo (mala
+ * actitud, llegar tarde, nivel distinto a su categoría) de una reseña recibida
+ * tras un partido abierto (issue #73). El saldo nunca baja de 0 (ver recordPointsMovement).
+ */
+export const NEGATIVE_REVIEW_POINTS = 5;
+
 /** Horas que tienen los jugadores para calificar a sus compañeros desde que termina el partido (HU-36). */
 export const REVIEW_WINDOW_HOURS = 48;
 
