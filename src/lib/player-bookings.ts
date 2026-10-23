@@ -1,7 +1,8 @@
 import "reflect-metadata";
 import { In } from "typeorm";
 import type { Booking } from "@/src/entities/Booking";
-import { MY_BOOKINGS_PAST_LIMIT } from "@/src/domain/constants";
+import { BookingState } from "@/src/domain/enums";
+import { MY_BOOKINGS_PAST_LIMIT, REVIEW_WINDOW_HOURS } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 
 const BOOKING_RELATIONS = {
@@ -12,8 +13,10 @@ const BOOKING_RELATIONS = {
 
 /**
  * Turnos del jugador para Mis turnos: los que reservó y los partidos de otros a
- * los que se sumó. Trae todos los próximos (o en curso) y solo los últimos
- * MY_BOOKINGS_PAST_LIMIT que ya terminaron, sin cargar los turnos del resto del club.
+ * los que se sumó. Trae todos los próximos (o en curso), los últimos
+ * MY_BOOKINGS_PAST_LIMIT que ya terminaron y, aunque no estén entre esos, los
+ * partidos que todavía puede calificar (issue #77: no cancelados, asistió y
+ * terminaron hace menos de REVIEW_WINDOW_HOURS). Sin cargar los turnos del resto del club.
  */
 export async function getPlayerBookings(playerId: number, now: Date = new Date()): Promise<Booking[]> {
   const dataSource = await getDataSource();
@@ -30,17 +33,32 @@ export async function getPlayerBookings(playerId: number, now: Date = new Date()
         { playerId },
       );
   const end = 'booking."datetime" + make_interval(mins => booking."duration_minutes")';
+  const reviewWindowStart = new Date(now.getTime() - REVIEW_WINDOW_HOURS * 60 * 60_000);
 
-  const [upcoming, past] = await Promise.all([
+  const [upcoming, past, reviewable] = await Promise.all([
     mine().andWhere(`${end} >= :now`, { now }).getRawMany<{ id: number }>(),
     mine()
       .andWhere(`${end} < :now`, { now })
       .orderBy('booking."datetime"', "DESC")
       .limit(MY_BOOKINGS_PAST_LIMIT)
       .getRawMany<{ id: number }>(),
+    // Si se puede calificar o no lo termina de decidir canReviewMatch (también exige
+    // que haya asistido algún compañero); acá solo se trae lo que podría serlo.
+    mine()
+      .andWhere(`${end} < :now`, { now })
+      .andWhere(`${end} >= :reviewWindowStart`, { reviewWindowStart })
+      .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM "match_players" "rmp" INNER JOIN "matches" "rm" ON "rm"."id" = "rmp"."match_id"
+          WHERE "rm"."booking_id" = booking.id AND "rmp"."player_id" = :playerId AND "rmp"."attended" = true
+        )`,
+        { playerId },
+      )
+      .getRawMany<{ id: number }>(),
   ]);
 
-  const ids = [...upcoming, ...past].map((row) => row.id);
+  const ids = [...new Set([...upcoming, ...past, ...reviewable].map((row) => row.id))];
   if (ids.length === 0) return [];
   return dataSource.getRepository<Booking>("Booking").find({ where: { id: In(ids) }, relations: BOOKING_RELATIONS });
 }
