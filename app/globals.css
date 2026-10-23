@@ -50,6 +50,17 @@ body {
 }
 
 /*
+ * Área mínima de 44 × 44 px en pantallas táctiles para los controles armados con
+ * utilidades sueltas (los que usan .btn, .icon-btn, .chip o .field ya la tienen).
+ */
+@utility touch-target {
+  @media (pointer: coarse) {
+    min-height: --spacing(11);
+    min-width: --spacing(11);
+  }
+}
+
+/*
  * Piezas reutilizables del sistema visual (ver docs/ui/). Se combinan en el
  * markup, p. ej. `btn btn-primary` o `badge badge-success`; al estar en la capa
  * components, cualquier utilidad de Tailwind puede pisarlas.

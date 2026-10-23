@@ -36,7 +36,7 @@ export function ReviewTeammatesModal({ matchId, onClose }: { matchId: number; on
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1 text-foreground/50 touch-target hover:bg-line/40 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>

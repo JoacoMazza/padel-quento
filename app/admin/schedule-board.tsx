@@ -350,7 +350,7 @@ export function ScheduleBoard({
                           data-state={state}
                           onClick={handleClick}
                           title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
-                          className={`inline-flex h-10 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
+                          className={`inline-flex h-10 w-full pointer-coarse:h-11 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
                           {state === "closed" ? (
                             "—"

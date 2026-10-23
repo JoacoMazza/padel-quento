@@ -145,6 +145,8 @@ describe("AdminPanel", () => {
       expect(classesOf(within(nav).getByRole("button", { name: "Canchas" }))).toEqual(
         expect.arrayContaining(["shrink-0", "whitespace-nowrap", "lg:w-full"]),
       );
+      // 44 px de alto en pantallas táctiles.
+      expect(classesOf(within(nav).getByRole("button", { name: "Canchas" }))).toContain("pointer-coarse:py-3");
     });
 
     it("ocultan el rótulo del panel y Cerrar sesión, que queda en el menú de usuario del header", async () => {

@@ -258,7 +258,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
                 type="button"
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => openSection(id)}
-                className={`flex shrink-0 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold whitespace-nowrap transition-colors lg:w-full ${
+                className={`flex shrink-0 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold whitespace-nowrap transition-colors pointer-coarse:py-3 lg:w-full ${
                   isActive ? "bg-primary-light text-primary" : "text-foreground/70 hover:bg-background hover:text-foreground"
                 }`}
               >

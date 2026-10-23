@@ -141,14 +141,14 @@ export function PlayerRecordModal({
             href={whatsappUrl(player.phoneNumber)}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/20"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-semibold touch-target text-success hover:bg-success/20"
           >
             <MessageCircle className="h-3.5 w-3.5" />
             WhatsApp
           </a>
           <a
             href={mailtoUrl(player.email)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold touch-target text-primary hover:bg-primary/20"
           >
             <Mail className="h-3.5 w-3.5" />
             Email
@@ -158,7 +158,7 @@ export function PlayerRecordModal({
             disabled={isTogglePending}
             aria-label={player.isBlocked ? `Desbloquear a ${player.names}` : `Bloquear a ${player.names}`}
             onClick={onToggleBlock}
-            className={`ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               player.isBlocked
                 ? "bg-success/10 text-success hover:bg-success/20"
                 : "bg-danger/10 text-danger hover:bg-danger/20"
@@ -233,7 +233,7 @@ export function PlayerRecordModal({
                       id="record-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value as PlayerCategory)}
-                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm touch-target"
                     >
                       {Object.values(PlayerCategory).map((value) => (
                         <option key={value} value={value}>
@@ -260,7 +260,7 @@ export function PlayerRecordModal({
                       min={1}
                       value={points}
                       onChange={(e) => setPoints(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm touch-target"
                     />
                     <label htmlFor="record-reason" className="block text-xs font-semibold text-foreground/70">
                       Motivo
@@ -269,7 +269,7 @@ export function PlayerRecordModal({
                       id="record-reason"
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm"
+                      className="w-full rounded-lg border border-line bg-background px-3 py-1.5 text-sm touch-target"
                     />
                     <button
                       type="button"

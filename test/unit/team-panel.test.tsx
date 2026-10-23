@@ -152,3 +152,17 @@ describe("TeamPanel", () => {
     expect(deleteAdmin).toHaveBeenCalledWith(2);
   });
 });
+
+describe("TeamPanel - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("cerrar el formulario es un área de al menos 44 px", () => {
+    render(<TeamPanel team={[me, worker]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Agregar administrador" }));
+
+    expect(screen.getByRole("button", { name: "Cerrar" }).className.split(" ")).toContain("touch-target");
+  });
+});
