@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("next/link", () => ({
@@ -94,13 +94,75 @@ describe("AppHeader", () => {
     expect(screen.queryByRole("link", { name: "Turnos" })).toBeNull();
   });
 
+  describe("menú de navegación en pantallas chicas", () => {
+    it("oculta la navegación en línea en pantallas chicas y la muestra desde lg", () => {
+      render(<AppHeader active="/" />);
+
+      const nav = screen.getByRole("navigation");
+      expect(nav.className.split(" ")).toEqual(expect.arrayContaining(["hidden", "lg:flex"]));
+    });
+
+    it("ofrece un botón para abrir el menú, que solo se ve en pantallas chicas", () => {
+      render(<AppHeader active="/" />);
+
+      const toggle = screen.getByRole("button", { name: "Abrir menú" });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      expect(toggle.className.split(" ")).toContain("lg:hidden");
+    });
+
+    it("al abrirlo muestra los links principales, con el actual marcado", () => {
+      render(<AppHeader active="/bookings" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+
+      const menu = screen.getByRole("navigation", { name: "Menú principal" });
+      const links = within(menu).getAllByRole("link");
+      expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+        ["Inicio", "/"],
+        ["Turnos", "/bookings"],
+        ["Partidos abiertos", "/open-matches"],
+        ["Mis reservas", "/my-bookings"],
+      ]);
+      expect(within(menu).getByRole("link", { name: "Turnos" }).getAttribute("aria-current")).toBe("page");
+      expect(screen.getByRole("button", { name: "Cerrar menú" }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("se cierra al elegir un link o al volver a tocar el botón", () => {
+      render(<AppHeader active="/" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Menú principal" })).getByRole("link", { name: "Turnos" }));
+      expect(screen.queryByRole("navigation", { name: "Menú principal" })).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+      fireEvent.click(screen.getByRole("button", { name: "Cerrar menú" }));
+      expect(screen.queryByRole("navigation", { name: "Menú principal" })).toBeNull();
+    });
+
+    it("para un visitante solo lista las secciones que se pueden ver sin sesión", () => {
+      render(<AppHeader active="/" guest />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+
+      const menu = screen.getByRole("navigation", { name: "Menú principal" });
+      expect(within(menu).queryByRole("link", { name: "Mis reservas" })).toBeNull();
+      expect(within(menu).getByRole("link", { name: "Turnos" })).toBeTruthy();
+    });
+
+    it("no se muestra en el panel de administración", () => {
+      render(<AppHeader active="/admin" showNav={false} />);
+
+      expect(screen.queryByRole("button", { name: "Abrir menú" })).toBeNull();
+    });
+  });
+
   describe("visitante sin sesión", () => {
     it("ofrece iniciar sesión y registrarse en lugar del menú de usuario", () => {
-      render(<AppHeader active="/" guest />);
+      const { container } = render(<AppHeader active="/" guest />);
 
       expect(screen.getByRole("link", { name: "Iniciar sesión" }).getAttribute("href")).toBe("/login");
       expect(screen.getByRole("link", { name: "Registrarse" }).getAttribute("href")).toBe("/register");
-      expect(screen.queryByRole("button", { expanded: false })).toBeNull();
+      expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull();
     });
 
     it("no muestra el link a Mis reservas, pero sí los que se pueden ver sin sesión", () => {
