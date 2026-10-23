@@ -127,6 +127,15 @@ describe("AppHeader", () => {
       expect(screen.getByRole("button", { name: "Cerrar menú" }).getAttribute("aria-expanded")).toBe("true");
     });
 
+    it("el menú se despliega de arriba hacia abajo", () => {
+      render(<AppHeader active="/" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+
+      const menu = screen.getByRole("navigation", { name: "Menú principal" });
+      expect(menu.className.split(" ")).toContain("motion-safe:animate-slide-down");
+    });
+
     it("se cierra al elegir un link o al volver a tocar el botón", () => {
       render(<AppHeader active="/" />);
 

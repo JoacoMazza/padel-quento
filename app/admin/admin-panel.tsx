@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
@@ -223,19 +223,42 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
   const [activeSection, setActiveSection] = useState<SectionId>("schedule");
   const [visitedSections, setVisitedSections] = useState<SectionId[]>(["schedule"]);
   const sections = SECTIONS.filter((section) => isOwner || !section.ownerOnly);
-  const activeLabel = sections.find((s) => s.id === activeSection)?.label ?? "";
+  const activeSectionItem = sections.find((s) => s.id === activeSection);
+  const activeLabel = activeSectionItem?.label ?? "";
+  const ActiveIcon = activeSectionItem?.icon;
+  // Debajo de lg las secciones van en un menú hamburguesa; desde lg se ven siempre en la barra lateral.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   function openSection(id: SectionId) {
     setActiveSection(id);
+    setIsMenuOpen(false);
     setVisitedSections((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }
 
   return (
-    // Debajo de lg la barra lateral pasa a ser una fila de secciones arriba del contenido.
+    // Debajo de lg la barra lateral pasa a ser un menú hamburguesa arriba del contenido.
     <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-      <aside className="flex shrink-0 flex-col overflow-hidden border-b border-line bg-card lg:w-64 lg:border-r lg:border-b-0">
+      <aside className="relative flex shrink-0 flex-col border-b border-line bg-card lg:w-64 lg:overflow-hidden lg:border-r lg:border-b-0">
         <p className="label-caps hidden px-6 pt-6 pb-2 lg:block">Panel operativo</p>
-        <nav className="flex gap-1 overflow-x-auto px-3 py-2 lg:flex-1 lg:flex-col lg:overflow-y-auto">
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((v) => !v)}
+          aria-expanded={isMenuOpen}
+          aria-controls="admin-sections"
+          aria-label={isMenuOpen ? "Cerrar secciones" : "Abrir secciones"}
+          className="flex h-12 w-full cursor-pointer items-center justify-between gap-3 px-6 text-sm font-semibold text-foreground lg:hidden"
+        >
+          <span className="flex items-center gap-3">
+            {ActiveIcon ? <ActiveIcon className="h-5 w-5 text-primary" /> : null}
+            {activeLabel}
+          </span>
+          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+        {/* En pantallas chicas se despliega de arriba hacia abajo, sobre el contenido. */}
+        <nav
+          id="admin-sections"
+          className={`${isMenuOpen ? "flex" : "hidden"} absolute inset-x-0 top-full z-30 flex-col gap-1 border-b border-line bg-card px-3 py-2 shadow-lg motion-safe:animate-slide-down lg:static lg:z-auto lg:flex lg:flex-1 lg:overflow-y-auto lg:border-b-0 lg:shadow-none lg:motion-safe:animate-none`}
+        >
           {sections.map(({ id, label, icon: Icon, available }) => {
             const isActive = id === activeSection;
             if (!available) {
@@ -258,7 +281,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
                 type="button"
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => openSection(id)}
-                className={`flex shrink-0 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold whitespace-nowrap transition-colors pointer-coarse:py-3 lg:w-full ${
+                className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors pointer-coarse:py-3 ${
                   isActive ? "bg-primary-light text-primary" : "text-foreground/70 hover:bg-background hover:text-foreground"
                 }`}
               >

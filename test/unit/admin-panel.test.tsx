@@ -132,21 +132,58 @@ describe("AdminPanel", () => {
       return element.className.split(" ");
     }
 
-    it("las secciones pasan a una fila con scroll horizontal arriba del contenido, y al costado desde lg", async () => {
+    it("las secciones quedan arriba del contenido, y al costado desde lg", async () => {
       render(<AdminPanel isOwner />);
       await flush();
 
-      const nav = screen.getByRole("navigation");
-      const aside = nav.closest("aside")!;
+      const aside = screen.getByRole("navigation").closest("aside")!;
       expect(classesOf(aside.parentElement!)).toEqual(expect.arrayContaining(["flex-col", "lg:flex-row"]));
       expect(classesOf(aside)).toEqual(expect.arrayContaining(["border-b", "lg:w-64", "lg:border-r"]));
       expect(classesOf(aside)).not.toContain("w-64");
-      expect(classesOf(nav)).toEqual(expect.arrayContaining(["overflow-x-auto", "lg:flex-col"]));
-      expect(classesOf(within(nav).getByRole("button", { name: "Canchas" }))).toEqual(
-        expect.arrayContaining(["shrink-0", "whitespace-nowrap", "lg:w-full"]),
+    });
+
+    it("las secciones quedan detrás de un botón hamburguesa que muestra la sección actual", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      const toggle = screen.getByRole("button", { name: "Abrir secciones" });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      expect(classesOf(toggle)).toContain("lg:hidden");
+      expect(toggle.textContent).toContain("Turnera Global");
+      expect(classesOf(screen.getByRole("navigation"))).toEqual(expect.arrayContaining(["hidden", "lg:flex"]));
+    });
+
+    it("al abrirlo, las secciones se despliegan de arriba hacia abajo", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+
+      const nav = screen.getByRole("navigation");
+      expect(classesOf(nav)).toEqual(expect.arrayContaining(["flex", "motion-safe:animate-slide-down"]));
+      expect(classesOf(nav)).not.toContain("hidden");
+      expect(screen.getByRole("button", { name: "Cerrar secciones" }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("al elegir una sección el menú se cierra y el botón pasa a mostrarla", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+      openSection("Canchas");
+      await flush();
+
+      expect(classesOf(screen.getByRole("navigation"))).toContain("hidden");
+      expect(screen.getByRole("button", { name: "Abrir secciones" }).textContent).toContain("Canchas");
+    });
+
+    it("cada sección del menú ocupa todo el ancho y mide 44 px en pantallas táctiles", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(within(screen.getByRole("navigation")).getByRole("button", { name: "Canchas" }))).toEqual(
+        expect.arrayContaining(["w-full", "pointer-coarse:py-3"]),
       );
-      // 44 px de alto en pantallas táctiles.
-      expect(classesOf(within(nav).getByRole("button", { name: "Canchas" }))).toContain("pointer-coarse:py-3");
     });
 
     it("ocultan el rótulo del panel y Cerrar sesión, que queda en el menú de usuario del header", async () => {

@@ -43,6 +43,21 @@
   --font-mono: var(--font-geist-mono), monospace;
 }
 
+/* Animaciones propias (utilidades animate-*). */
+@theme {
+  /* Despliega un menú de arriba hacia abajo: se revela desde su borde superior. */
+  --animate-slide-down: slide-down 200ms ease-out;
+
+  @keyframes slide-down {
+    from {
+      clip-path: inset(0 0 100% 0);
+    }
+    to {
+      clip-path: inset(0);
+    }
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

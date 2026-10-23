@@ -30,7 +30,7 @@ export function MobileNav({ items, active }: { items: NavItem[]; active: string 
         <nav
           id="mobile-nav"
           aria-label="Menú principal"
-          className="absolute inset-x-0 top-full border-b border-line bg-card px-4 py-3 shadow-lg lg:hidden"
+          className="absolute inset-x-0 top-full border-b border-line bg-card px-4 py-3 shadow-lg motion-safe:animate-slide-down lg:hidden"
         >
           {items.map((item) => {
             const isActive = item.href === active;
