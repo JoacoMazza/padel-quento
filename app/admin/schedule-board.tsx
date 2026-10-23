@@ -261,7 +261,7 @@ export function ScheduleBoard({
           />
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-medium text-foreground/60">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-foreground/60">
           <span className="relative flex h-2 w-2">
             <span
               className={`absolute inline-flex h-full w-full rounded-full bg-emerald-500 ${

@@ -262,6 +262,15 @@ describe("ScheduleBoard - turnos fijos", () => {
     );
   });
 
+  it("si las acciones no entran en una fila (pantallas chicas), pasan a la línea siguiente", async () => {
+    getScheduleBoardData.mockResolvedValue(BOARD);
+    render(<ScheduleBoard toolbarActions={<button type="button">Registrar turno fijo</button>} />);
+    await advance(0);
+
+    const toolbar = screen.getByRole("button", { name: "Actualizar turnera" }).parentElement!;
+    expect(toolbar.className.split(" ")).toContain("flex-wrap");
+  });
+
   it("se actualiza cuando cambia refreshKey (por ejemplo, al crear un turno fijo)", async () => {
     getScheduleBoardData.mockResolvedValue(BOARD);
     const { rerender } = render(<ScheduleBoard refreshKey={0} />);
