@@ -192,6 +192,16 @@ describe("BookingsBoard", () => {
     });
   });
 
+  it("en pantallas táctiles, cerrar el resumen y elegir la cantidad de jugadores son áreas de 44 px", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+    fireEvent.click(screen.getByLabelText(/Buscar jugadores/));
+
+    expect(screen.getByRole("button", { name: "Cerrar" }).className.split(" ")).toContain("pointer-coarse:size-11");
+    expect(screen.getByRole("button", { name: "2 jugadores" }).className.split(" ")).toContain("pointer-coarse:h-11");
+  });
+
   it("muestra el título Filtrar antes de los botones de fecha", () => {
     renderBoard();
 
