@@ -54,8 +54,8 @@ const players = [{ id: 7, name: "Ana Gómez", phoneNumber: "2215550102" }];
 const onCloseCreate = vi.fn();
 const onChanged = vi.fn();
 
-function renderPanel(items = [fixedBooking()], { isCreating = false } = {}) {
-  return render(
+function panel(items = [fixedBooking()], { isCreating = false, refreshKey = 0 } = {}) {
+  return (
     <FixedBookingsPanel
       fixedBookings={items}
       courts={courts}
@@ -63,8 +63,21 @@ function renderPanel(items = [fixedBooking()], { isCreating = false } = {}) {
       isCreating={isCreating}
       onCloseCreate={onCloseCreate}
       onChanged={onChanged}
-    />,
+      refreshKey={refreshKey}
+    />
   );
+}
+
+function renderPanel(items = [fixedBooking()], options: { isCreating?: boolean; refreshKey?: number } = {}) {
+  return render(panel(items, options));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe("FixedBookingsPanel", () => {
@@ -166,6 +179,57 @@ describe("FixedBookingsPanel", () => {
 
     expect(screen.getByText("Dado de baja")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Dar de baja el turno fijo de la cancha 3" })).toBeNull();
+  });
+
+  describe("refresco del listado (refreshKey)", () => {
+    it("vuelve a pedir el listado cuando cambia refreshKey", async () => {
+      getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [fixedBooking({ holderName: "Otro Titular" })] });
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("Otro Titular")).toBeTruthy();
+    });
+
+    it("muestra el error si no se pudo actualizar el listado", async () => {
+      getFixedBookingsAdmin.mockResolvedValue({ success: false, error: "No autorizado." });
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("No autorizado.")).toBeTruthy();
+    });
+
+    it("muestra un error si el pedido del listado falla", async () => {
+      getFixedBookingsAdmin.mockRejectedValue(new Error("network"));
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("No se pudo actualizar el listado de turnos fijos.")).toBeTruthy();
+    });
+
+    it("una respuesta vieja no pisa a la más nueva", async () => {
+      const stale = deferred<unknown>();
+      const fresh = deferred<unknown>();
+      getFixedBookingsAdmin.mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise);
+      releaseFixedBookingDate.mockResolvedValue({ success: true, data: null });
+      const { rerender } = renderPanel();
+
+      // La grilla pide refrescar y, antes de que llegue la respuesta, se libera una fecha desde el listado.
+      rerender(panel(undefined, { refreshKey: 1 }));
+      fireEvent.click(screen.getByRole("button", { name: "Ver fechas del turno fijo de la cancha 3" }));
+      fireEvent.click(screen.getByRole("button", { name: "Liberar la fecha 2026-10-19" }));
+      await waitFor(() => expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(2));
+
+      fresh.resolve({ success: true, data: [fixedBooking({ holderName: "Listado Nuevo" })] });
+      expect(await screen.findByText("Listado Nuevo")).toBeTruthy();
+      stale.resolve({ success: true, data: [fixedBooking({ holderName: "Listado Viejo" })] });
+      await stale.promise;
+
+      await waitFor(() => expect(screen.getByText("Listado Nuevo")).toBeTruthy());
+      expect(screen.queryByText("Listado Viejo")).toBeNull();
+    });
   });
 
   describe("alta", () => {

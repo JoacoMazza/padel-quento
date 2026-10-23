@@ -273,6 +273,27 @@ describe("ScheduleBoard - turnos fijos", () => {
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
   });
+
+  it("si refreshKey cambia mientras se está actualizando, vuelve a pedir los datos al terminar", async () => {
+    let resolveFirst!: (value: typeof BOARD) => void;
+    getScheduleBoardData.mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)));
+    const withFixed = {
+      ...BOARD,
+      data: { ...BOARD.data, bookings: [bookingAt(5, 18)], fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }] },
+    };
+    getScheduleBoardData.mockResolvedValue(withFixed);
+    const { rerender } = render(<ScheduleBoard refreshKey={0} />);
+    await advance(0);
+
+    // Se crea un turno fijo mientras la primera carga sigue en curso.
+    rerender(<ScheduleBoard refreshKey={1} />);
+    await advance(0);
+    resolveFirst(BOARD);
+    await advance(0);
+
+    expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("Turno fijo").some((el) => el.getAttribute("role") === "button")).toBe(true);
+  });
 });
 
 describe("ScheduleBoard - agendar desde una celda libre", () => {

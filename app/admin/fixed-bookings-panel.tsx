@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { CalendarDays, CalendarX, RotateCcw, Trash2, X } from "lucide-react";
 import { DayOfWeek, FixedBookingDateState, FixedBookingFrequency } from "@/src/domain/enums";
 import { dayOfWeekOfISO } from "@/src/domain/fixed-booking";
@@ -60,7 +60,9 @@ function formatShortDate(iso: string): string {
  * Turnos fijos (HU-41), debajo de la grilla de la Turnera Global: listado con
  * sus próximas fechas (liberar o restaurar una sola fecha) y baja del turno
  * fijo completo. El alta se abre desde el botón junto a Actualizar
- * (isCreating), y onChanged avisa para refrescar la grilla.
+ * (isCreating), y onChanged avisa para refrescar la grilla. El listado se
+ * vuelve a pedir cuando cambia refreshKey (por ejemplo, al liberar una fecha
+ * desde la grilla).
  */
 export function FixedBookingsPanel({
   fixedBookings: initialFixedBookings,
@@ -69,6 +71,7 @@ export function FixedBookingsPanel({
   isCreating,
   onCloseCreate,
   onChanged,
+  refreshKey = 0,
 }: {
   fixedBookings: FixedBookingAdminItem[];
   courts: FixedBookingCourtOption[];
@@ -76,18 +79,39 @@ export function FixedBookingsPanel({
   isCreating: boolean;
   onCloseCreate: () => void;
   onChanged: () => void;
+  refreshKey?: number;
 }) {
   const [fixedBookings, setFixedBookings] = useState(initialFixedBookings);
+  const lastRefreshKeyRef = useRef(refreshKey);
+  const lastRequestIdRef = useRef(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Si se superponen dos pedidos del listado, solo cuenta la respuesta del último.
+  async function fetchFixedBookings() {
+    const requestId = ++lastRequestIdRef.current;
+    try {
+      const result = await getFixedBookingsAdmin();
+      if (requestId !== lastRequestIdRef.current) return;
+      if (result.success) setFixedBookings(result.data);
+      else setError(result.error);
+    } catch {
+      if (requestId === lastRequestIdRef.current) setError("No se pudo actualizar el listado de turnos fijos.");
+    }
+  }
+
+  useEffect(() => {
+    if (refreshKey === lastRefreshKeyRef.current) return;
+    lastRefreshKeyRef.current = refreshKey;
+    fetchFixedBookings();
+  }, [refreshKey]);
+
   async function reload() {
     onChanged();
-    const result = await getFixedBookingsAdmin();
-    if (result.success) setFixedBookings(result.data);
+    await fetchFixedBookings();
   }
 
   async function run(action: () => Promise<{ success: boolean; error?: string }>) {

@@ -25,7 +25,7 @@ const {
     const playerFindOne = vi.fn(async () => ({ id: 1, account: { isBlocked: false } }) as unknown);
     const bookerExistsBy = vi.fn(async () => true);
     const fixedDateExistsBy = vi.fn(async () => false);
-    const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+    const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
     const deleteFn = vi.fn();
     const getOne = vi.fn(async () => null as unknown);
     const queryFn = vi.fn(async () => undefined);
@@ -35,7 +35,7 @@ const {
     const bookerRepository = { existsBy: bookerExistsBy };
     const fixedDateRepository = { existsBy: fixedDateExistsBy };
 
-    const queryBuilder: any = {};
+    const queryBuilder: Record<string, unknown> = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
     queryBuilder.andWhere = vi.fn(() => queryBuilder);
     queryBuilder.getOne = getOne;
@@ -129,7 +129,7 @@ describe("booking actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
     playerFindOne.mockResolvedValue(bookingPlayer());
     bookerExistsBy.mockResolvedValue(true);
