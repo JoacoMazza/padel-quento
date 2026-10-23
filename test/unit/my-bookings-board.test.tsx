@@ -57,6 +57,13 @@ describe("MyBookingsBoard", () => {
     expect(within(section("Turnos anteriores")).getByText("Turno 2")).toBeTruthy();
   });
 
+  it("en pantallas chicas muestra el panel de filtros antes de la lista, y al costado desde lg", () => {
+    render(<MyBookingsBoard bookings={[booking(1, 2)]} playerId={7} />);
+
+    const panel = screen.getByRole("complementary");
+    expect(panel.className.split(" ")).toEqual(expect.arrayContaining(["order-first", "lg:order-none"]));
+  });
+
   it("sin partidos para calificar no muestra esa sección", () => {
     render(<MyBookingsBoard bookings={[booking(1, 2), booking(2, -3)]} playerId={7} />);
 
