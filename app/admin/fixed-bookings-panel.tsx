@@ -184,14 +184,14 @@ export function FixedBookingsPanel({
                               type="button"
                               disabled={pending}
                               onClick={() => handleCancel(fixed.id)}
-                              className="cursor-pointer rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger/90 disabled:opacity-50"
+                              className="cursor-pointer rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold touch-target text-white hover:bg-danger/90 disabled:opacity-50"
                             >
                               Sí, dar de baja
                             </button>
                             <button
                               type="button"
                               onClick={() => setConfirmingCancelId(null)}
-                              className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-foreground/70 hover:bg-line/40"
+                              className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold touch-target text-foreground/70 hover:bg-line/40"
                             >
                               Volver
                             </button>
@@ -203,7 +203,7 @@ export function FixedBookingsPanel({
                               aria-label={`Ver fechas del turno fijo de la cancha ${fixed.courtNumber}`}
                               title="Próximas fechas"
                               onClick={() => setExpandedId(expandedId === fixed.id ? null : fixed.id)}
-                              className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-line/40 hover:text-foreground"
+                              className="cursor-pointer rounded-lg p-2 text-foreground/60 touch-target hover:bg-line/40 hover:text-foreground"
                             >
                               <CalendarDays className="h-4 w-4" />
                             </button>
@@ -213,7 +213,7 @@ export function FixedBookingsPanel({
                                 aria-label={`Dar de baja el turno fijo de la cancha ${fixed.courtNumber}`}
                                 title="Dar de baja"
                                 onClick={() => setConfirmingCancelId(fixed.id)}
-                                className="cursor-pointer rounded-lg p-2 text-foreground/60 hover:bg-danger/10 hover:text-danger"
+                                className="cursor-pointer rounded-lg p-2 text-foreground/60 touch-target hover:bg-danger/10 hover:text-danger"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -245,7 +245,7 @@ export function FixedBookingsPanel({
                                         disabled={pending}
                                         aria-label={`Liberar la fecha ${date.date}`}
                                         onClick={() => run(() => releaseFixedBookingDate(date.id))}
-                                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger/10 disabled:opacity-50"
+                                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold touch-target text-danger hover:bg-danger/10 disabled:opacity-50"
                                       >
                                         <CalendarX className="h-3.5 w-3.5" />
                                         Liberar
@@ -257,7 +257,7 @@ export function FixedBookingsPanel({
                                         disabled={pending}
                                         aria-label={`Restaurar la fecha ${date.date}`}
                                         onClick={() => run(() => restoreFixedBookingDate(date.id))}
-                                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold touch-target text-primary hover:bg-primary/10 disabled:opacity-50"
                                       >
                                         <RotateCcw className="h-3.5 w-3.5" />
                                         Restaurar
@@ -335,14 +335,14 @@ function CreateFixedBookingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Nuevo turno fijo</h2>
           <button
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1 text-foreground/50 touch-target hover:bg-line/40 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -416,14 +416,14 @@ function CreateFixedBookingModal({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-line/40"
+              className="cursor-pointer rounded-xl border border-line px-4 py-2 text-sm touch-target font-medium hover:bg-line/40"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm touch-target font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? "Creando..." : "Crear turno fijo"}
             </button>

@@ -38,7 +38,8 @@ export function FiltersPanel({
   onClear: () => void;
 }) {
   return (
-    <aside className="flex h-fit flex-col gap-4 lg:sticky lg:top-24">
+    // En pantallas chicas va antes de la lista: al final quedaría debajo de todos los turnos.
+    <aside className="order-first flex h-fit flex-col gap-4 lg:sticky lg:top-24 lg:order-none">
       <div className="card p-6">
         <div className="flex items-center gap-3">
           <Avatar initials={getInitials(userName, userEmail)} tone="dark" />
@@ -92,7 +93,7 @@ export function FiltersPanel({
               type="button"
               aria-pressed={statusFilter === option.value}
               onClick={() => onStatusFilterChange(option.value)}
-              className={`chip h-9 ${statusFilter === option.value ? "chip-active" : ""}`}
+              className={`chip h-9 pointer-coarse:h-11 ${statusFilter === option.value ? "chip-active" : ""}`}
             >
               {option.label}
             </button>

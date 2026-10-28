@@ -30,7 +30,7 @@ export function EditProfileModal({ initialData }: { initialData: React.Component
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-profile-title"
-            className="modal-panel max-h-[90vh] max-w-2xl overflow-y-auto"
+            className="modal-panel max-w-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-5 flex items-center justify-between">

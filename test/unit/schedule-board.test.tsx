@@ -262,6 +262,15 @@ describe("ScheduleBoard - turnos fijos", () => {
     );
   });
 
+  it("si las acciones no entran en una fila (pantallas chicas), pasan a la línea siguiente", async () => {
+    getScheduleBoardData.mockResolvedValue(BOARD);
+    render(<ScheduleBoard toolbarActions={<button type="button">Registrar turno fijo</button>} />);
+    await advance(0);
+
+    const toolbar = screen.getByRole("button", { name: "Actualizar turnera" }).parentElement!;
+    expect(toolbar.className.split(" ")).toContain("flex-wrap");
+  });
+
   it("se actualiza cuando cambia refreshKey (por ejemplo, al crear un turno fijo)", async () => {
     getScheduleBoardData.mockResolvedValue(BOARD);
     const { rerender } = render(<ScheduleBoard refreshKey={0} />);
@@ -293,6 +302,13 @@ describe("ScheduleBoard - agendar desde una celda libre", () => {
     const row = screen.getByText(time).closest("tr")!;
     return row.querySelector("[data-state]") as HTMLElement;
   }
+
+  it("en pantallas táctiles las celdas miden 44 px de alto", async () => {
+    render(<ScheduleBoard onAvailableSlotClick={vi.fn()} />);
+    await advance(0);
+
+    expect(cellAt("09:30").className.split(" ")).toEqual(expect.arrayContaining(["h-10", "pointer-coarse:h-11"]));
+  });
 
   it("al hacer click en una celda disponible futura avisa la cancha, el día y la hora", async () => {
     const onAvailableSlotClick = vi.fn();

@@ -186,14 +186,14 @@ function AdminForm({ form, onClose, onSaved }: { form: FormState; onClose: () =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">{member ? "Editar administrador" : "Nuevo administrador"}</h2>
           <button
             type="button"
             aria-label="Cerrar"
             onClick={onClose}
-            className="cursor-pointer rounded-lg p-1 text-foreground/50 hover:bg-line/40 hover:text-foreground"
+            className="cursor-pointer rounded-lg p-1 text-foreground/50 touch-target hover:bg-line/40 hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>

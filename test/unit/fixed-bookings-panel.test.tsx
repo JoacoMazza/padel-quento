@@ -252,3 +252,32 @@ describe("FixedBookingsPanel", () => {
     });
   });
 });
+
+describe("FixedBookingsPanel - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  function expectTouchTarget(name: string | RegExp) {
+    expect(screen.getByRole("button", { name }).className.split(" ")).toContain("touch-target");
+  }
+
+  it("las acciones del listado y de sus fechas son áreas de al menos 44 px", () => {
+    renderPanel();
+
+    expectTouchTarget("Ver fechas del turno fijo de la cancha 3");
+    fireEvent.click(screen.getByRole("button", { name: "Ver fechas del turno fijo de la cancha 3" }));
+    expectTouchTarget("Liberar la fecha 2026-10-19");
+    expectTouchTarget("Restaurar la fecha 2026-10-26");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dar de baja el turno fijo de la cancha 3" }));
+    expectTouchTarget("Sí, dar de baja");
+    expectTouchTarget("Volver");
+  });
+
+  it("cerrar, cancelar y crear en el alta son áreas de al menos 44 px", () => {
+    renderPanel(undefined, { isCreating: true });
+
+    for (const name of ["Cerrar", "Cancelar", "Crear turno fijo"]) expectTouchTarget(name);
+  });
+});

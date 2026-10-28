@@ -152,3 +152,25 @@ describe("CreateBookingModal", () => {
     expect(createBookingAdmin).not.toHaveBeenCalled();
   });
 });
+
+describe("CreateBookingModal - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("cerrar, cancelar y confirmar son áreas de al menos 44 px (touch-target)", () => {
+    renderModal();
+
+    for (const name of ["Cerrar", "Cancelar", "Confirmar turno"]) {
+      expect(screen.getByRole("button", { name }).className.split(" ")).toContain("touch-target");
+    }
+  });
+
+  it("las opciones del titular se tocan en toda la fila, de al menos 44 px", () => {
+    renderModal();
+
+    for (const label of ["Jugador registrado", "Sin cuenta"]) {
+      expect(screen.getByLabelText(label).closest("label")!.className.split(" ")).toContain("touch-target");
+    }
+  });
+});
