@@ -15,7 +15,7 @@ export class Chat {
   id!: number;
 
   @OneToOne("Match", "chat", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "match_id" })
+  @JoinColumn({ name: "match_id", foreignKeyConstraintName: "FK_chats_match_id" })
   match!: Match;
 
   @OneToMany("Message", "chat")

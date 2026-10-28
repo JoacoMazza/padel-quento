@@ -10,7 +10,7 @@ export class Admin {
   id!: number;
 
   @OneToOne("Account", "admin", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "account_id" })
+  @JoinColumn({ name: "account_id", foreignKeyConstraintName: "FK_admins_account_id" })
   account!: Account;
 
   /**

@@ -21,6 +21,7 @@
     "migration:revert": "pnpm typeorm migration:revert",
     "migration:show": "pnpm typeorm migration:show",
     "db:seed": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed.ts",
+    "db:seed:prod": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed-production.ts",
     "db:seed:bookings": "ts-node -r tsconfig-paths/register --project tsconfig.json scripts/seed-bookings.ts"
   },
   "dependencies": {

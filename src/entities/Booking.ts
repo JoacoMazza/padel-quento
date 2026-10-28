@@ -35,7 +35,7 @@ export class Booking {
    * (bookings.booker_phone_number -> bookers.phone_number).
    */
   @ManyToOne("Booker", "bookings", { onUpdate: "CASCADE" })
-  @JoinColumn({ name: "booker_phone_number", referencedColumnName: "phoneNumber" })
+  @JoinColumn({ name: "booker_phone_number", foreignKeyConstraintName: "FK_bookings_booker_phone_number", referencedColumnName: "phoneNumber" })
   booker!: Booker;
 
   @ManyToOne("Court", (court: any) => court.bookings)

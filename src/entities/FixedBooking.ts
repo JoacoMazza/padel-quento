@@ -24,12 +24,12 @@ export class FixedBooking {
   id!: number;
 
   @ManyToOne("Court")
-  @JoinColumn({ name: "court_id" })
+  @JoinColumn({ name: "court_id", foreignKeyConstraintName: "FK_fixed_bookings_court_id" })
   court!: Court;
 
   // Igual que en Booking: quien reserva se identifica por su teléfono.
   @ManyToOne("Booker", { onUpdate: "CASCADE" })
-  @JoinColumn({ name: "booker_phone_number", referencedColumnName: "phoneNumber" })
+  @JoinColumn({ name: "booker_phone_number", foreignKeyConstraintName: "FK_fixed_bookings_booker_phone_number", referencedColumnName: "phoneNumber" })
   booker!: Booker;
 
   @Column({ type: "date", name: "start_date" })
