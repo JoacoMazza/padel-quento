@@ -18,15 +18,15 @@ export class PlayerReview {
   id!: number;
 
   @ManyToOne("Match", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "match_id" })
+  @JoinColumn({ name: "match_id", foreignKeyConstraintName: "FK_player_reviews_match_id" })
   match!: Match;
 
   @ManyToOne("Player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "reviewer_id" })
+  @JoinColumn({ name: "reviewer_id", foreignKeyConstraintName: "FK_player_reviews_reviewer_id" })
   reviewer!: Player;
 
   @ManyToOne("Player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "reviewed_id" })
+  @JoinColumn({ name: "reviewed_id", foreignKeyConstraintName: "FK_player_reviews_reviewed_id" })
   reviewed!: Player;
 
   @Column({ type: "enum", enum: ReviewLevel })

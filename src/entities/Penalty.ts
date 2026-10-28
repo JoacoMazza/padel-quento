@@ -15,7 +15,7 @@ export class Penalty {
   id!: number;
 
   @ManyToOne("Player", "penalties", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "player_id" })
+  @JoinColumn({ name: "player_id", foreignKeyConstraintName: "FK_penalties_player_id" })
   player!: Player;
 
   /** Puntos penalizados o bonificados (negativo para penalizaciones, positivo para bonificaciones) */

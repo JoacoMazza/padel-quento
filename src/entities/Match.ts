@@ -15,8 +15,8 @@ export class Match {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @OneToOne("Booking", "match")
-  @JoinColumn({ name: "booking_id" })
+  @OneToOne("Booking", "match", { onDelete: "CASCADE" })
+  @JoinColumn({ name: "booking_id", foreignKeyConstraintName: "FK_matches_booking_id" })
   booking!: Booking;
 
   @Column({ type: "boolean", default: true, name: "need_players" })
