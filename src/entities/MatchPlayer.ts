@@ -30,11 +30,11 @@ export class MatchPlayer {
   id!: number;
 
   @ManyToOne("Match", "matchPlayers", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "match_id" })
+  @JoinColumn({ name: "match_id", foreignKeyConstraintName: "FK_match_players_match_id" })
   match!: Match;
 
   @ManyToOne("Player", "matchParticipations", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "player_id" })
+  @JoinColumn({ name: "player_id", foreignKeyConstraintName: "FK_match_players_player_id" })
   player!: Player;
 
   @RelationId((matchPlayer: MatchPlayer) => matchPlayer.player)

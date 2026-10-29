@@ -1,6 +1,6 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
@@ -67,6 +67,8 @@ En Next.js App Router las Server Actions no pueden devolver instancias de clases
 
 - Los nombres de tablas y columnas siguen el DER (snake_case); las propiedades de las entidades TypeORM siguen en camelCase, mapeadas con `name` en `@Column`/`@JoinColumn`.
 - Al modificar una entidad, generar la migración correspondiente (`pnpm migration:generate src/migrations/NombreDelCambio`). No editar migraciones ya aplicadas.
+- La app nunca sincroniza el esquema (`synchronize: false`): solo cambia con migraciones corridas a mano. `test/integration/migrations.integration.test.ts` falla si las migraciones no dejan el mismo esquema que las entidades.
+- La base de producción (Supabase) es compartida: nunca correr comandos ni la app contra ella salvo que se pida explícitamente (ver README > Deploy).
 - **Checklist al crear una entidad nueva**:
   1. Exportarla en `src/entities/index.ts` (lo usan `db.ts` y `data-source.ts`).
   2. Registrarla en el array `entities` de `test/integration/global-setup.ts` (de lo contrario la DB de test no crea la tabla y fallan los tests de integración).

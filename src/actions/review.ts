@@ -6,7 +6,8 @@ import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 import type { PlayerReview } from "@/src/entities/PlayerReview";
 import { BookingState, ReviewLevel, type PlayerCategory } from "@/src/domain/enums";
 import { REVIEW_COMMENT_MAX_LENGTH } from "@/src/domain/constants";
-import { isWithinReviewWindow } from "@/src/domain/reputation";
+import { isWithinReviewWindow, NEGATIVE_REVIEW_REASON, negativeReviewPoints } from "@/src/domain/reputation";
+import { recordPointsMovement } from "@/src/actions/profile";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import type { ActionResult } from "@/src/lib/action-result";
@@ -94,7 +95,10 @@ export async function getReviewableTeammates(matchId: number): Promise<ActionRes
   }
 }
 
-/** Guarda la reseña del jugador de la sesión sobre un compañero del partido (HU-36). */
+/**
+ * Guarda la reseña del jugador de la sesión sobre un compañero del partido (HU-36).
+ * Si es negativa, le descuenta puntos al reseñado (issue #73).
+ */
 export async function submitPlayerReview(input: SubmitPlayerReviewInput): Promise<ActionResult<null>> {
   try {
     const playerId = await getSessionPlayerId();
@@ -125,6 +129,10 @@ export async function submitPlayerReview(input: SubmitPlayerReviewInput): Promis
         comment,
       }),
     );
+
+    // Una reseña negativa descuenta puntos al reseñado (issue #73); el saldo nunca baja de 0.
+    const points = negativeReviewPoints(input);
+    if (points > 0) await recordPointsMovement(input.reviewedPlayerId, points, "penalty", NEGATIVE_REVIEW_REASON);
     return { success: true, data: null };
   } catch (error) {
     if (error instanceof ReviewError) return { success: false, error: error.message };

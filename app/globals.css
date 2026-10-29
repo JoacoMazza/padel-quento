@@ -43,10 +43,36 @@
   --font-mono: var(--font-geist-mono), monospace;
 }
 
+/* Animaciones propias (utilidades animate-*). */
+@theme {
+  /* Despliega un menú de arriba hacia abajo: se revela desde su borde superior. */
+  --animate-slide-down: slide-down 200ms ease-out;
+
+  @keyframes slide-down {
+    from {
+      clip-path: inset(0 0 100% 0);
+    }
+    to {
+      clip-path: inset(0);
+    }
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-jakarta), Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Área mínima de 44 × 44 px en pantallas táctiles para los controles armados con
+ * utilidades sueltas (los que usan .btn, .icon-btn, .chip o .field ya la tienen).
+ */
+@utility touch-target {
+  @media (pointer: coarse) {
+    min-height: --spacing(11);
+    min-width: --spacing(11);
+  }
 }
 
 /*
@@ -67,8 +93,9 @@ body {
     @apply inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-60;
   }
 
+  /* En pantallas táctiles (pointer-coarse) los controles chicos llegan a 44 px, para tocarlos sin errar. */
   .btn-sm {
-    @apply h-9 rounded-lg px-3.5 text-xs;
+    @apply h-9 rounded-lg px-3.5 text-xs pointer-coarse:h-11;
   }
 
   .btn-lg {
@@ -96,11 +123,11 @@ body {
   }
 
   .icon-btn {
-    @apply inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line text-foreground/60 transition-colors hover:border-foreground/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-line text-foreground/60 transition-colors hover:border-foreground/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:size-11;
   }
 
   .chip {
-    @apply inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-medium whitespace-nowrap text-foreground/80 transition-colors hover:border-foreground/30;
+    @apply inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-card px-4 text-sm font-medium whitespace-nowrap text-foreground/80 transition-colors hover:border-foreground/30 pointer-coarse:h-11;
   }
 
   .chip-active {
@@ -148,7 +175,7 @@ body {
   }
 
   .field {
-    @apply w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none;
+    @apply w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40 focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none pointer-coarse:min-h-11;
   }
 
   .field-label {
@@ -167,8 +194,9 @@ body {
     @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 backdrop-blur-[2px];
   }
 
+  /* dvh y no vh: en el celular 100vh incluye la barra del navegador y el panel quedaría cortado. */
   .modal-panel {
-    @apply w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl;
+    @apply max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-2xl;
   }
 
   .table-head {

@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingState, PlayerCategory, ReviewLevel, Role } from "@/src/domain/enums";
+import { NEGATIVE_REVIEW_POINTS } from "@/src/domain/constants";
+import { NEGATIVE_REVIEW_REASON } from "@/src/domain/reputation";
 import { reviewInviteNotice, type NotificationMessage, type NotificationRecipient } from "@/src/domain/notifications";
 import { getDataSource } from "@/src/lib/db";
 import { getReputations } from "@/src/lib/player-reviews";
@@ -252,6 +254,66 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
       const result = await submitPlayerReview({ matchId, reviewedPlayerId: bruno.id, ...answers, comment: "x".repeat(501) });
 
       expect(result).toEqual({ success: false, error: "El comentario puede tener hasta 500 caracteres." });
+    });
+  });
+
+  describe("puntos por reseñas negativas", () => {
+    async function scoringOf(player: TestPlayer) {
+      asAdmin();
+      const record = await getPlayerRecordAdmin(player.id);
+      if (!record.success) throw new Error(record.error);
+      return record.data;
+    }
+
+    it("una reseña negativa le descuenta puntos al reseñado, con un motivo en su historial", async () => {
+      const { matchId } = await playedMatch();
+      await recordPointsMovement(carla.id, 100, "bonus", "Puntos de prueba");
+      const before = (await scoringOf(carla)).scoring;
+      signedInAs(ana);
+
+      const result = await submitPlayerReview({
+        matchId,
+        reviewedPlayerId: carla.id,
+        level: ReviewLevel.LOWER,
+        goodAttitude: false,
+        onTime: false,
+      });
+
+      expect(result).toEqual({ success: true, data: null });
+      const record = await scoringOf(carla);
+      expect(record.scoring).toBe(before - 3 * NEGATIVE_REVIEW_POINTS);
+      expect(record.movements[0]).toMatchObject({ amount: -3 * NEGATIVE_REVIEW_POINTS, description: NEGATIVE_REVIEW_REASON });
+    });
+
+    it("una reseña no negativa no modifica los puntos", async () => {
+      const { matchId } = await playedMatch();
+      await recordPointsMovement(carla.id, 50, "bonus", "Puntos de prueba");
+      const before = await scoringOf(carla);
+      signedInAs(ana);
+
+      await submitPlayerReview({ matchId, reviewedPlayerId: carla.id, ...answers });
+
+      const after = await scoringOf(carla);
+      expect(after.scoring).toBe(before.scoring);
+      expect(after.movements).toHaveLength(before.movements.length);
+    });
+
+    it("el saldo nunca queda por debajo de 0", async () => {
+      const helena = await newPlayer("Helena");
+      const { matchId } = await playedMatch();
+      const dataSource = await getDataSource();
+      await dataSource
+        .getRepository<MatchPlayer>("MatchPlayer")
+        .update({ match: { id: matchId }, player: { id: carla.id } }, { player: { id: helena.id } });
+      await recordPointsMovement(helena.id, 3, "bonus", "Puntos de prueba");
+      signedInAs(ana);
+
+      const result = await submitPlayerReview({ matchId, reviewedPlayerId: helena.id, ...answers, onTime: false });
+
+      expect(result).toEqual({ success: true, data: null });
+      const record = await scoringOf(helena);
+      expect(record.scoring).toBe(0);
+      expect(record.movements[0]).toMatchObject({ amount: -3, description: NEGATIVE_REVIEW_REASON });
     });
   });
 

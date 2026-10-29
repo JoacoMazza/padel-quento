@@ -154,7 +154,7 @@ export function UsersTable({ players: initialPlayers }: { players: PlayerAdminIt
                             }
                             title={player.isBlocked ? "Desbloquear" : "Bloquear"}
                             onClick={() => handleToggleBlock(player)}
-                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                               player.isBlocked
                                 ? "bg-success/10 text-success hover:bg-success/20"
                                 : "bg-danger/10 text-danger hover:bg-danger/20"

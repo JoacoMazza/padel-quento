@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
@@ -227,18 +227,55 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
   const [activeSection, setActiveSection] = useState<SectionId>("schedule");
   const [visitedSections, setVisitedSections] = useState<SectionId[]>(["schedule"]);
   const sections = SECTIONS.filter((section) => isOwner || !section.ownerOnly);
-  const activeLabel = sections.find((s) => s.id === activeSection)?.label ?? "";
+  const activeSectionItem = sections.find((s) => s.id === activeSection);
+  const activeLabel = activeSectionItem?.label ?? "";
+  const ActiveIcon = activeSectionItem?.icon;
+  // Debajo de lg las secciones van en un menú hamburguesa; desde lg se ven siempre en la barra lateral.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Tocar fuera del menú lo cierra (pointerdown, como en MobileNav, para que funcione en iOS).
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    function onPointerDownOutside(event: PointerEvent) {
+      if (asideRef.current && !asideRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDownOutside);
+    return () => document.removeEventListener("pointerdown", onPointerDownOutside);
+  }, [isMenuOpen]);
 
   function openSection(id: SectionId) {
     setActiveSection(id);
+    setIsMenuOpen(false);
     setVisitedSections((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-line bg-card">
-        <p className="label-caps px-6 pt-6 pb-2">Panel operativo</p>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+    // Debajo de lg la barra lateral pasa a ser un menú hamburguesa arriba del contenido.
+    <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+      <aside ref={asideRef} className="relative flex shrink-0 flex-col border-b border-line bg-card lg:w-64 lg:overflow-hidden lg:border-r lg:border-b-0">
+        <p className="label-caps hidden px-6 pt-6 pb-2 lg:block">Panel operativo</p>
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((v) => !v)}
+          aria-expanded={isMenuOpen}
+          aria-controls="admin-sections"
+          aria-label={isMenuOpen ? "Cerrar secciones" : "Abrir secciones"}
+          className="flex h-12 w-full cursor-pointer items-center justify-between gap-3 px-6 text-sm font-semibold text-foreground lg:hidden"
+        >
+          <span className="flex items-center gap-3">
+            {ActiveIcon ? <ActiveIcon className="h-5 w-5 text-primary" /> : null}
+            {activeLabel}
+          </span>
+          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+        {/* En pantallas chicas se despliega de arriba hacia abajo, sobre el contenido. */}
+        <nav
+          id="admin-sections"
+          className={`${isMenuOpen ? "flex" : "hidden"} absolute inset-x-0 top-full z-30 flex-col gap-1 border-b border-line bg-card px-3 py-2 shadow-lg motion-safe:animate-slide-down lg:static lg:z-auto lg:flex lg:flex-1 lg:overflow-y-auto lg:border-b-0 lg:shadow-none lg:motion-safe:animate-none`}
+        >
           {sections.map(({ id, label, icon: Icon, available }) => {
             const isActive = id === activeSection;
             if (!available) {
@@ -261,7 +298,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
                 type="button"
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => openSection(id)}
-                className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors pointer-coarse:py-3 ${
                   isActive ? "bg-primary-light text-primary" : "text-foreground/70 hover:bg-background hover:text-foreground"
                 }`}
               >
@@ -272,12 +309,13 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-line px-3 py-4">
+        {/* En pantallas chicas Cerrar sesión queda solo en el menú de usuario del header. */}
+        <div className="hidden shrink-0 border-t border-line px-3 py-4 lg:block">
           <SignOutButton />
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto px-8 py-10">
+      <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-8 lg:py-10">
         <p className="eyebrow mb-2">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Administración · Quento Club

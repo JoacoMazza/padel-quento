@@ -112,6 +112,34 @@ describe("OccupancyMetrics", () => {
     expect(within(bySlot).getByText("11:00")).toBeTruthy();
   });
 
+  it("los gráficos por día y por turno van en una columna que se achica al ancho de la pantalla, y en dos desde xl", async () => {
+    await renderLastWeek();
+
+    const grid = (await screen.findByRole("region", { name: "Ocupación por día de la semana" })).parentElement!;
+    expect(grid.contains(screen.getByRole("region", { name: "Ocupación por turno" }))).toBe(true);
+    // grid-cols-1 es minmax(0, 1fr): sin él la columna toma el ancho del contenido y desborda en el celular.
+    expect(grid.className.split(" ")).toEqual(expect.arrayContaining(["grid-cols-1", "xl:grid-cols-2"]));
+  });
+
+  it("las columnas no se achican hasta encimar sus textos: si no entran, el gráfico scrollea en horizontal", async () => {
+    await renderLastWeek();
+
+    const bySlot = await screen.findByRole("region", { name: "Ocupación por turno" });
+    const column = within(bySlot).getByRole("img", { name: "09:30 a 11:00: 50,00%" }).parentElement!.parentElement!;
+    expect(column.className.split(" ")).toContain("min-w-11");
+    expect(column.className.split(" ")).not.toContain("min-w-0");
+    expect(column.parentElement!.parentElement!.className.split(" ")).toContain("overflow-x-auto");
+  });
+
+  it("los chips de período llegan a 44 px en pantallas táctiles", async () => {
+    render(<OccupancyMetrics />);
+    await screen.findByTestId("kpi-occupancy");
+
+    expect(screen.getByRole("button", { name: "Últimos 7 días" }).className.split(" ")).toEqual(
+      expect.arrayContaining(["h-9", "pointer-coarse:h-11"]),
+    );
+  });
+
   it("muestra el mapa de los turnos más solicitados por día y turno", async () => {
     await renderLastWeek();
 

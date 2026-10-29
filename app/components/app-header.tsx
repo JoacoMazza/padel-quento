@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { QuentoLogo } from "@/app/components/quento-logo";
 import { UserMenu } from "@/app/components/user-menu";
+import { MobileNav } from "@/app/components/mobile-nav";
 import { Role } from "@/src/domain/enums";
 
 export type HeaderActiveTab =
@@ -49,6 +50,8 @@ export function AppHeader({
   /** Visitante sin sesión: ve solo las secciones públicas y los accesos para entrar o registrarse. */
   guest?: boolean;
 }) {
+  const navItems = NAV_ITEMS.filter((item) => !guest || item.guest);
+
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">
       {/* Tres columnas en una fila: logo a la izquierda, navegación centrada y menú de usuario a la derecha.
@@ -68,9 +71,9 @@ export function AppHeader({
           </Link>
         )}
         {showNav ? (
-          // Si no entra en pantallas chicas, scrollea en horizontal.
-          <nav className="flex min-w-0 gap-1 overflow-x-auto">
-            {NAV_ITEMS.filter((item) => !guest || item.guest).map((item) => {
+          // En pantallas chicas no entra en una fila: los links pasan al menú desplegable (MobileNav).
+          <nav className="hidden min-w-0 gap-1 lg:flex">
+            {navItems.map((item) => {
               const isActive = item.href === active;
               return (
                 <Link
@@ -85,7 +88,7 @@ export function AppHeader({
             })}
           </nav>
         ) : null}
-        <div className="col-start-3 justify-self-end">
+        <div className="col-start-3 flex items-center gap-2 justify-self-end">
           {guest ? (
             <div className="flex items-center gap-2">
               <Link href="/login" className="btn btn-outline btn-sm">
@@ -99,6 +102,7 @@ export function AppHeader({
           ) : (
             <UserMenu name={userName} email={userEmail} role={userRole} />
           )}
+          {showNav ? <MobileNav items={navItems} active={active} /> : null}
         </div>
       </div>
     </header>

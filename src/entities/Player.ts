@@ -14,7 +14,7 @@ import type { MatchPlayer } from "@/src/entities/MatchPlayer";
 @ChildEntity()
 export class Player extends Booker {
   @OneToOne("Account", "player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "account_id" })
+  @JoinColumn({ name: "account_id", foreignKeyConstraintName: "FK_bookers_account_id" })
   account!: Account;
 
   @Column({

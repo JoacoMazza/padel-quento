@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import * as entities from "@/src/entities";
+import { databaseSsl } from "@/src/lib/db-ssl";
 
 const globalForDb = globalThis as unknown as {
   dataSource?: DataSource;
@@ -16,9 +17,15 @@ function createDataSource() {
   return new DataSource({
     type: "postgres",
     url,
+    ssl: databaseSsl(),
     entities: entities,
-    synchronize: process.env.NODE_ENV !== "production",
+    // La base es compartida por el equipo: el esquema cambia solo con migraciones
+    // corridas a mano (pnpm migration:run), nunca al levantar la app.
+    synchronize: false,
     logging: process.env.NODE_ENV === "development",
+    // En Vercel cada instancia abre su propio pool: con pocas conexiones por
+    // instancia no se agotan las del session pooler de Supabase.
+    extra: process.env.VERCEL ? { max: 2 } : undefined,
   });
 }
 
@@ -38,7 +45,7 @@ export async function getDataSource() {
 
   // Los procesos en segundo plano piden la conexión todos juntos al arrancar:
   // comparten la misma inicialización en curso para no crear varias conexiones
-  // que sincronicen el esquema a la vez. Si falla, se descarta para reintentar.
+  // a la vez. Si falla, se descarta para reintentar.
   globalForDb.dataSourceInit ??= initializeDataSource().finally(() => {
     globalForDb.dataSourceInit = undefined;
   });

@@ -29,7 +29,7 @@ export function SummaryHeader({
           type="button"
           onClick={onClose}
           aria-label="Cerrar"
-          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-white/10 p-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+          className="flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-lg bg-white/10 p-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 pointer-coarse:size-11"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -110,7 +110,7 @@ export function GroupSizePicker({
             aria-label={`${size} jugador${size === 1 ? "" : "es"}`}
             aria-pressed={value === size}
             onClick={() => onChange(size)}
-            className={`h-10 cursor-pointer rounded-lg text-sm font-semibold transition-colors ${
+            className={`h-10 cursor-pointer rounded-lg text-sm font-semibold transition-colors pointer-coarse:h-11 ${
               value === size ? "bg-white text-ink" : "bg-white/5 text-white ring-1 ring-white/10 hover:bg-white/10"
             }`}
           >

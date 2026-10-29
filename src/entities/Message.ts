@@ -16,11 +16,11 @@ export class Message {
   id!: number;
 
   @ManyToOne("Chat", "messages", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "chat_id" })
+  @JoinColumn({ name: "chat_id", foreignKeyConstraintName: "FK_messages_chat_id" })
   chat!: Chat;
 
   @ManyToOne("Player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "sender_id" })
+  @JoinColumn({ name: "sender_id", foreignKeyConstraintName: "FK_messages_sender_id" })
   sender!: Player;
 
   @Column({ type: "text" })

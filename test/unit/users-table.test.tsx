@@ -187,3 +187,33 @@ describe("UsersTable - ficha del jugador", () => {
     });
   });
 });
+
+describe("UsersTable - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("bloquear desde la tabla y los accesos de contacto de la ficha son áreas de al menos 44 px", async () => {
+    getPlayerRecordAdmin.mockResolvedValue({ success: true, data: record });
+    render(<UsersTable players={[player]} />);
+    const blockInTable = screen.getByRole("button", { name: "Bloquear a Ana" });
+    expect(blockInTable.className.split(" ")).toContain("touch-target");
+
+    const dialog = await openRecord();
+    expect((await within(dialog).findByRole("link", { name: /whatsapp/i })).className.split(" ")).toContain(
+      "touch-target",
+    );
+    expect(within(dialog).getByRole("link", { name: /email/i }).className.split(" ")).toContain("touch-target");
+    expect(within(dialog).getByRole("button", { name: "Bloquear a Ana" }).className.split(" ")).toContain("touch-target");
+  });
+
+  it("los campos para cambiar la categoría y descontar puntos son áreas de al menos 44 px", async () => {
+    getPlayerRecordAdmin.mockResolvedValue({ success: true, data: record });
+    render(<UsersTable players={[player]} />);
+    const dialog = await openRecord();
+
+    for (const label of ["Categoría", "Puntos a descontar", "Motivo"]) {
+      expect((await within(dialog).findByLabelText(label)).className.split(" ")).toContain("touch-target");
+    }
+  });
+});

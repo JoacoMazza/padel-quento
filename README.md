@@ -64,7 +64,7 @@ Después de un partido abierto, cada jugador que asistió puede calificar a sus 
 
 - La reputación se muestra en porcentajes (puntualidad, buena actitud, nivel acorde) desde las 3 reseñas, en el detalle de los partidos abiertos y en el perfil del propio jugador. Es anónima: los jugadores no ven quién dijo qué.
 - El admin ve en la ficha del jugador la reputación, alertas cuando algo baja del 70% y cada reseña con su comentario y quién la dejó. Desde ahí puede cambiarle la categoría o descontarle puntos con un motivo.
-- Las reseñas no tocan los puntos de fidelidad. La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
+- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
 
 ## Acceso sin sesión
 
@@ -119,12 +119,15 @@ Variables relevantes en `.env`:
 | Variable | Descripción |
 | --- | --- |
 | `DATABASE_URL` | Cadena de conexión a Postgres (`postgres://usuario:password@localhost:5432/db`) |
+| `DATABASE_SSL_CA` | Certificado de la CA de Supabase, para conectarse por SSL (solo producción, ver [Deploy](#deploy-supabase); vacío en local) |
 | `NEXTAUTH_SECRET` | Secreto usado por NextAuth para firmar sesiones |
 | `NEXTAUTH_URL` | URL base de la app (`http://localhost:3000` en desarrollo) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
 | `TZ` | Zona horaria del proceso (`America/Argentina/Buenos_Aires`); definirla también en el despliegue de producción |
+| `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
+| `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |
 
 ### Avisos a los jugadores (correo y WhatsApp)
 
@@ -168,9 +171,17 @@ Con Docker Compose se levanta un Postgres local usando las credenciales definida
 docker compose up -d
 ```
 
-En desarrollo y en los tests, el esquema se sincroniza automáticamente contra las entidades de TypeORM al iniciar la app (`synchronize` está habilitado fuera de producción), por lo que no hace falta correr migraciones para trabajar localmente.
+La app **no** crea ni modifica el esquema al levantarse (`synchronize` está deshabilitado siempre): el esquema se crea y se actualiza solo con migraciones, corridas a mano. Con la base recién levantada:
 
-En producción (o en cualquier entorno donde `synchronize` esté deshabilitado) el esquema se provee con migraciones — ver la sección siguiente.
+```bash
+pnpm migration:run
+```
+
+Después de cada `git pull` que traiga migraciones nuevas, volver a correr `pnpm migration:run`.
+
+> Si tu base local se creó antes de este cambio (con `synchronize`), `migration:run` falla porque las tablas ya existen. Recreala: `docker compose down -v && docker compose up -d`, luego `pnpm migration:run` y `pnpm db:seed`.
+
+Los tests de integración no usan migraciones: `test/integration/global-setup.ts` recrea la base de test desde las entidades en cada corrida.
 
 ### 4. Migraciones
 
@@ -184,13 +195,14 @@ pnpm migration:generate src/migrations/NombreDelCambio # genera una migración a
 pnpm migration:create src/migrations/NombreDelCambio   # crea una migración vacía para escribir a mano
 ```
 
-> **En tu base de datos de desarrollo local no hace falta correr `pnpm migration:run`.** Como el esquema ya se creó por `synchronize`, aplicar la migración inicial fallaría porque las tablas ya existen. Las migraciones están pensadas para bases de datos nuevas (producción, CI, la máquina de un compañero que recién clona el repo).
-
-Al modificar una entidad, generar la migración correspondiente para que quede versionada:
+Al modificar una entidad, generar la migración correspondiente (contra tu base local, con todas las migraciones anteriores aplicadas) y aplicarla:
 
 ```bash
 pnpm migration:generate src/migrations/AgregarCampoX
+pnpm migration:run
 ```
+
+Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migración rompe la app en la base de cualquiera que no la tenga. Por eso [test/integration/migrations.integration.test.ts](test/integration/migrations.integration.test.ts) aplica todas las migraciones sobre una base vacía y falla si el esquema que dejan no es exactamente el que declaran las entidades (incluidos los nombres de foreign keys, índices y uniques: si una relación nueva no declara `foreignKeyConstraintName`, la migración generada usa el nombre que elige TypeORM, y está bien).
 
 ### 5. Datos de ejemplo (seed)
 
@@ -198,7 +210,7 @@ pnpm migration:generate src/migrations/AgregarCampoX
 pnpm db:seed
 ```
 
-Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
@@ -210,7 +222,90 @@ pnpm db:seed:bookings
 
 Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
 
-> Si tu base de desarrollo es anterior a la división de `users` en `accounts`/`admins`/`bookers`, `synchronize` no migra los datos (crea las tablas nuevas vacías y deja `users` huérfana). Lo más simple es recrearla (`docker compose down -v && docker compose up -d`), levantar la app una vez (`pnpm dev`) para que `synchronize` cree las tablas y recién ahí correr el seed: el seed usa la `DataSource` de CLI, que no sincroniza el esquema, así que sobre una base vacía falla con `no existe la relación «courts»`. Las bases gestionadas con migraciones conservan sus datos: `SplitUsersIntoAccounts` los copia de `users` a las tablas nuevas.
+> Los seeds no crean el esquema: sobre una base sin migraciones fallan con `no existe la relación «courts»`. Correr antes `pnpm migration:run`.
+
+## Deploy (Supabase)
+
+La base de producción está en Supabase, en una cuenta compartida por el equipo. Para no romperla:
+
+- **Nadie desarrolla contra la base de producción.** Cada uno trabaja con su Postgres local (Docker). La app local, apuntada a Supabase, también correría contra producción los procesos en segundo plano (vencimiento de partidos, puntos de asistencia, turnos fijos).
+- **Las migraciones se corren a mano y solo desde `main`**, después de mergear el PR que las trae. Nunca desde una rama.
+- **Nunca correr `pnpm db:seed` ni `pnpm db:seed:bookings` contra producción**: crean cuentas con contraseñas que están en este repo.
+
+El build de producción no minifica el código del servidor (`experimental.turbopackMinify` en [next.config.ts](next.config.ts)): al minificarlo se renombran las clases de las entidades, y TypeORM, que busca las entidades por nombre de clase (relaciones como `@OneToOne("Admin", ...)` y `getRepository("Account")`), deja de encontrarlas y fallan el login y todas las páginas con datos (issue #85). El código del navegador se sigue minificando. `test/unit/next-config.test.ts` falla si se vuelve a activar.
+
+### Configuración en el panel de Supabase
+
+1. **Cadena de conexión:** botón **Connect** → **Session pooler** (puerto 5432). Sirve para todo: la app, las migraciones y los seeds. La conexión directa (`db.<ref>.supabase.co`) solo funciona por IPv6, y el *transaction pooler* (6543) no sirve para migraciones. Si la contraseña tiene caracteres especiales (`@`, `#`, `/`, ...), van codificados (`encodeURIComponent`).
+2. **Certificado SSL:** **Database Settings** → **SSL Configuration** → **Download certificate**. Guardarlo como `supabase-ca.crt` en la raíz del repo (no se commitea, ver `.gitignore`). Supabase firma sus certificados con una CA propia, así que sin él la conexión SSL falla (`self-signed certificate in certificate chain`). Con la variable `DATABASE_SSL_CA` la app y la CLI verifican el servidor contra esa CA ([src/lib/db-ssl.ts](src/lib/db-ssl.ts)). No agregar `sslmode` a la URL: pisa esa configuración.
+3. **Enforce SSL:** en la misma sección, activar **Enforce SSL on incoming connections**, para que una conexión sin SSL falle en vez de viajar sin cifrar.
+4. **Data API:** Supabase expone las tablas de `public` por una API REST a cualquiera con la clave pública del proyecto. La app no la usa, y la migración `RevokeDataApiAccess` les quita los permisos a sus roles (`anon` y `authenticated`) sobre las tablas actuales y futuras. Además se puede apagar desde **Project Settings** → **Data API**.
+
+### Correr comandos contra Supabase
+
+Crear `.env.supabase` en la raíz (no se commitea: `.gitignore` ignora `.env*`):
+
+```bash
+DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+DATABASE_SSL_CA="$(cat supabase-ca.crt)"
+
+# Solo para el primer deploy (pnpm db:seed:prod); borrarlas después.
+SEED_OWNER_EMAIL=
+SEED_OWNER_PASSWORD=
+SEED_OWNER_NAMES=
+SEED_OWNER_LASTNAMES=
+SEED_OWNER_DNI=
+```
+
+Y correr los comandos dentro de un subshell que la cargue (en Git Bash, en Windows), así las variables no quedan en la terminal y el próximo `pnpm dev` sigue usando la base local:
+
+```bash
+(set -a; source .env.supabase; pnpm migration:show)   # ver qué migraciones faltan aplicar
+(set -a; source .env.supabase; pnpm migration:run)
+```
+
+Las variables de la terminal tienen prioridad sobre las de `.env`.
+
+### Primer deploy
+
+1. Hacer la [configuración en el panel](#configuración-en-el-panel-de-supabase) y crear `.env.supabase`.
+2. Aplicar las migraciones: `(set -a; source .env.supabase; pnpm migration:run)`.
+3. Cargar los datos iniciales: `(set -a; source .env.supabase; pnpm db:seed:prod)`.
+
+   Crea, si no existen, las 8 canchas con su horario de 09:00 a 23:00 los 7 días (igual que el seed de desarrollo) y la cuenta del dueño con los datos de las variables `SEED_OWNER_*` (sin puntos en el DNI). Sin esas variables, crea solo las canchas. No crea cuentas de prueba. Es idempotente: no duplica canchas ni horarios, y si ya hay una cuenta con ese email no crea el dueño. El resto del equipo (trabajadores) lo da de alta el dueño desde el panel.
+4. Deployar la app con estas variables de entorno:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `DATABASE_URL` | La del session pooler (paso 1 del panel) |
+   | `DATABASE_SSL_CA` | El contenido de `supabase-ca.crt` (ver abajo si el hosting no acepta varias líneas) |
+   | `NEXTAUTH_SECRET` | Un secreto nuevo, distinto del de desarrollo (`openssl rand -base64 32`) |
+   | `NEXTAUTH_URL` | La URL pública de la app |
+   | `SMTP_*` / `WHATSAPP_*` | Las de producción, si se usan los avisos |
+
+   Si el panel del hosting no acepta valores de varias líneas, `DATABASE_SSL_CA` se puede cargar en una sola, con `\n` en lugar de cada salto. Este comando la imprime así:
+
+   ```bash
+   awk '{printf "%s%cn", $0, 92}' supabase-ca.crt   # 92 es la barra invertida
+   ```
+
+   Los procesos en segundo plano ([instrumentation.ts](instrumentation.ts)) corren mientras el servidor está levantado: en un hosting con `pnpm start` como proceso permanente andan solos. En un hosting serverless como Vercel no, y los corre un programador externo (ver [Deploy en Vercel](#deploy-en-vercel)).
+
+## Deploy en Vercel
+
+Vercel es serverless: levanta la app solo cuando llega un pedido y la apaga después, así que no hay un servidor prendido para los `setInterval` de los procesos en segundo plano (vencimiento de partidos abiertos, puntos por asistencia y extensión de turnos fijos). Por eso:
+
+- En Vercel (variable `VERCEL`, la define la plataforma) `instrumentation.ts` no los arranca.
+- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `fixed-booking-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
+- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos y los puntos, y cada 6 horas los turnos fijos. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
+- Cada instancia usa como mucho 2 conexiones a la base ([src/lib/db.ts](src/lib/db.ts)), para no agotar las del session pooler de Supabase.
+
+Pasos:
+
+1. En Vercel, **Add New → Project** e importar el repo de GitHub. Vercel detecta Next.js y pnpm solo (build `pnpm build`).
+2. En **Settings → Environment Variables** (entorno *Production*) cargar las variables de la tabla del [primer deploy](#primer-deploy) y además `CRON_SECRET` (un valor nuevo, por ejemplo `openssl rand -base64 32`). `NEXTAUTH_URL` es la URL pública que asigna Vercel (por ejemplo `https://padel-quento.vercel.app`).
+3. Deployar. Las migraciones no corren solas: se aplican a mano antes de cada deploy que las necesite (ver [Correr comandos contra Supabase](#correr-comandos-contra-supabase)).
+4. En GitHub, **Settings → Secrets and variables → Actions → New repository secret**: `APP_URL` (la misma URL pública) y `CRON_SECRET` (el mismo valor que en Vercel). Sin esos secrets el workflow avisa y no corre nada.
 
 ## Comandos importantes
 
@@ -231,7 +326,8 @@ pnpm migration:create src/migrations/NombreDelCambio    # crea una migración va
 pnpm migration:run                                      # aplica las migraciones pendientes
 pnpm migration:revert                                   # revierte la última migración aplicada
 pnpm migration:show                                     # lista migraciones aplicadas/pendientes
-pnpm db:seed                                             # crea 8 canchas con horario 09-23hs todos los días (idempotente)
+pnpm db:seed                                             # desarrollo: 8 canchas con horario 09-23hs y cuentas de prueba (idempotente)
+pnpm db:seed:prod                                        # producción: 8 canchas con horario 09-23hs y el dueño de SEED_OWNER_* (idempotente)
 pnpm db:seed:bookings                                    # crea turnos de ejemplo alrededor de la fecha actual, para las métricas
 ```
 
