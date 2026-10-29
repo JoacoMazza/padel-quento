@@ -83,6 +83,7 @@ export function CourtsTable({ courts: initialCourts, isOwner }: { courts: CourtI
           <thead className="border-b border-line bg-background/60">
             <tr>
               <th className="table-head">Cancha</th>
+              <th className="table-head">Complejo</th>
               <th className="table-head">Precio</th>
               <th className="table-head">Estado</th>
               <th className="table-head text-right">Acciones</th>
@@ -99,6 +100,22 @@ export function CourtsTable({ courts: initialCourts, isOwner }: { courts: CourtI
                       <CourtTag number={court.number} size="sm" />
                       <span className="font-semibold text-foreground">Cancha {court.number}</span>
                     </div>
+                  </td>
+                  <td className="table-cell">
+                    {court.location ? (
+                      <div>
+                        <p className="font-semibold text-foreground">{court.location.name}</p>
+                        <a
+                          href={court.location.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Ver ubicación en Google Maps"
+                          className="text-xs text-foreground/60 transition-colors hover:text-primary"
+                        >
+                          {court.location.address}, {court.location.city}
+                        </a>
+                      </div>
+                    ) : null}
                   </td>
                   <td className="table-cell text-foreground/70">{formatPrice(court.price)}</td>
                   <td className="table-cell">

@@ -1,4 +1,5 @@
 import { BookingState } from "@/src/domain/enums";
+import type { ComplexLocation } from "@/src/domain/complex";
 
 export type MyBookingItem = {
   id: number;
@@ -6,6 +7,8 @@ export type MyBookingItem = {
   durationMinutes: number;
   bookingState: BookingState;
   courtNumber: number;
+  /** Complejo donde está la cancha. */
+  location?: ComplexLocation;
   price: number;
   /** Id del partido abierto asociado, si lo hay. */
   matchId: number | null;

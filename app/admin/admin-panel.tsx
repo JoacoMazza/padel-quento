@@ -14,6 +14,7 @@ import { TeamPanel } from "@/app/admin/team-panel";
 import { getTeam } from "@/src/actions/admin";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
+import { toComplexLocation } from "@/src/domain/complex";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
@@ -83,6 +84,7 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
         state: c.state,
         price: c.price,
         activeOutOfService: active ? { id: active.id, reason: active.reason, toDateTime: active.toDateTime } : null,
+        location: c.complex ? toComplexLocation(c.complex) : undefined,
       };
     }),
   };

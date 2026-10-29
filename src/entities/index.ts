@@ -3,6 +3,7 @@ import { Admin } from "@/src/entities/Admin";
 import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
+import { Complex } from "@/src/entities/Complex";
 import { Court } from "@/src/entities/Court";
 import { FixedBooking } from "@/src/entities/FixedBooking";
 import { FixedBookingDate } from "@/src/entities/FixedBookingDate";
@@ -15,4 +16,4 @@ import { Player } from "@/src/entities/Player";
 import { PlayerReview } from "@/src/entities/PlayerReview";
 import { Schedule } from "@/src/entities/Schedule";
 
-export { Account, Admin, Booker, Booking, Chat, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, PlayerReview, Schedule };
+export { Account, Admin, Booker, Booking, Chat, Complex, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, PlayerReview, Schedule };

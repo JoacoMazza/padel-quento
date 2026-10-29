@@ -97,6 +97,14 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
     expect(joined.court.id).toBe(courtId);
   });
 
+  it("trae el complejo de la cancha de cada turno, para mostrar dónde se juega", async () => {
+    const bookings = await getPlayerBookings(ana);
+
+    for (const booking of bookings) {
+      expect(booking.court.complex).toMatchObject({ name: expect.any(String), city: expect.any(String) });
+    }
+  });
+
   it("no trae turnos del resto del club", async () => {
     const bookings = await getPlayerBookings(ana);
 

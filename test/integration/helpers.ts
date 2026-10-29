@@ -1,6 +1,7 @@
 import { AdminAccessLevel, CourtState } from "@/src/domain/enums";
 import type { Account } from "@/src/entities/Account";
 import type { Admin } from "@/src/entities/Admin";
+import type { Complex } from "@/src/entities/Complex";
 import type { Court } from "@/src/entities/Court";
 import { getDataSource } from "@/src/lib/db";
 
@@ -40,12 +41,36 @@ export async function createTestAdmin(accessLevel: AdminAccessLevel = AdminAcces
 }
 
 /**
+ * Complejo del club en la base de test (el de menor id, como el que usa createCourt):
+ * lo crea si todavía no hay ninguno.
+ */
+export async function ensureTestComplex() {
+  const dataSource = await getDataSource();
+  const complexes = dataSource.getRepository<Complex>("Complex");
+  const [existing] = await complexes.find({ order: { id: "ASC" }, take: 1 });
+  if (existing) return existing;
+  return complexes.save(
+    complexes.create({
+      name: "Quento Club",
+      address: "Cam. Centenario 8907",
+      city: "Villa Elisa",
+      province: "Buenos Aires",
+      postalCode: "B1894",
+      latitude: -34.863726,
+      longitude: -58.061057,
+      mapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+    }),
+  );
+}
+
+/**
  * Crea una cancha directo en la base para preparar un test (createCourt es solo
- * para el dueño). Devuelve lo mismo que createCourt.
+ * para el dueño), en el complejo del club. Devuelve lo mismo que createCourt.
  */
 export async function createTestCourt(input: { number: number; price: number; state?: CourtState }) {
   const dataSource = await getDataSource();
   const courts = dataSource.getRepository<Court>("Court");
-  const data = await courts.save(courts.create({ state: CourtState.AVAILABLE, ...input }));
+  const complex = await ensureTestComplex();
+  const data = await courts.save(courts.create({ state: CourtState.AVAILABLE, complex, ...input }));
   return { success: true as const, data };
 }

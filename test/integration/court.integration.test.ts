@@ -8,7 +8,8 @@ import {
   updateAllCourtsPrice,
   updateCourt,
 } from "@/src/actions/court";
-import { createTestAdmin, createTestCourt, uniqueCourtNumber } from "./helpers";
+import type { Court } from "@/src/entities/Court";
+import { createTestAdmin, createTestCourt, ensureTestComplex, uniqueCourtNumber } from "./helpers";
 
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 
@@ -18,6 +19,7 @@ describe("court actions (integración con Postgres real)", () => {
   // Editar canchas es solo para administradores; precios, altas y bajas, solo para el dueño.
   let ownerEmail: string;
   let staffEmail: string;
+  let complexId: number;
 
   function signInAs(email: string) {
     vi.mocked(getServerSession).mockResolvedValue({ user: { email, role: Role.ADMIN } } as never);
@@ -26,6 +28,7 @@ describe("court actions (integración con Postgres real)", () => {
   beforeAll(async () => {
     ownerEmail = (await createTestAdmin(AdminAccessLevel.OWNER)).email;
     staffEmail = (await createTestAdmin(AdminAccessLevel.STAFF)).email;
+    complexId = (await ensureTestComplex()).id;
   });
 
   beforeEach(() => {
@@ -52,6 +55,34 @@ describe("court actions (integración con Postgres real)", () => {
     if (!result.success) throw new Error("expected success");
     expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE, price: 10000 });
     expect(result.data.id).toBeDefined();
+  });
+
+  it("asocia la cancha nueva al complejo del club", async () => {
+    const result = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    if (!result.success) throw new Error(result.error);
+
+    const dataSource = await getDataSource();
+    const saved = await dataSource
+      .getRepository<Court>("Court")
+      .findOneOrFail({ where: { id: result.data.id }, relations: { complex: true } });
+    expect(saved.complex.id).toBe(complexId);
+  });
+
+  it("lista las canchas con su complejo y su ubicación", async () => {
+    const number = uniqueCourtNumber();
+    await createCourt({ number, price: 10000 });
+
+    const result = await getCourts();
+
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.find((c) => c.number === number)?.complex).toMatchObject({
+      id: complexId,
+      name: expect.any(String),
+      address: expect.any(String),
+      city: expect.any(String),
+      latitude: expect.any(Number),
+      longitude: expect.any(Number),
+    });
   });
 
   it("no permite crear dos canchas con el mismo número", async () => {

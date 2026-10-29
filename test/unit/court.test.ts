@@ -50,17 +50,37 @@ describe("court actions", () => {
   });
 
   describe("createCourt", () => {
-    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado", async () => {
+    const complex = { id: 1, name: "Quento Club" };
+
+    beforeEach(() => {
+      // El complejo del club, al que se asocian las canchas nuevas.
+      findOne.mockResolvedValue(complex);
+    });
+
+    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado, en el complejo del club", async () => {
       const result = await createCourt({ number: 3, price: 10000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000 });
-      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE, price: 10000 } });
+      expect(findOne).toHaveBeenCalledWith({ where: {}, order: { id: "ASC" } });
+      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000, complex });
+      expect(result).toEqual({
+        success: true,
+        data: { number: 3, state: CourtState.AVAILABLE, price: 10000, complex },
+      });
     });
 
     it("respeta el estado y precio indicados", async () => {
       await createCourt({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000, complex });
+    });
+
+    it("devuelve error si no hay un complejo al que asociar la cancha", async () => {
+      findOne.mockResolvedValue(null);
+
+      const result = await createCourt({ number: 3, price: 10000 });
+
+      expect(result).toEqual({ success: false, error: "No hay un complejo cargado para asociar la cancha." });
+      expect(save).not.toHaveBeenCalled();
     });
 
     it("devuelve error si el precio no se proporciona o no es mayor a 0", async () => {

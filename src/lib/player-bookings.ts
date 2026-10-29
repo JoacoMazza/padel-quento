@@ -7,7 +7,7 @@ import { getDataSource } from "@/src/lib/db";
 
 const BOOKING_RELATIONS = {
   booker: true,
-  court: true,
+  court: { complex: true },
   match: { matchPlayers: { player: true }, chat: true },
 } as const;
 

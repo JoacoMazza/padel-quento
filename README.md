@@ -83,6 +83,15 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
 
+## Complejos
+
+Cada cancha pertenece a un complejo (`courts.complex_id`, obligatoria), que guarda su ubicación: nombre, dirección, ciudad, provincia, código postal, latitud, longitud y, opcional, el link a Google Maps (tabla `complexes`, entidad [src/entities/Complex.ts](src/entities/Complex.ts)).
+
+- La base valida que la latitud esté entre -90 y 90 y la longitud entre -180 y 180 (`CHK_complexes_latitude` y `CHK_complexes_longitude`).
+- La migración `AddComplexes` crea el complejo del club (Quento Club, Cam. Centenario 8907, Villa Elisa) y le asigna las canchas que ya existían, sin tocar sus turnos.
+- Los complejos no se gestionan desde el panel: las canchas nuevas (alta del dueño y seeds) se asocian al complejo del club, el primero que se cargó ([src/lib/club-complex.ts](src/lib/club-complex.ts)).
+- El complejo y su ubicación se ven en la tabla de canchas del panel, en `/bookings` (arriba y en el resumen del turno elegido) y en Mis turnos. El link lleva a Google Maps; si el complejo no tiene uno cargado, se arma con la latitud y la longitud.
+
 ## Administradores: dueño y trabajador
 
 Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) o **trabajador** (`staff`).
@@ -207,7 +216,7 @@ Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migraci
 pnpm db:seed
 ```
 
-Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
