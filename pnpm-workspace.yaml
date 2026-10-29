@@ -4,5 +4,3 @@ ignoredBuiltDependencies:
 
 onlyBuiltDependencies:
   - bcrypt
-overrides:
-  vite@>=8.2.0 <=8.2.3: '>=8.2.4'
