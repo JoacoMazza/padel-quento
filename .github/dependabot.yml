@@ -1,0 +1,42 @@
+version: 2
+
+updates:
+  # npm also covers pnpm: Dependabot reads and updates pnpm-lock.yaml
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [ minor, patch ]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: [ "*" ]
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # Images in docker-compose.yml and docker-compose.test.yml
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      # A Postgres major upgrade needs a data migration, so it is done by hand
+      - dependency-name: postgres
+        update-types: [ version-update:semver-major ]
+    commit-message:
+      prefix: chore
+      include: scope

@@ -266,3 +266,11 @@ pnpm test:all       # Tests unitarios + de integración
 ## CI
 
 El workflow de GitHub Actions ([.github/workflows/tests.yml](.github/workflows/tests.yml)) corre `pnpm test` y `pnpm test:integration` en cada push a `main`/`hotfix/*`/`release/*` y en cada pull request, levantando Postgres como servicio.
+
+### Seguridad
+
+- **Trivy** ([.github/workflows/security.yml](.github/workflows/security.yml)) corre en cada push a `main`, en cada pull request, todos los lunes y a mano (`workflow_dispatch`):
+  - Analiza el repo: vulnerabilidades en las dependencias (`pnpm-lock.yaml`), secretos commiteados y malas configuraciones (Dockerfile, IaC). El job falla si hay hallazgos HIGH/CRITICAL que ya tienen arreglo.
+  - Analiza las imágenes de Docker que usa el proyecto (`postgres:16-alpine`). Solo informa, no falla: los arreglos dependen de la imagen oficial. Si se agrega una imagen nueva a los `docker-compose*.yml`, sumarla a la matriz del workflow.
+  - Los resultados se ven en la pestaña **Security → Code scanning** del repo.
+- **Dependabot** ([.github/dependabot.yml](.github/dependabot.yml)) abre PRs semanales para actualizar dependencias de npm/pnpm (minor y patch agrupadas), las GitHub Actions y las imágenes de los `docker-compose*.yml` (sin saltos de versión mayor de Postgres). Las alertas y PRs de seguridad se activan en *Settings → Code security* (Dependabot alerts y security updates).
