@@ -12,6 +12,7 @@ import {
   restoreFixedBookingDate,
   type FixedBookingAdminItem,
 } from "@/src/actions/fixedBooking";
+import { getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
 import {
   EMPTY_HOLDER,
   HolderFields,
@@ -328,12 +329,35 @@ function CreateFixedBookingModal({
 }) {
   const [courtId, setCourtId] = useState(courts[0]?.id ?? 0);
   const [startDate, setStartDate] = useState("");
-  const [startTime, setStartTime] = useState("18:00");
+  const [startTime, setStartTime] = useState("");
+  // Horarios libres de la última cancha y fecha de inicio consultadas.
+  const [loadedSlots, setLoadedSlots] = useState<{ key: string; slots: string[] } | null>(null);
   const [frequency, setFrequency] = useState(FixedBookingFrequency.WEEKLY);
   const [endDate, setEndDate] = useState("");
   const [holder, setHolder] = useState(EMPTY_HOLDER);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // null mientras se consultan los de la cancha y la fecha elegidas (o si falta la fecha).
+  const slots = loadedSlots?.key === `${courtId}|${startDate}` ? loadedSlots.slots : null;
+
+  // Solo se ofrecen las horas de los turnos de la grilla (cada 90 minutos desde
+  // la apertura) que están libres la fecha de inicio; al cambiar la cancha o la
+  // fecha se vuelven a pedir.
+  useEffect(() => {
+    if (!startDate) return;
+    let cancelled = false;
+    getAvailableSlotsAdmin({ courtId, date: startDate }).then((result) => {
+      if (cancelled) return;
+      const free = result.success ? result.data : [];
+      if (!result.success) setError(result.error);
+      setLoadedSlots({ key: `${courtId}|${startDate}`, slots: free });
+      setStartTime((current) => (free.includes(current) ? current : ""));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [courtId, startDate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -397,17 +421,28 @@ function CreateFixedBookingModal({
               <label htmlFor="fixed-start-time" className={LABEL_CLASS}>
                 Hora
               </label>
-              <input
+              <select
                 id="fixed-start-time"
-                type="time"
-                step={1800}
                 required
+                disabled={!slots || slots.length === 0}
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className={INPUT_CLASS}
-              />
+              >
+                <option value="">
+                  {!startDate ? "Elegí la fecha de inicio" : slots ? "Elegí un horario" : "Cargando horarios…"}
+                </option>
+                {slots?.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {slot}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+          {slots && slots.length === 0 ? (
+            <p className="-mt-2 text-xs font-medium text-danger">No hay horarios libres en esa cancha ese día.</p>
+          ) : null}
           {startDate ? (
             <p className="-mt-2 text-xs text-foreground/60">
               Se repite los {DAY_LABELS[dayOfWeekOfISO(startDate)].toLowerCase()}.
@@ -446,7 +481,7 @@ function CreateFixedBookingModal({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || !slots || slots.length === 0}
               className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm touch-target font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? "Creando..." : "Crear turno fijo"}

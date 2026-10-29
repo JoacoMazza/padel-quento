@@ -310,6 +310,8 @@ describe("AdminPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Registrar turno fijo" }));
     fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+    await flush();
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "18:00" } });
     fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear turno fijo" }));
     await flush();

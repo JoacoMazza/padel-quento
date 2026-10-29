@@ -11,6 +11,7 @@ import type { ActionResult } from "@/src/lib/action-result";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
 import {
   BookingRuleError,
+  isSlotStart,
   isSlotTaken,
   isWithinSchedule,
   lockCourt,
@@ -57,6 +58,9 @@ export async function createBookingAdmin(input: CreateBookingAdminInput): Promis
       if (court.state === CourtState.CLOSED_DOWN) throw new BookingRuleError("La cancha está dada de baja.");
       if (!isWithinSchedule(court.schedules, input.date, input.startTime, durationMinutes)) {
         throw new BookingRuleError("La cancha no está abierta en ese horario ese día.");
+      }
+      if (!isSlotStart(court.schedules, input.date, input.startTime)) {
+        throw new BookingRuleError("Ese horario no corresponde a un turno de la cancha.");
       }
 
       const booker = await resolveBookingHolder(manager, input.holder);
