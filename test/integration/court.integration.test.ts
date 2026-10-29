@@ -46,6 +46,25 @@ describe("court actions (integración con Postgres real)", () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 
+  it("un archivo que arranca después no repite números ya usados por otro anterior, aunque haya usado muchos", async () => {
+    // Cada archivo de test carga su propia copia de helpers (como en la suite): se simulan dos, el segundo 300 ms después.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(1_793_236_924_000);
+      vi.resetModules();
+      const earlierFile = await import("./helpers");
+      const used = Array.from({ length: 1100 }, () => earlierFile.uniqueCourtNumber());
+
+      vi.setSystemTime(1_793_236_924_300);
+      vi.resetModules();
+      const laterFile = await import("./helpers");
+
+      expect(laterFile.uniqueCourtNumber()).toBeGreaterThan(Math.max(...used));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("crea una cancha con el estado AVAILABLE por defecto y la persiste", async () => {
     const number = uniqueCourtNumber();
 

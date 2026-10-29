@@ -7,7 +7,9 @@ import { getDataSource } from "@/src/lib/db";
 
 // Test files run serially against the same database, so each file starts from the current
 // timestamp and increments: numbers never repeat within a file nor overlap with earlier files.
-let lastCourtNumber = Date.now() % 1_000_000_000;
+// Each millisecond leaves room for 1000 numbers, so a file that uses many (court tests use
+// over 1000) does not run into the next one; the modulo keeps them within the int column.
+let lastCourtNumber = (Date.now() % 2_000_000) * 1000;
 
 export function uniqueCourtNumber() {
   lastCourtNumber += 1;
