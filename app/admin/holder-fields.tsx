@@ -22,7 +22,7 @@ export function toBookingHolder(value: HolderValue): BookingHolder {
 }
 
 export const INPUT_CLASS =
-  "w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
+  "w-full rounded-xl border border-line bg-background px-4 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary touch-target";
 export const LABEL_CLASS = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-foreground/70";
 
 /**
@@ -46,7 +46,7 @@ export function HolderFields({
     <fieldset>
       <legend className={LABEL_CLASS}>Titular</legend>
       <div className="mb-3 flex gap-4 text-sm">
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 touch-target">
           <input
             type="radio"
             name={`${idPrefix}-holder-type`}
@@ -55,7 +55,7 @@ export function HolderFields({
           />
           Jugador registrado
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 touch-target">
           <input
             type="radio"
             name={`${idPrefix}-holder-type`}

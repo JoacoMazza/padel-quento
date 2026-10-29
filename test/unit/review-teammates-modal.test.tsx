@@ -99,3 +99,16 @@ describe("ReviewTeammatesModal", () => {
     expect(await screen.findByText("Ya pasaron las 48 horas para calificar este partido.")).toBeTruthy();
   });
 });
+
+describe("ReviewTeammatesModal - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("cerrar es un área de al menos 44 px", async () => {
+    getReviewableTeammates.mockResolvedValue({ success: true, data: teammates });
+    await renderModal();
+
+    expect(screen.getByRole("button", { name: "Cerrar" }).className.split(" ")).toContain("touch-target");
+  });
+});

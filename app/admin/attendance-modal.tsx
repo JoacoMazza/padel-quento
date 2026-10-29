@@ -116,7 +116,7 @@ export function AttendanceModal({
                   type="button"
                   disabled={pendingId === matchPlayer.id}
                   onClick={() => handleToggleMatchPlayer(matchPlayer.id, matchPlayer.attended)}
-                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     matchPlayer.attended
                       ? "bg-success/10 text-success hover:bg-danger/10 hover:text-danger"
                       : "bg-danger/10 text-danger hover:bg-success/10 hover:text-success"
@@ -138,7 +138,7 @@ export function AttendanceModal({
                 type="button"
                 disabled={pendingId === booking.id}
                 onClick={handleToggleBookingPlayer}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   booking.attended
                     ? "bg-success/10 text-success hover:bg-danger/10 hover:text-danger"
                     : "bg-danger/10 text-danger hover:bg-success/10 hover:text-success"
@@ -162,7 +162,7 @@ export function AttendanceModal({
                   type="button"
                   disabled={isReleasing}
                   onClick={handleRelease}
-                  className="cursor-pointer rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold touch-target text-white hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isReleasing ? "Liberando..." : "Confirmar"}
                 </button>
@@ -170,7 +170,7 @@ export function AttendanceModal({
                   type="button"
                   disabled={isReleasing}
                   onClick={() => setConfirmingRelease(false)}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-foreground/70 hover:bg-line/40"
+                  className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold touch-target text-foreground/70 hover:bg-line/40"
                 >
                   Volver
                 </button>
@@ -179,7 +179,7 @@ export function AttendanceModal({
               <button
                 type="button"
                 onClick={() => setConfirmingRelease(true)}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger/10"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target text-danger hover:bg-danger/10"
               >
                 <CalendarX className="h-3.5 w-3.5" />
                 Liberar esta fecha

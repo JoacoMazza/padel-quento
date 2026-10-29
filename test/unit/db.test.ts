@@ -40,6 +40,32 @@ describe("getDataSource", { timeout: 20000 }, () => {
     await expect(getDataSource()).rejects.toThrow(/DATABASE_URL/);
   });
 
+  it.each(["development", "production", "test"])(
+    "nunca sincroniza el esquema al conectarse (NODE_ENV=%s): se cambia solo con migraciones",
+    async (nodeEnv) => {
+      process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+      (process.env as Record<string, string>).NODE_ENV = nodeEnv;
+      const { getDataSource } = await import("@/src/lib/db");
+
+      const dataSource = await getDataSource();
+
+      expect((dataSource.options as { synchronize?: boolean }).synchronize).toBe(false);
+    },
+  );
+
+  it("con DATABASE_SSL_CA se conecta por SSL verificando el certificado (Supabase)", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    process.env.DATABASE_SSL_CA = "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----";
+    const { getDataSource } = await import("@/src/lib/db");
+
+    const dataSource = await getDataSource();
+
+    expect((dataSource.options as { ssl?: unknown }).ssl).toEqual({
+      ca: process.env.DATABASE_SSL_CA,
+      rejectUnauthorized: true,
+    });
+  });
+
   it("inicializa una sola vez y reutiliza la misma instancia en llamadas sucesivas", async () => {
     process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
     const { getDataSource } = await import("@/src/lib/db");

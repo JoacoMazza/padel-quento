@@ -181,3 +181,23 @@ describe("AttendanceModal", () => {
     });
   });
 });
+
+describe("AttendanceModal - pantallas táctiles", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("los botones de asistencia son áreas de al menos 44 px", () => {
+    render(<AttendanceModal booking={simpleBooking()} onClose={vi.fn()} onUpdated={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Presente" }).className.split(" ")).toContain("touch-target");
+  });
+
+  it("en un partido abierto, la asistencia de cada jugador es un área de al menos 44 px", () => {
+    render(<AttendanceModal booking={openMatchBooking()} onClose={vi.fn()} onUpdated={vi.fn()} />);
+
+    for (const button of screen.getAllByRole("button", { name: /Presente|Ausente/ })) {
+      expect(button.className.split(" ")).toContain("touch-target");
+    }
+  });
+});

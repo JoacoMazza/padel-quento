@@ -10,13 +10,13 @@ import type { FixedBooking } from "@/src/entities/FixedBooking";
  * la extensión automática las vuelva a generar.
  */
 @Entity({ name: "fixed_booking_dates" })
-@Unique(["fixedBooking", "date"])
+@Unique("UQ_fixed_booking_dates_fixed_booking_id_date", ["fixedBooking", "date"])
 export class FixedBookingDate {
   @PrimaryGeneratedColumn()
   id!: number;
 
   @ManyToOne("FixedBooking", "dates", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "fixed_booking_id" })
+  @JoinColumn({ name: "fixed_booking_id", foreignKeyConstraintName: "FK_fixed_booking_dates_fixed_booking_id" })
   fixedBooking!: FixedBooking;
 
   @Column({ type: "date" })
@@ -26,6 +26,6 @@ export class FixedBookingDate {
   state!: FixedBookingDateState;
 
   @OneToOne("Booking", { nullable: true })
-  @JoinColumn({ name: "booking_id" })
+  @JoinColumn({ name: "booking_id", foreignKeyConstraintName: "FK_fixed_booking_dates_booking_id" })
   booking!: Booking | null;
 }

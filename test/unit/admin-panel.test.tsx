@@ -127,6 +127,96 @@ describe("AdminPanel", () => {
     expect(getAttendanceReport).not.toHaveBeenCalled();
   });
 
+  describe("en pantallas chicas", () => {
+    function classesOf(element: Element) {
+      return element.className.split(" ");
+    }
+
+    it("las secciones quedan arriba del contenido, y al costado desde lg", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      const aside = screen.getByRole("navigation").closest("aside")!;
+      expect(classesOf(aside.parentElement!)).toEqual(expect.arrayContaining(["flex-col", "lg:flex-row"]));
+      expect(classesOf(aside)).toEqual(expect.arrayContaining(["border-b", "lg:w-64", "lg:border-r"]));
+      expect(classesOf(aside)).not.toContain("w-64");
+    });
+
+    it("las secciones quedan detrás de un botón hamburguesa que muestra la sección actual", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      const toggle = screen.getByRole("button", { name: "Abrir secciones" });
+      expect(toggle.getAttribute("aria-expanded")).toBe("false");
+      expect(classesOf(toggle)).toContain("lg:hidden");
+      expect(toggle.textContent).toContain("Turnera Global");
+      expect(classesOf(screen.getByRole("navigation"))).toEqual(expect.arrayContaining(["hidden", "lg:flex"]));
+    });
+
+    it("al abrirlo, las secciones se despliegan de arriba hacia abajo", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+
+      const nav = screen.getByRole("navigation");
+      expect(classesOf(nav)).toEqual(expect.arrayContaining(["flex", "motion-safe:animate-slide-down"]));
+      expect(classesOf(nav)).not.toContain("hidden");
+      expect(screen.getByRole("button", { name: "Cerrar secciones" }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("el menú de secciones se cierra al tocar fuera de él, pero no al tocar adentro", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+      fireEvent.pointerDown(screen.getByRole("navigation"));
+      expect(classesOf(screen.getByRole("navigation"))).not.toContain("hidden");
+
+      fireEvent.pointerDown(screen.getByRole("main"));
+      expect(classesOf(screen.getByRole("navigation"))).toContain("hidden");
+      expect(screen.getByRole("button", { name: "Abrir secciones" }).getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("al elegir una sección el menú se cierra y el botón pasa a mostrarla", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      fireEvent.click(screen.getByRole("button", { name: "Abrir secciones" }));
+      openSection("Canchas");
+      await flush();
+
+      expect(classesOf(screen.getByRole("navigation"))).toContain("hidden");
+      expect(screen.getByRole("button", { name: "Abrir secciones" }).textContent).toContain("Canchas");
+    });
+
+    it("cada sección del menú ocupa todo el ancho y mide 44 px en pantallas táctiles", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(within(screen.getByRole("navigation")).getByRole("button", { name: "Canchas" }))).toEqual(
+        expect.arrayContaining(["w-full", "pointer-coarse:py-3"]),
+      );
+    });
+
+    it("ocultan el rótulo del panel y Cerrar sesión, que queda en el menú de usuario del header", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByText("Panel operativo"))).toEqual(expect.arrayContaining(["hidden", "lg:block"]));
+      expect(classesOf(screen.getByRole("button", { name: "Cerrar sesión" }).parentElement!)).toEqual(
+        expect.arrayContaining(["hidden", "lg:block"]),
+      );
+    });
+
+    it("el contenido usa el mismo margen lateral que el header", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByRole("main"))).toEqual(expect.arrayContaining(["px-6", "lg:px-8"]));
+    });
+  });
+
   it("los turnos fijos están en la Turnera Global, debajo de la grilla, y no en una sección aparte", async () => {
     render(<AdminPanel isOwner />);
     await flush();
