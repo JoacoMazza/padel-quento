@@ -124,6 +124,7 @@ Variables relevantes en `.env`:
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
+| `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |
 
 ### Avisos a los jugadores (correo y WhatsApp)
@@ -286,7 +287,23 @@ Las variables de la terminal tienen prioridad sobre las de `.env`.
    awk '{printf "%s%cn", $0, 92}' supabase-ca.crt   # 92 es la barra invertida
    ```
 
-   Los procesos en segundo plano ([instrumentation.ts](instrumentation.ts)) corren mientras el servidor está levantado, así que el hosting tiene que mantener `pnpm start` como proceso permanente (no funciones serverless que se apagan entre pedidos).
+   Los procesos en segundo plano ([instrumentation.ts](instrumentation.ts)) corren mientras el servidor está levantado: en un hosting con `pnpm start` como proceso permanente andan solos. En un hosting serverless como Vercel no, y los corre un programador externo (ver [Deploy en Vercel](#deploy-en-vercel)).
+
+## Deploy en Vercel
+
+Vercel es serverless: levanta la app solo cuando llega un pedido y la apaga después, así que no hay un servidor prendido para los `setInterval` de los procesos en segundo plano (vencimiento de partidos abiertos, puntos por asistencia y extensión de turnos fijos). Por eso:
+
+- En Vercel (variable `VERCEL`, la define la plataforma) `instrumentation.ts` no los arranca.
+- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `fixed-booking-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
+- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos y los puntos, y cada 6 horas los turnos fijos. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
+- Cada instancia usa como mucho 2 conexiones a la base ([src/lib/db.ts](src/lib/db.ts)), para no agotar las del session pooler de Supabase.
+
+Pasos:
+
+1. En Vercel, **Add New → Project** e importar el repo de GitHub. Vercel detecta Next.js y pnpm solo (build `pnpm build`).
+2. En **Settings → Environment Variables** (entorno *Production*) cargar las variables de la tabla del [primer deploy](#primer-deploy) y además `CRON_SECRET` (un valor nuevo, por ejemplo `openssl rand -base64 32`). `NEXTAUTH_URL` es la URL pública que asigna Vercel (por ejemplo `https://padel-quento.vercel.app`).
+3. Deployar. Las migraciones no corren solas: se aplican a mano antes de cada deploy que las necesite (ver [Correr comandos contra Supabase](#correr-comandos-contra-supabase)).
+4. En GitHub, **Settings → Secrets and variables → Actions → New repository secret**: `APP_URL` (la misma URL pública) y `CRON_SECRET` (el mismo valor que en Vercel). Sin esos secrets el workflow avisa y no corre nada.
 
 ## Comandos importantes
 
