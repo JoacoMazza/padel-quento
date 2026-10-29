@@ -229,6 +229,8 @@ La base de producción está en Supabase, en una cuenta compartida por el equipo
 - **Las migraciones se corren a mano y solo desde `main`**, después de mergear el PR que las trae. Nunca desde una rama.
 - **Nunca correr `pnpm db:seed` ni `pnpm db:seed:bookings` contra producción**: crean cuentas con contraseñas que están en este repo.
 
+El build de producción no minifica el código del servidor (`experimental.turbopackMinify` en [next.config.ts](next.config.ts)): al minificarlo se renombran las clases de las entidades, y TypeORM, que busca las entidades por nombre de clase (relaciones como `@OneToOne("Admin", ...)` y `getRepository("Account")`), deja de encontrarlas y fallan el login y todas las páginas con datos (issue #85). El código del navegador se sigue minificando. `test/unit/next-config.test.ts` falla si se vuelve a activar.
+
 ### Configuración en el panel de Supabase
 
 1. **Cadena de conexión:** botón **Connect** → **Session pooler** (puerto 5432). Sirve para todo: la app, las migraciones y los seeds. La conexión directa (`db.<ref>.supabase.co`) solo funciona por IPv6, y el *transaction pooler* (6543) no sirve para migraciones. Si la contraseña tiene caracteres especiales (`@`, `#`, `/`, ...), van codificados (`encodeURIComponent`).
