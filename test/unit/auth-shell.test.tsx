@@ -31,4 +31,15 @@ describe("AuthShell", () => {
       expect(logo.getAttribute("href")).toBe("/");
     }
   });
+
+  it("en mobile deja lugar abajo para que el botón de WhatsApp no tape el formulario", () => {
+    render(
+      <AuthShell title="Iniciar sesión" subtitle="Bienvenido">
+        <form aria-label="login" />
+      </AuthShell>,
+    );
+
+    const content = screen.getByRole("form", { name: "login" }).closest(".card")!.parentElement!;
+    expect(content.className.split(" ")).toEqual(expect.arrayContaining(["pb-24", "sm:pb-12"]));
+  });
 });

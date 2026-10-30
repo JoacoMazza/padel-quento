@@ -19,4 +19,11 @@ describe("AppFooter", () => {
     expect(screen.getByText("Quento Club")).toBeTruthy();
     expect(screen.queryByText(/· Villa Elisa/)).toBeNull();
   });
+
+  it("en mobile deja lugar abajo para que el botón de WhatsApp no tape los links", () => {
+    const { container } = render(<AppFooter />);
+
+    const classes = container.querySelector("footer > div")!.className.split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["pb-24", "md:pb-8"]));
+  });
 });
