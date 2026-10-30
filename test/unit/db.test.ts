@@ -40,6 +40,16 @@ describe("getDataSource", { timeout: 20000 }, () => {
     await expect(getDataSource()).rejects.toThrow(/DATABASE_URL/);
   });
 
+  it("le pasa el paquete pg a TypeORM: en Vercel solo se incluyen los paquetes importados en el código, y TypeORM lo carga dinámicamente", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    const { getDataSource } = await import("@/src/lib/db");
+    const pg = await import("pg");
+
+    const dataSource = await getDataSource();
+
+    expect((dataSource.options as { driver?: unknown }).driver).toBe(pg.default);
+  });
+
   it.each(["development", "production", "test"])(
     "nunca sincroniza el esquema al conectarse (NODE_ENV=%s): se cambia solo con migraciones",
     async (nodeEnv) => {
