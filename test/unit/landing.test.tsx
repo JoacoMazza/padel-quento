@@ -79,6 +79,16 @@ describe("Landing", () => {
       expect(number.className.split(" ")).toContain("whitespace-nowrap");
     });
 
+    it("en mobile el botón de WhatsApp alinea el texto con el ícono a la izquierda y lleva la flecha al final", () => {
+      renderLanding();
+
+      const whatsapp = within(screen.getByRole("region", { name: "El complejo" })).getByRole("link", { name: /WhatsApp/ });
+      expect(whatsapp.className.split(" ")).toEqual(expect.arrayContaining(["justify-start", "sm:justify-center"]));
+      expect(whatsapp.lastElementChild!.getAttribute("class")!.split(" ")).toEqual(
+        expect.arrayContaining(["ml-auto", "sm:ml-0.5"]),
+      );
+    });
+
     it("cuenta qué se puede hacer en la plataforma", () => {
       renderLanding();
 
