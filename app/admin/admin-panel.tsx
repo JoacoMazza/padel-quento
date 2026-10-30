@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
+import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/fixed-bookings-panel";
@@ -92,7 +93,12 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 
 function CourtsSection({ isOwner }: { isOwner: boolean }) {
   const state = useSectionData(loadCourts);
-  return state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />;
+  return (
+    <div className="space-y-6">
+      {state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />}
+      <ComplexContactPanel />
+    </div>
+  );
 }
 
 type FixedBookingsData = {

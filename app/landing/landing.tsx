@@ -15,8 +15,6 @@ import {
   CLUB_MAPS_URL,
   CLUB_NAME,
   CLUB_SHORT_ADDRESS,
-  CLUB_PHONE_LABEL,
-  CLUB_WHATSAPP_URL,
 } from "@/app/components/club-info";
 import type { ClubHoursRow } from "@/app/landing/club-hours";
 import { ATTENDANCE_POINTS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
@@ -32,11 +30,14 @@ import { HeroVideo } from "@/app/landing/hero-video";
 export function Landing({
   courtCount,
   hours,
+  whatsappUrl,
 }: {
   userName: string | null;
   isGuest: boolean;
   courtCount: number;
   hours: ClubHoursRow[];
+  /** Link de WhatsApp del complejo; sin número cargado, null y no se muestra el botón. */
+  whatsappUrl: string | null;
   courts?: unknown;
 }) {
   return (
@@ -477,19 +478,20 @@ export function Landing({
               </div>
 
               {/* Botón WhatsApp */}
-              <div className="pt-2">
-                <a
-                  href={CLUB_WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#141518] px-6 py-3.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.98]"
-                >
-                  <MessageCircle className="h-4 w-4 text-white" />
-                  <span>Escribinos por WhatsApp</span>
-                  <span className="font-mono text-white/70">{CLUB_PHONE_LABEL}</span>
-                  <ArrowRight className="h-4 w-4 ml-0.5 text-white/70" />
-                </a>
-              </div>
+              {whatsappUrl ? (
+                <div className="pt-2">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#141518] px-6 py-3.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.98]"
+                  >
+                    <MessageCircle className="h-4 w-4 text-white" />
+                    <span>Escribinos por WhatsApp</span>
+                    <ArrowRight className="h-4 w-4 ml-0.5 text-white/70" />
+                  </a>
+                </div>
+              ) : null}
             </div>
 
             {/* Mapa Embebido (7 columnas) */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toComplexLocation, uniqueComplexLocations } from "@/src/domain/complex";
+import { isValidWhatsAppNumber, toComplexLocation, toWhatsAppDigits, uniqueComplexLocations, whatsAppContactUrl } from "@/src/domain/complex";
 
 const complex = {
   id: 1,
@@ -36,5 +36,40 @@ describe("uniqueComplexLocations", () => {
 
   it("deja una sola vez cada complejo, en el orden en que aparece", () => {
     expect(uniqueComplexLocations([quento, other, quento, undefined])).toEqual([quento, other]);
+  });
+});
+
+describe("whatsAppContactUrl", () => {
+  it("arma el link de wa.me con el número", () => {
+    expect(whatsAppContactUrl("5492216049987")).toBe("https://wa.me/5492216049987");
+  });
+
+  it("agrega el mensaje inicial codificado", () => {
+    expect(whatsAppContactUrl("5492216049987", "Hola, quiero reservar una cancha & consultar")).toBe(
+      "https://wa.me/5492216049987?text=Hola%2C%20quiero%20reservar%20una%20cancha%20%26%20consultar",
+    );
+  });
+
+  it("sin mensaje (o vacío) no agrega el parámetro text", () => {
+    expect(whatsAppContactUrl("5492216049987", "  ")).toBe("https://wa.me/5492216049987");
+    expect(whatsAppContactUrl("5492216049987", null)).toBe("https://wa.me/5492216049987");
+  });
+
+  it("sin número no hay link", () => {
+    expect(whatsAppContactUrl(null)).toBeNull();
+    expect(whatsAppContactUrl("")).toBeNull();
+  });
+});
+
+describe("número de WhatsApp", () => {
+  it("se guarda solo con los dígitos, como lo espera wa.me", () => {
+    expect(toWhatsAppDigits("+54 9 221 604-9987")).toBe("5492216049987");
+  });
+
+  it("es válido con entre 10 y 15 dígitos (código de país incluido)", () => {
+    expect(isValidWhatsAppNumber("5492216049987")).toBe(true);
+    expect(isValidWhatsAppNumber("2216049987")).toBe(true);
+    expect(isValidWhatsAppNumber("221604998")).toBe(false);
+    expect(isValidWhatsAppNumber("5492216049987123")).toBe(false);
   });
 });

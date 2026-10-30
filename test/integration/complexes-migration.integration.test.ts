@@ -7,7 +7,8 @@ const migrationModules = import.meta.glob<Record<string, unknown>>("../../src/mi
 const migrations = Object.values(migrationModules).flatMap((module) =>
   Object.values(module).filter((value): value is new () => object => typeof value === "function"),
 );
-const isComplexesMigration = (migration: new () => object) => migration.name.startsWith("AddComplexes");
+// AddComplexes y las que la siguen (AddComplexWhatsApp, que necesita la tabla).
+const isComplexesMigration = (migration: new () => object) => migration.name.startsWith("AddComplex");
 
 const CHECK_DATABASE = "padel_quento_complexes_migration_check";
 
@@ -68,6 +69,14 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
     ]);
   });
 
+  it("carga el WhatsApp de contacto del club, con su mensaje inicial", async () => {
+    const complexes = await db.query(`SELECT "whatsapp_number", "whatsapp_message" FROM "complexes"`);
+
+    expect(complexes).toEqual([
+      { whatsapp_number: "5492216049987", whatsapp_message: "Hola, quiero hacer una consulta sobre Quento Club." },
+    ]);
+  });
+
   it("asigna las canchas existentes al complejo por defecto, sin perder sus datos ni sus turnos", async () => {
     const courts = await db.query(
       `SELECT "c"."number", "c"."state", "c"."price"::float AS "price", "x"."name" AS "complex"
@@ -85,6 +94,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
   });
 
   it("se puede revertir sin perder las canchas", async () => {
+    await db.undoLastMigration();
     await db.undoLastMigration();
 
     const courts = await db.query(`SELECT "number" FROM "courts" ORDER BY "number"`);

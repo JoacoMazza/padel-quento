@@ -32,3 +32,20 @@ export function uniqueComplexLocations(locations: (ComplexLocation | undefined)[
   }
   return [...unique.values()];
 }
+
+/** Link de wa.me para el número (solo dígitos) con el mensaje inicial opcional. Sin número no hay link. */
+export function whatsAppContactUrl(number: string | null | undefined, message?: string | null): string | null {
+  if (!number) return null;
+  const text = message?.trim();
+  return text ? `https://wa.me/${number}?text=${encodeURIComponent(text)}` : `https://wa.me/${number}`;
+}
+
+/** El número como lo espera wa.me: solo los dígitos ("+54 9 221 604-9987" → "5492216049987"). */
+export function toWhatsAppDigits(input: string): string {
+  return input.replace(/\D/g, "");
+}
+
+/** Un número de WhatsApp, con su código de país, tiene entre 10 y 15 dígitos. */
+export function isValidWhatsAppNumber(digits: string): boolean {
+  return /^\d{10,15}$/.test(digits);
+}

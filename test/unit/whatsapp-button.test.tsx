@@ -1,81 +1,70 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { WhatsAppButton, whatsAppContactUrl } from "@/app/components/whatsapp-button";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-describe("whatsAppContactUrl", () => {
-  it("arma el link de wa.me con el número", () => {
-    expect(whatsAppContactUrl("5492215380806")).toBe("https://wa.me/5492215380806");
-  });
+const { getWhatsAppContactUrl } = vi.hoisted(() => ({ getWhatsAppContactUrl: vi.fn() }));
+vi.mock("@/src/actions/complex", () => ({ getWhatsAppContactUrl }));
 
-  it("deja solo los dígitos del número, como lo espera wa.me", () => {
-    expect(whatsAppContactUrl("+54 9 221 538-0806")).toBe("https://wa.me/5492215380806");
-  });
+import { WhatsAppButton } from "@/app/components/whatsapp-button";
 
-  it("agrega el mensaje inicial codificado", () => {
-    expect(whatsAppContactUrl("5492215380806", "Hola, quiero reservar una cancha & consultar")).toBe(
-      "https://wa.me/5492215380806?text=Hola%2C%20quiero%20reservar%20una%20cancha%20%26%20consultar",
-    );
-  });
-
-  it("sin mensaje (o vacío) no agrega el parámetro text", () => {
-    expect(whatsAppContactUrl("5492215380806", "  ")).toBe("https://wa.me/5492215380806");
-  });
-
-  it("sin número no hay link", () => {
-    expect(whatsAppContactUrl(undefined)).toBeNull();
-    expect(whatsAppContactUrl("")).toBeNull();
-    expect(whatsAppContactUrl("sin número")).toBeNull();
-  });
-});
+const URL = "https://wa.me/5492216049987?text=Hola%20Quento";
 
 describe("WhatsAppButton", () => {
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllEnvs();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getWhatsAppContactUrl.mockResolvedValue({ success: true, data: URL });
   });
 
-  function renderWith(number: string | undefined, message?: string) {
-    vi.stubEnv("NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER", number);
-    vi.stubEnv("NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE", message);
-    return render(<WhatsAppButton />);
+  afterEach(() => {
+    cleanup();
+  });
+
+  async function renderButton() {
+    render(<WhatsAppButton />);
+    return screen.findByRole("link", { name: "Contactar por WhatsApp" });
   }
 
-  it("abre WhatsApp con el número y el mensaje de las variables de entorno, en una pestaña nueva", () => {
-    renderWith("5492215380806", "Hola Quento");
+  it("abre el chat con el número y el mensaje del complejo, en una pestaña nueva", async () => {
+    const link = await renderButton();
 
-    const link = screen.getByRole("link", { name: "Contactar por WhatsApp" });
-    expect(link.getAttribute("href")).toBe("https://wa.me/5492215380806?text=Hola%20Quento");
+    expect(link.getAttribute("href")).toBe(URL);
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("queda fijo en la esquina inferior derecha, debajo de los modales y del header", () => {
-    renderWith("5492215380806");
+  it("queda fijo en la esquina inferior derecha, debajo de los modales y del header", async () => {
+    const classes = (await renderButton()).className.split(" ");
 
-    const classes = screen.getByRole("link", { name: "Contactar por WhatsApp" }).className.split(" ");
     expect(classes).toEqual(expect.arrayContaining(["fixed", "right-4", "bottom-4", "z-30"]));
   });
 
-  it("mide al menos 44 px para tocarlo sin errar", () => {
-    renderWith("5492215380806");
+  it("mide al menos 44 px para tocarlo sin errar", async () => {
+    const classes = (await renderButton()).className.split(" ");
 
-    const classes = screen.getByRole("link", { name: "Contactar por WhatsApp" }).className.split(" ");
     expect(classes).toEqual(expect.arrayContaining(["h-14", "w-14"]));
   });
 
-  it("se puede enfocar con el teclado y muestra el foco", () => {
-    renderWith("5492215380806");
+  it("se puede enfocar con el teclado y muestra el foco", async () => {
+    const link = await renderButton();
 
-    const link = screen.getByRole("link", { name: "Contactar por WhatsApp" });
     link.focus();
     expect(document.activeElement).toBe(link);
     expect(link.className).toContain("focus-visible:ring-2");
   });
 
-  it("no se muestra si no está configurado el número", () => {
-    const { container } = renderWith(undefined, "Hola");
+  it("no se muestra si el complejo no tiene número cargado", async () => {
+    getWhatsAppContactUrl.mockResolvedValue({ success: true, data: null });
+    const { container } = render(<WhatsAppButton />);
 
+    await waitFor(() => expect(getWhatsAppContactUrl).toHaveBeenCalled());
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("no se muestra si no se pudo obtener el número", async () => {
+    getWhatsAppContactUrl.mockResolvedValue({ success: false, error: "No se pudo obtener el contacto." });
+    const { container } = render(<WhatsAppButton />);
+
+    await waitFor(() => expect(getWhatsAppContactUrl).toHaveBeenCalled());
     expect(container.innerHTML).toBe("");
   });
 });
