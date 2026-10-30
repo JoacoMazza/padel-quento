@@ -66,6 +66,19 @@ describe("Landing", () => {
       expect(whatsapp.textContent).toContain("0221 538-0806");
     });
 
+    it("en el botón de WhatsApp, en mobile el texto va arriba y el número abajo; desde sm, en una línea", () => {
+      renderLanding();
+
+      const whatsapp = within(screen.getByRole("region", { name: "El complejo" })).getByRole("link", { name: /WhatsApp/ });
+      const text = within(whatsapp).getByText("Escribinos por WhatsApp");
+      const number = within(whatsapp).getByText("0221 538-0806");
+      // Uno debajo del otro: en la misma columna, el texto primero.
+      expect(text.parentElement).toBe(number.parentElement);
+      expect(text.parentElement!.className.split(" ")).toEqual(expect.arrayContaining(["flex-col", "sm:flex-row"]));
+      expect(text.compareDocumentPosition(number) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(number.className.split(" ")).toContain("whitespace-nowrap");
+    });
+
     it("cuenta qué se puede hacer en la plataforma", () => {
       renderLanding();
 
