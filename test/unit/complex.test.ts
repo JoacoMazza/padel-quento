@@ -40,8 +40,9 @@ describe("uniqueComplexLocations", () => {
 });
 
 describe("whatsAppContactUrl", () => {
-  it("arma el link de wa.me con el número", () => {
+  it("arma el link de wa.me con los dígitos del número, como lo espera wa.me", () => {
     expect(whatsAppContactUrl("5492216049987")).toBe("https://wa.me/5492216049987");
+    expect(whatsAppContactUrl("+54 9 221 604-9987")).toBe("https://wa.me/5492216049987");
   });
 
   it("agrega el mensaje inicial codificado", () => {

@@ -33,11 +33,15 @@ export function uniqueComplexLocations(locations: (ComplexLocation | undefined)[
   return [...unique.values()];
 }
 
-/** Link de wa.me para el número (solo dígitos) con el mensaje inicial opcional. Sin número no hay link. */
+/** WhatsApp de contacto: el link al chat y el número como se muestra. */
+export type WhatsAppContact = { url: string; number: string };
+
+/** Link de wa.me para el número (se usan solo sus dígitos) con el mensaje inicial opcional. Sin número no hay link. */
 export function whatsAppContactUrl(number: string | null | undefined, message?: string | null): string | null {
-  if (!number) return null;
+  const digits = number ? toWhatsAppDigits(number) : "";
+  if (!digits) return null;
   const text = message?.trim();
-  return text ? `https://wa.me/${number}?text=${encodeURIComponent(text)}` : `https://wa.me/${number}`;
+  return text ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : `https://wa.me/${digits}`;
 }
 
 /** El número como lo espera wa.me: solo los dígitos ("+54 9 221 604-9987" → "5492216049987"). */

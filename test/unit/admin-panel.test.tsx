@@ -34,7 +34,7 @@ vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateA
 vi.mock("@/src/actions/complex", () => ({
   getComplexContacts: vi.fn(async () => ({
     success: true,
-    data: [{ id: 1, name: "Quento Club", whatsappNumber: "5492216049987", whatsappMessage: null }],
+    data: [{ id: 1, name: "Quento Club", whatsappNumber: "+54 9 221 604-9987", whatsappMessage: null }],
   })),
   updateComplexContact: vi.fn(),
 }));
@@ -385,7 +385,7 @@ describe("AdminPanel", () => {
     await flush();
 
     expect(screen.getByRole("heading", { name: "WhatsApp de contacto" })).toBeTruthy();
-    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+5492216049987");
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 604-9987");
   });
 
   it("muestra fuera de servicio la cancha con un bloqueo activo, pero no por uno programado o vencido", async () => {

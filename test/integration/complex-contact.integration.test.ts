@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { AdminAccessLevel, Role } from "@/src/domain/enums";
 import type { Complex } from "@/src/entities/Complex";
 import { getDataSource } from "@/src/lib/db";
-import { getComplexContacts, getWhatsAppContactUrl, updateComplexContact } from "@/src/actions/complex";
+import { getComplexContacts, getWhatsAppContact, updateComplexContact } from "@/src/actions/complex";
 import { createTestAdmin, ensureTestComplex } from "./helpers";
 
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
@@ -36,28 +36,28 @@ describe("WhatsApp de contacto del complejo (integración con Postgres real)", (
     await setContact(null, null);
   });
 
-  describe("getWhatsAppContactUrl", () => {
-    it("arma el link de wa.me con el número y el mensaje del complejo del club, sin pedir sesión", async () => {
-      await setContact("5492216049987", "Hola Quento");
+  describe("getWhatsAppContact", () => {
+    it("devuelve el link de wa.me y el número a mostrar del complejo del club, sin pedir sesión", async () => {
+      await setContact("+54 9 221 604-9987", "Hola Quento");
       vi.mocked(getServerSession).mockResolvedValue(null);
 
-      expect(await getWhatsAppContactUrl()).toEqual({
+      expect(await getWhatsAppContact()).toEqual({
         success: true,
-        data: "https://wa.me/5492216049987?text=Hola%20Quento",
+        data: { url: "https://wa.me/5492216049987?text=Hola%20Quento", number: "+54 9 221 604-9987" },
       });
     });
 
     it("sin número cargado no hay link", async () => {
       await setContact(null, "Hola Quento");
 
-      expect(await getWhatsAppContactUrl()).toEqual({ success: true, data: null });
+      expect(await getWhatsAppContact()).toEqual({ success: true, data: null });
     });
   });
 
   describe("updateComplexContact", () => {
-    it("guarda el número solo con sus dígitos y el mensaje sin espacios de más", async () => {
+    it("guarda el número como se escribió, para mostrarlo así, y el mensaje sin espacios de más", async () => {
       const result = await updateComplexContact(complex.id, {
-        whatsappNumber: "+54 9 221 604-9987",
+        whatsappNumber: "  +54 9 221   604-9987 ",
         whatsappMessage: "  Hola, quiero hacer una consulta.  ",
       });
 
@@ -66,27 +66,37 @@ describe("WhatsApp de contacto del complejo (integración con Postgres real)", (
         data: {
           id: complex.id,
           name: complex.name,
-          whatsappNumber: "5492216049987",
+          whatsappNumber: "+54 9 221 604-9987",
           whatsappMessage: "Hola, quiero hacer una consulta.",
         },
       });
-      expect(await getWhatsAppContactUrl()).toEqual({
+      expect(await getWhatsAppContact()).toEqual({
         success: true,
-        data: "https://wa.me/5492216049987?text=Hola%2C%20quiero%20hacer%20una%20consulta.",
+        data: {
+          url: "https://wa.me/5492216049987?text=Hola%2C%20quiero%20hacer%20una%20consulta.",
+          number: "+54 9 221 604-9987",
+        },
+      });
+    });
+
+    it("rechaza un número con letras u otros caracteres que no van en un teléfono", async () => {
+      expect(await updateComplexContact(complex.id, { whatsappNumber: "+54 9 221 604-9987 int 2", whatsappMessage: "" })).toEqual({
+        success: false,
+        error: "El número de WhatsApp solo puede tener dígitos, espacios, guiones, paréntesis y el + del código de país.",
       });
     });
 
     it("con el número vacío lo borra (y el botón deja de mostrarse)", async () => {
-      await setContact("5492216049987", null);
+      await setContact("+54 9 221 604-9987", null);
 
       const result = await updateComplexContact(complex.id, { whatsappNumber: " ", whatsappMessage: "" });
 
       expect(result).toMatchObject({ success: true, data: { whatsappNumber: null, whatsappMessage: null } });
-      expect(await getWhatsAppContactUrl()).toEqual({ success: true, data: null });
+      expect(await getWhatsAppContact()).toEqual({ success: true, data: null });
     });
 
     it("rechaza un número con menos de 10 o más de 15 dígitos y no lo guarda", async () => {
-      await setContact("5492216049987", null);
+      await setContact("+54 9 221 604-9987", null);
 
       for (const whatsappNumber of ["221 604-998", "+54 9 221 604-9987 123"]) {
         expect(await updateComplexContact(complex.id, { whatsappNumber, whatsappMessage: "" })).toEqual({
@@ -94,7 +104,10 @@ describe("WhatsApp de contacto del complejo (integración con Postgres real)", (
           error: "El número de WhatsApp tiene que tener entre 10 y 15 dígitos, con el código de país (por ejemplo +54 9 221 604-9987).",
         });
       }
-      expect(await getWhatsAppContactUrl()).toEqual({ success: true, data: "https://wa.me/5492216049987" });
+      expect(await getWhatsAppContact()).toEqual({
+        success: true,
+        data: { url: "https://wa.me/5492216049987", number: "+54 9 221 604-9987" },
+      });
     });
 
     it("rechaza un mensaje de más de 500 caracteres", async () => {
@@ -121,7 +134,7 @@ describe("WhatsApp de contacto del complejo (integración con Postgres real)", (
 
   describe("getComplexContacts", () => {
     it("lista los complejos con su número y mensaje", async () => {
-      await setContact("5492216049987", "Hola Quento");
+      await setContact("+54 9 221 604-9987", "Hola Quento");
 
       const result = await getComplexContacts();
 
@@ -129,7 +142,7 @@ describe("WhatsApp de contacto del complejo (integración con Postgres real)", (
       expect(result.data.find((c) => c.id === complex.id)).toEqual({
         id: complex.id,
         name: complex.name,
-        whatsappNumber: "5492216049987",
+        whatsappNumber: "+54 9 221 604-9987",
         whatsappMessage: "Hola Quento",
       });
     });

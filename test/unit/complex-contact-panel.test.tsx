@@ -13,7 +13,7 @@ import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 const contact = {
   id: 1,
   name: "Quento Club",
-  whatsappNumber: "5492216049987",
+  whatsappNumber: "+54 9 221 604-9987",
   whatsappMessage: "Hola, quiero hacer una consulta sobre Quento Club.",
 };
 
@@ -31,14 +31,14 @@ describe("ComplexContactPanel", () => {
     render(<ComplexContactPanel />);
 
     expect(await screen.findByText("Quento Club")).toBeTruthy();
-    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+5492216049987");
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 604-9987");
     expect((screen.getByLabelText("Mensaje inicial") as HTMLTextAreaElement).value).toBe(contact.whatsappMessage);
   });
 
   it("guarda el número y el mensaje editados y avisa", async () => {
     updateComplexContact.mockResolvedValue({
       success: true,
-      data: { ...contact, whatsappNumber: "5492215550000", whatsappMessage: "Hola" },
+      data: { ...contact, whatsappNumber: "+54 9 221 555-0000", whatsappMessage: "Hola" },
     });
     render(<ComplexContactPanel />);
     await screen.findByText("Quento Club");
@@ -51,7 +51,7 @@ describe("ComplexContactPanel", () => {
       expect(updateComplexContact).toHaveBeenCalledWith(1, { whatsappNumber: "+54 9 221 555-0000", whatsappMessage: "Hola" }),
     );
     expect(await screen.findByText("WhatsApp de contacto guardado.")).toBeTruthy();
-    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+5492215550000");
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 555-0000");
   });
 
   it("muestra el error si no se pudo guardar", async () => {

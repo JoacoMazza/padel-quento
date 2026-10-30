@@ -73,7 +73,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
     const complexes = await db.query(`SELECT "whatsapp_number", "whatsapp_message" FROM "complexes"`);
 
     expect(complexes).toEqual([
-      { whatsapp_number: "5492216049987", whatsapp_message: "Hola, quiero hacer una consulta sobre Quento Club." },
+      { whatsapp_number: "+54 9 221 604-9987", whatsapp_message: "Hola, quiero hacer una consulta sobre Quento Club." },
     ]);
   });
 

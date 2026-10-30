@@ -6,7 +6,7 @@ import { Landing } from "@/app/landing/landing";
 import { summarizeClubHours } from "@/app/landing/club-hours";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
-import { getWhatsAppContactUrl } from "@/src/actions/complex";
+import { getWhatsAppContact } from "@/src/actions/complex";
 import { CourtState } from "@/src/domain/enums";
 
 // La home usa el título por defecto del sitio; solo define su URL canónica.
@@ -20,7 +20,7 @@ export default async function Home() {
   const [courtsResult, schedulesResult, whatsappResult] = await Promise.all([
     getCourts(),
     getSchedules(),
-    getWhatsAppContactUrl(),
+    getWhatsAppContact(),
   ]);
   const activeCourts = (courtsResult.success ? courtsResult.data : []).filter(
     (court) => court.state !== CourtState.CLOSED_DOWN,
@@ -41,7 +41,7 @@ export default async function Home() {
         isGuest={isGuest}
         courtCount={activeCourts.length}
         hours={summarizeClubHours(schedules)}
-        whatsappUrl={whatsappResult.success ? whatsappResult.data : null}
+        whatsapp={whatsappResult.success ? whatsappResult.data : null}
         courts={activeCourts.map((c) => ({
           id: c.id,
           number: c.number,

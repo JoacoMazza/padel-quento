@@ -2,7 +2,7 @@
 
 import "reflect-metadata";
 import type { Complex } from "@/src/entities/Complex";
-import { isValidWhatsAppNumber, toWhatsAppDigits, whatsAppContactUrl } from "@/src/domain/complex";
+import { isValidWhatsAppNumber, toWhatsAppDigits, whatsAppContactUrl, type WhatsAppContact } from "@/src/domain/complex";
 import { getDataSource } from "@/src/lib/db";
 import { findClubComplex } from "@/src/lib/club-complex";
 import type { ActionResult } from "@/src/lib/action-result";
@@ -19,6 +19,8 @@ export type ComplexContact = {
 export type UpdateComplexContactInput = { whatsappNumber: string; whatsappMessage: string };
 
 const MAX_MESSAGE_LENGTH = 500;
+// Lo que puede tener un teléfono escrito a mano: dígitos, espacios, guiones, paréntesis y el + del código de país.
+const PHONE_CHARACTERS = /^[\d\s()+-]*$/;
 
 function toContact(complex: Complex): ComplexContact {
   return {
@@ -34,14 +36,18 @@ function authErrorMessage(error: unknown): string | null {
   return error instanceof ForbiddenError || error instanceof UnauthorizedError ? error.message : null;
 }
 
-/** Link de WhatsApp del complejo del club, para el botón de contacto (público). Null si no tiene número. */
-export async function getWhatsAppContactUrl(): Promise<ActionResult<string | null>> {
+/**
+ * WhatsApp del complejo del club, para los botones de contacto (público): el
+ * link al chat y el número como se muestra. Null si no tiene número.
+ */
+export async function getWhatsAppContact(): Promise<ActionResult<WhatsAppContact | null>> {
   try {
     const dataSource = await getDataSource();
     const complex = await findClubComplex(dataSource);
-    return { success: true, data: whatsAppContactUrl(complex?.whatsappNumber, complex?.whatsappMessage) };
+    const url = whatsAppContactUrl(complex?.whatsappNumber, complex?.whatsappMessage);
+    return { success: true, data: url && complex?.whatsappNumber ? { url, number: complex.whatsappNumber } : null };
   } catch (error) {
-    console.error("getWhatsAppContactUrl", error);
+    console.error("getWhatsAppContact", error);
     return { success: false, error: "No se pudo obtener el WhatsApp de contacto." };
   }
 }
@@ -63,7 +69,8 @@ export async function getComplexContacts(): Promise<ActionResult<ComplexContact[
 
 /**
  * Carga el WhatsApp de contacto de un complejo: cualquier administrador. El
- * número se guarda solo con sus dígitos; vacío lo borra y el botón deja de mostrarse.
+ * número se guarda como se escribió (para mostrarlo así) y el link usa sus
+ * dígitos; vacío lo borra y el botón deja de mostrarse.
  */
 export async function updateComplexContact(
   id: number,
@@ -71,8 +78,14 @@ export async function updateComplexContact(
 ): Promise<ActionResult<ComplexContact>> {
   try {
     await requireAdmin();
-    const whatsappNumber = toWhatsAppDigits(input.whatsappNumber) || null;
-    if (whatsappNumber && !isValidWhatsAppNumber(whatsappNumber)) {
+    const whatsappNumber = input.whatsappNumber.trim().replace(/\s+/g, " ") || null;
+    if (whatsappNumber && !PHONE_CHARACTERS.test(whatsappNumber)) {
+      return {
+        success: false,
+        error: "El número de WhatsApp solo puede tener dígitos, espacios, guiones, paréntesis y el + del código de país.",
+      };
+    }
+    if (whatsappNumber && !isValidWhatsAppNumber(toWhatsAppDigits(whatsappNumber))) {
       return {
         success: false,
         error: "El número de WhatsApp tiene que tener entre 10 y 15 dígitos, con el código de país (por ejemplo +54 9 221 604-9987).",

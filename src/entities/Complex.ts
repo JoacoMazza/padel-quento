@@ -39,8 +39,8 @@ export class Complex {
   @Column({ type: "varchar", length: 500, name: "maps_url", nullable: true })
   mapsUrl!: string | null;
 
-  /** WhatsApp de contacto, solo dígitos y con código de país; sin número no se muestra el botón. */
-  @Column({ type: "varchar", length: 15, name: "whatsapp_number", nullable: true })
+  /** WhatsApp de contacto, con código de país y como se muestra ("+54 9 221 604-9987"); sin número no se muestra el botón. */
+  @Column({ type: "varchar", length: 30, name: "whatsapp_number", nullable: true })
   whatsappNumber!: string | null;
 
   /** Mensaje con el que se abre el chat de WhatsApp. */

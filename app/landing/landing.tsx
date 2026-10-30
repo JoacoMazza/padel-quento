@@ -17,6 +17,7 @@ import {
   CLUB_SHORT_ADDRESS,
 } from "@/app/components/club-info";
 import type { ClubHoursRow } from "@/app/landing/club-hours";
+import type { WhatsAppContact } from "@/src/domain/complex";
 import { ATTENDANCE_POINTS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { HeroVideo } from "@/app/landing/hero-video";
 
@@ -30,14 +31,14 @@ import { HeroVideo } from "@/app/landing/hero-video";
 export function Landing({
   courtCount,
   hours,
-  whatsappUrl,
+  whatsapp,
 }: {
   userName: string | null;
   isGuest: boolean;
   courtCount: number;
   hours: ClubHoursRow[];
-  /** Link de WhatsApp del complejo; sin número cargado, null y no se muestra el botón. */
-  whatsappUrl: string | null;
+  /** WhatsApp del complejo (link al chat y número a mostrar); sin número cargado, null y no se muestra el botón. */
+  whatsapp: WhatsAppContact | null;
   courts?: unknown;
 }) {
   return (
@@ -478,17 +479,21 @@ export function Landing({
               </div>
 
               {/* Botón WhatsApp */}
-              {whatsappUrl ? (
+              {whatsapp ? (
                 <div className="pt-2">
                   <a
-                    href={whatsappUrl}
+                    href={whatsapp.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#141518] px-6 py-3.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.98]"
+                    className="inline-flex w-full sm:w-auto items-center justify-start sm:justify-center gap-2.5 rounded-xl bg-[#141518] px-6 py-3.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-black hover:scale-[1.01] active:scale-[0.98]"
                   >
                     <MessageCircle className="h-4 w-4 text-white" />
-                    <span>Escribinos por WhatsApp</span>
-                    <ArrowRight className="h-4 w-4 ml-0.5 text-white/70" />
+                    {/* En mobile el número va debajo del texto y la flecha al final del botón; desde sm, todo en una línea. */}
+                    <span className="flex flex-col items-start leading-tight sm:flex-row sm:items-center sm:gap-2.5">
+                      <span>Escribinos por WhatsApp</span>
+                      <span className="font-mono text-xs whitespace-nowrap text-white/70 sm:text-sm">{whatsapp.number}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 ml-auto sm:ml-0.5 text-white/70" />
                   </a>
                 </div>
               ) : null}

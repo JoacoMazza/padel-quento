@@ -4,13 +4,8 @@ import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { getComplexContacts, updateComplexContact, type ComplexContact } from "@/src/actions/complex";
 
-/** El número guardado (solo dígitos) como se muestra en el campo, con el "+" del código de país. */
-function numberLabel(whatsappNumber: string | null): string {
-  return whatsappNumber ? `+${whatsappNumber}` : "";
-}
-
 function ContactForm({ contact }: { contact: ComplexContact }) {
-  const [whatsappNumber, setWhatsappNumber] = useState(numberLabel(contact.whatsappNumber));
+  const [whatsappNumber, setWhatsappNumber] = useState(contact.whatsappNumber ?? "");
   const [whatsappMessage, setWhatsappMessage] = useState(contact.whatsappMessage ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +24,7 @@ function ContactForm({ contact }: { contact: ComplexContact }) {
       setError(result.error);
       return;
     }
-    setWhatsappNumber(numberLabel(result.data.whatsappNumber));
+    setWhatsappNumber(result.data.whatsappNumber ?? "");
     setWhatsappMessage(result.data.whatsappMessage ?? "");
     setNotice("WhatsApp de contacto guardado.");
   }

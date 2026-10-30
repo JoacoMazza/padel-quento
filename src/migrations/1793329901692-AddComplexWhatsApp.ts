@@ -8,9 +8,9 @@ export class AddComplexWhatsApp1793329901692 implements MigrationInterface {
     name = 'AddComplexWhatsApp1793329901692'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "complexes" ADD "whatsapp_number" character varying(15)`);
+        await queryRunner.query(`ALTER TABLE "complexes" ADD "whatsapp_number" character varying(30)`);
         await queryRunner.query(`ALTER TABLE "complexes" ADD "whatsapp_message" character varying(500)`);
-        await queryRunner.query(`UPDATE "complexes" SET "whatsapp_number" = '5492216049987', "whatsapp_message" = 'Hola, quiero hacer una consulta sobre Quento Club.' WHERE "id" = (SELECT MIN("id") FROM "complexes")`);
+        await queryRunner.query(`UPDATE "complexes" SET "whatsapp_number" = '+54 9 221 604-9987', "whatsapp_message" = 'Hola, quiero hacer una consulta sobre Quento Club.' WHERE "id" = (SELECT MIN("id") FROM "complexes")`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

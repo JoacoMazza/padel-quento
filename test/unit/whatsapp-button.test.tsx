@@ -2,8 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-const { getWhatsAppContactUrl } = vi.hoisted(() => ({ getWhatsAppContactUrl: vi.fn() }));
-vi.mock("@/src/actions/complex", () => ({ getWhatsAppContactUrl }));
+const { getWhatsAppContact } = vi.hoisted(() => ({ getWhatsAppContact: vi.fn() }));
+vi.mock("@/src/actions/complex", () => ({ getWhatsAppContact }));
 
 import { WhatsAppButton } from "@/app/components/whatsapp-button";
 
@@ -12,7 +12,7 @@ const URL = "https://wa.me/5492216049987?text=Hola%20Quento";
 describe("WhatsAppButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getWhatsAppContactUrl.mockResolvedValue({ success: true, data: URL });
+    getWhatsAppContact.mockResolvedValue({ success: true, data: { url: URL, number: "+54 9 221 604-9987" } });
   });
 
   afterEach(() => {
@@ -53,18 +53,18 @@ describe("WhatsAppButton", () => {
   });
 
   it("no se muestra si el complejo no tiene número cargado", async () => {
-    getWhatsAppContactUrl.mockResolvedValue({ success: true, data: null });
+    getWhatsAppContact.mockResolvedValue({ success: true, data: null });
     const { container } = render(<WhatsAppButton />);
 
-    await waitFor(() => expect(getWhatsAppContactUrl).toHaveBeenCalled());
+    await waitFor(() => expect(getWhatsAppContact).toHaveBeenCalled());
     expect(container.innerHTML).toBe("");
   });
 
   it("no se muestra si no se pudo obtener el número", async () => {
-    getWhatsAppContactUrl.mockResolvedValue({ success: false, error: "No se pudo obtener el contacto." });
+    getWhatsAppContact.mockResolvedValue({ success: false, error: "No se pudo obtener el contacto." });
     const { container } = render(<WhatsAppButton />);
 
-    await waitFor(() => expect(getWhatsAppContactUrl).toHaveBeenCalled());
+    await waitFor(() => expect(getWhatsAppContact).toHaveBeenCalled());
     expect(container.innerHTML).toBe("");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getWhatsAppContactUrl } from "@/src/actions/complex";
+import { getWhatsAppContact } from "@/src/actions/complex";
 
 // Logo oficial de WhatsApp (de Simple Icons, CC0), sin modificar, como piden las pautas de marca de Meta.
 const WHATSAPP_LOGO_PATH =
@@ -17,8 +17,8 @@ export function WhatsAppButton() {
 
   // Se pide desde el navegador para que las páginas estáticas también muestren el número vigente.
   useEffect(() => {
-    getWhatsAppContactUrl().then((result) => {
-      if (result.success) setHref(result.data);
+    getWhatsAppContact().then((result) => {
+      if (result.success) setHref(result.data?.url ?? null);
     });
   }, []);
 
