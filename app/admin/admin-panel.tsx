@@ -311,7 +311,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-8 lg:py-10">
+      <main className="flex-1 overflow-y-auto px-6 pt-8 pb-24 lg:px-8 lg:pt-10 lg:pb-10">
         <p className="eyebrow mb-2">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Administración · Quento Club

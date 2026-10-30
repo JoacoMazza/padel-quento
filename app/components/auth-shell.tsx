@@ -43,7 +43,7 @@ export function AuthShell({
         <p className="text-xs text-white/40">{CLUB_ADDRESS}</p>
       </aside>
 
-      <div className="flex flex-1 items-center justify-center px-4 py-12">
+      <div className="flex flex-1 items-center justify-center px-4 pt-12 pb-24 sm:pb-12">
         <div className="card w-full max-w-md p-8 shadow-lg">
           <Link href="/" aria-label="Ir al inicio" className="mx-auto mb-6 flex w-fit flex-col items-center justify-center">
             <QuentoLogo size="md" variant="full" />
