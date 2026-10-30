@@ -1,0 +1,49 @@
+name: Background jobs
+
+# In Vercel (serverless) there is no long-running server for the setIntervals in src/jobs,
+# so this workflow runs them by calling /api/cron/<job> (see src/lib/cron.ts).
+# Needs the repository secrets APP_URL (e.g. https://padel-quento.vercel.app) and CRON_SECRET
+# (the same value as the CRON_SECRET environment variable in Vercel).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # open match expiration and attendance points
+    - cron: "0 */6 * * *" # fixed booking extension (same frequency as src/jobs/fixed-booking-extension.ts)
+  workflow_dispatch:
+
+jobs:
+  run:
+    name: Run background jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::Faltan los secrets APP_URL y/o CRON_SECRET: no se corre ningún proceso."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run jobs
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          if [ "${{ github.event.schedule }}" = "0 */6 * * *" ]; then
+            jobs="fixed-booking-extension"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            jobs="open-match-expiration attendance-points fixed-booking-extension"
+          else
+            jobs="open-match-expiration attendance-points"
+          fi
+          for job in $jobs; do
+            echo "Corriendo $job"
+            curl --fail-with-body --silent --show-error --max-time 60 -X POST \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "${APP_URL%/}/api/cron/$job"
+            echo
+          done

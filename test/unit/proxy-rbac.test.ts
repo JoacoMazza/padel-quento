@@ -49,6 +49,18 @@ describe("proxy RBAC and Route Protection", () => {
     });
   });
 
+  describe("Procesos en segundo plano (/api/cron/*)", () => {
+    it("deja pasar al programador sin sesión: el endpoint se protege con CRON_SECRET", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce(null);
+      const req = createMockRequest("/api/cron/attendance-points");
+
+      const res = await proxy(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+  });
+
   describe("Manifest del sitio (/manifest.webmanifest)", () => {
     it("permite el acceso sin token, para que el navegador pueda leerlo", async () => {
       vi.mocked(getToken).mockResolvedValueOnce(null);

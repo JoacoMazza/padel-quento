@@ -111,4 +111,24 @@ describe("getDataSource", { timeout: 20000 }, () => {
 
     expect(retried.isInitialized).toBe(true);
   });
+
+  it("en Vercel usa pocas conexiones por instancia, para no agotar las del pooler de Supabase", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    process.env.VERCEL = "1";
+    const { getDataSource } = await import("@/src/lib/db");
+
+    const dataSource = await getDataSource();
+
+    expect((dataSource.options as { extra?: { max?: number } }).extra?.max).toBe(2);
+  });
+
+  it("fuera de Vercel deja el tamaño del pool por defecto", async () => {
+    process.env.DATABASE_URL = "postgres://user:pass@localhost:5432/db";
+    delete process.env.VERCEL;
+    const { getDataSource } = await import("@/src/lib/db");
+
+    const dataSource = await getDataSource();
+
+    expect((dataSource.options as { extra?: { max?: number } }).extra?.max).toBeUndefined();
+  });
 });

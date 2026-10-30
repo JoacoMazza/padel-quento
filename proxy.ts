@@ -11,6 +11,9 @@ function isPublicPath(pathname: string) {
   // El navegador pide el manifest y recursos estáticos sin cookies de sesión.
   return (
     pathname.startsWith("/api/auth") ||
+    // Los procesos en segundo plano los llama un programador sin sesión: el endpoint
+    // se protege con CRON_SECRET (ver src/lib/cron.ts).
+    pathname.startsWith("/api/cron/") ||
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/material_landing/") ||
     pathname === "/favicon.ico" ||

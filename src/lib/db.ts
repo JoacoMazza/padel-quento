@@ -23,6 +23,9 @@ function createDataSource() {
     // corridas a mano (pnpm migration:run), nunca al levantar la app.
     synchronize: false,
     logging: process.env.NODE_ENV === "development",
+    // En Vercel cada instancia abre su propio pool: con pocas conexiones por
+    // instancia no se agotan las del session pooler de Supabase.
+    extra: process.env.VERCEL ? { max: 2 } : undefined,
   });
 }
 
