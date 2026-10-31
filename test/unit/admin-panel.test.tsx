@@ -144,6 +144,13 @@ describe("AdminPanel", () => {
       expect(classesOf(aside)).not.toContain("w-64");
     });
 
+    it("el contenido deja lugar abajo para que el botón de WhatsApp no tape los controles", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByRole("main"))).toEqual(expect.arrayContaining(["pb-24", "lg:pb-10"]));
+    });
+
     it("las secciones quedan detrás de un botón hamburguesa que muestra la sección actual", async () => {
       render(<AdminPanel isOwner />);
       await flush();

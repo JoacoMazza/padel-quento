@@ -11,7 +11,7 @@ const FOOTER_LINKS = [
 export function AppFooter({ showLinks = true }: { showLinks?: boolean }) {
   return (
     <footer className="mt-auto border-t border-line bg-card">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-8 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 pt-8 pb-24 md:pb-8 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <p className="text-sm font-extrabold tracking-wide text-foreground uppercase">Quento Club</p>
           <a
