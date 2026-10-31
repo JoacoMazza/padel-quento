@@ -24,16 +24,26 @@ function occupancyLabel(lesson: TeacherClassItem): string {
 }
 
 /**
- * Próximos turnos de clase del profesor con sus alumnos (HU-44): busca
- * jugadores registrados y los suma hasta el cupo, o los quita mientras la
- * clase no empezó (el servidor lo verifica).
+ * Agenda del profesor (HU-46): sus próximos turnos de clase con los alumnos,
+ * donde busca jugadores registrados y los suma hasta el cupo o los quita
+ * mientras la clase no empezó (HU-44, el servidor lo verifica). Debajo, las
+ * clases que terminaron hace poco, como "Finalizado" y sin cambios.
  */
-export function TeacherClassesBoard({ classes: initialClasses }: { classes: TeacherClassItem[] }) {
+export function TeacherClassesBoard({
+  classes: initialClasses,
+  onChanged,
+}: {
+  classes: TeacherClassItem[];
+  /** Avisa que cambiaron los alumnos de una clase, con la agenda actualizada (por ejemplo, para el listado de alumnos). */
+  onChanged?: (classes: TeacherClassItem[]) => void;
+}) {
   const [classes, setClasses] = useState(initialClasses);
 
   async function reload() {
     const result = await getTeacherClasses();
-    if (result.success) setClasses(result.data);
+    if (!result.success) return;
+    setClasses(result.data);
+    onChanged?.(result.data);
   }
 
   if (classes.length === 0) {
@@ -48,11 +58,37 @@ export function TeacherClassesBoard({ classes: initialClasses }: { classes: Teac
     );
   }
 
+  const upcoming = classes.filter((lesson) => !lesson.isFinished);
+  // Las finalizadas, de la más reciente a la más vieja.
+  const finished = classes.filter((lesson) => lesson.isFinished).reverse();
+
   return (
-    <div className="mt-10 space-y-4">
-      {classes.map((lesson) => (
-        <ClassCard key={lesson.id} lesson={lesson} onChanged={reload} />
-      ))}
+    <div className="mt-10 space-y-10">
+      <section aria-labelledby="upcoming-classes" className="space-y-4">
+        <h2 id="upcoming-classes" className="label-caps">
+          Próximas clases
+        </h2>
+        {upcoming.length === 0 ? (
+          <div className="card flex flex-col items-center gap-3 p-8 text-center">
+            <p className="text-sm text-foreground/60">No tenés próximos turnos de clase.</p>
+            <Link href="/teacher/book" className="btn btn-primary btn-sm">
+              Reservar clase
+            </Link>
+          </div>
+        ) : (
+          upcoming.map((lesson) => <ClassCard key={lesson.id} lesson={lesson} onChanged={reload} />)
+        )}
+      </section>
+      {finished.length > 0 ? (
+        <section aria-labelledby="finished-classes" className="space-y-4">
+          <h2 id="finished-classes" className="label-caps">
+            Finalizadas
+          </h2>
+          {finished.map((lesson) => (
+            <ClassCard key={lesson.id} lesson={lesson} onChanged={reload} />
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -66,6 +102,7 @@ function ClassCard({ lesson, onChanged }: { lesson: TeacherClassItem; onChanged:
   const start = new Date(lesson.fromDateTime);
   const end = new Date(start.getTime() + lesson.durationMinutes * 60_000);
   const isFull = lesson.students.length >= lesson.classCapacity;
+  const canEdit = !lesson.isFinished;
   const titleId = `class-${lesson.id}-title`;
   const searchId = `class-${lesson.id}-search`;
 
@@ -116,7 +153,11 @@ function ClassCard({ lesson, onChanged }: { lesson: TeacherClassItem; onChanged:
             </span>
           </p>
         </div>
-        <span className={`badge ${isFull ? "badge-neutral" : "badge-success"}`}>{occupancyLabel(lesson)}</span>
+        {lesson.isFinished ? (
+          <span className="badge badge-neutral">Finalizado</span>
+        ) : (
+          <span className={`badge ${isFull ? "badge-neutral" : "badge-success"}`}>{occupancyLabel(lesson)}</span>
+        )}
       </div>
 
       {lesson.students.length > 0 ? (
@@ -129,24 +170,28 @@ function ClassCard({ lesson, onChanged }: { lesson: TeacherClassItem; onChanged:
                   <p className="text-sm font-semibold text-foreground">{fullName}</p>
                   <p className="text-xs text-foreground/60">{student.email}</p>
                 </div>
-                <button
-                  type="button"
-                  aria-label={`Quitar a ${fullName} de la clase`}
-                  title="Quitar de la clase"
-                  onClick={() => run(() => removeClassStudent(lesson.id, student.id))}
-                  className="icon-btn hover:border-danger/40 hover:text-danger"
-                >
-                  <UserMinus className="h-4 w-4" />
-                </button>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    aria-label={`Quitar a ${fullName} de la clase`}
+                    title="Quitar de la clase"
+                    onClick={() => run(() => removeClassStudent(lesson.id, student.id))}
+                    className="icon-btn hover:border-danger/40 hover:text-danger"
+                  >
+                    <UserMinus className="h-4 w-4" />
+                  </button>
+                ) : null}
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="text-sm text-foreground/60">Todavía no registraste alumnos.</p>
+        <p className="text-sm text-foreground/60">
+          {lesson.isFinished ? "No tuvo alumnos registrados." : "Todavía no registraste alumnos."}
+        </p>
       )}
 
-      {isFull ? null : (
+      {!canEdit || isFull ? null : (
         <div className="space-y-2">
           <label htmlFor={searchId} className="field-label">
             Buscar alumno
