@@ -22,12 +22,22 @@ import { getNextSlotChange } from "@/app/admin/schedule-refresh";
 import { getAdminBookingStatus } from "@/app/admin/admin-booking-status";
 import { dateToClockLabel } from "@/src/domain/time-format";
 
-type CellState = "available" | "reserved" | "fixed" | "pending" | "finished" | "unbooked" | "blocked" | "closed";
+type CellState =
+  | "available"
+  | "reserved"
+  | "fixed"
+  | "class"
+  | "pending"
+  | "finished"
+  | "unbooked"
+  | "blocked"
+  | "closed";
 
 const CELL_STYLES: Record<CellState, string> = {
   available: "border border-line bg-card text-success",
   reserved: "bg-ink text-white hover:bg-ink-soft",
   fixed: "bg-occupied text-white hover:bg-occupied/85",
+  class: "bg-violet-600 text-white hover:bg-violet-600/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
   finished: "bg-foreground/70 text-white hover:bg-foreground/80",
   unbooked: "bg-foreground/55 text-white/80 line-through",
@@ -39,6 +49,7 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
   { state: "available", label: "Disponible", swatch: "border border-line bg-card" },
   { state: "reserved", label: "Reservado", swatch: "bg-ink" },
   { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
+  { state: "class", label: "Clase", swatch: "bg-violet-600" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
   { state: "finished", label: "Finalizado", swatch: "bg-foreground/70" },
   { state: "unbooked", label: "No reservado", swatch: "bg-foreground/55" },
@@ -221,7 +232,8 @@ export function ScheduleBoard({
       overlappingBooking?.bookingState === BookingState.RESERVED ||
       overlappingBooking?.bookingState === BookingState.PAID
     ) {
-      return { state: overlappingBooking.fixedBookingDateId ? "fixed" : "reserved", booking: overlappingBooking };
+      const state = overlappingBooking.classInfo ? "class" : overlappingBooking.fixedBookingDateId ? "fixed" : "reserved";
+      return { state, booking: overlappingBooking };
     }
 
     // Horario que terminó sin que nadie lo tomara (o cuyo turno se canceló).
@@ -349,7 +361,15 @@ export function ScheduleBoard({
                           tabIndex={isClickable ? 0 : undefined}
                           data-state={state}
                           onClick={handleClick}
-                          title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
+                          title={
+                            booking?.classInfo
+                              ? `Clase de ${booking.bookerName} · ${booking.classInfo.students.length}/${booking.classInfo.capacity} alumnos`
+                              : booking
+                                ? "Ver y marcar asistencia"
+                                : canSchedule
+                                  ? "Agendar turno"
+                                  : undefined
+                          }
                           className={`inline-flex h-10 w-full pointer-coarse:h-11 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
                           {state === "closed" ? (

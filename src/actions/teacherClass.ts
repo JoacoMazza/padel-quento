@@ -6,11 +6,13 @@ import type { Booking } from "@/src/entities/Booking";
 import type { ClassStudent } from "@/src/entities/ClassStudent";
 import type { Player } from "@/src/entities/Player";
 import { BookingState } from "@/src/domain/enums";
-import { FINISHED_CLASSES_DAYS, MAX_CLASS_CAPACITY, MIN_CLASS_CAPACITY } from "@/src/domain/constants";
+import { MAX_CLASS_CAPACITY, MIN_CLASS_CAPACITY } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { createBookingForPlayer } from "@/src/lib/bookings";
+import { findAgendaOf } from "@/src/lib/teacher-classes";
 import { ForbiddenError, UnauthorizedError, requireTeacher } from "@/src/lib/rbac";
+import { getSessionPlayerId } from "@/src/lib/session-player";
 
 const MIN_SEARCH_LENGTH = 2;
 const SEARCH_LIMIT = 10;
@@ -94,34 +96,7 @@ export async function createClassBooking(input: CreateClassBookingInput): Promis
 export async function getTeacherClasses(): Promise<ActionResult<TeacherClassItem[]>> {
   try {
     const { playerId } = await requireTeacher();
-    const dataSource = await getDataSource();
-    const now = new Date();
-    const classes = await dataSource
-      .createQueryBuilder<Booking>("Booking", "booking")
-      .leftJoinAndSelect("booking.court", "court")
-      .leftJoinAndSelect("booking.classStudents", "student")
-      .leftJoinAndSelect("student.player", "player")
-      .leftJoinAndSelect("player.account", "account")
-      .leftJoin("booking.booker", "booker")
-      .where("booker.id = :playerId", { playerId })
-      .andWhere('booking."class_capacity" IS NOT NULL')
-      .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-      .andWhere('booking."datetime" + make_interval(mins => booking."duration_minutes") > :since', {
-        since: new Date(now.getTime() - FINISHED_CLASSES_DAYS * 24 * 60 * 60_000),
-      })
-      .orderBy('booking."datetime"', "ASC")
-      .addOrderBy("student.id", "ASC")
-      .getMany();
-
-    const data: TeacherClassItem[] = classes.map((booking) => ({
-      id: booking.id,
-      fromDateTime: booking.fromDateTime,
-      durationMinutes: booking.durationMinutes,
-      courtNumber: booking.court.number,
-      classCapacity: booking.classCapacity!,
-      isFinished: new Date(booking.fromDateTime).getTime() + booking.durationMinutes * 60_000 <= now.getTime(),
-      students: booking.classStudents.map((student) => toStudent(student.player)),
-    }));
+    const data = await findAgendaOf(playerId);
     return { success: true, data: toPlain(data) };
   } catch (error) {
     const known = knownErrorMessage(error);
@@ -292,5 +267,37 @@ export async function removeClassStudent(bookingId: number, studentId: number): 
     if (known) return { success: false, error: known };
     console.error("removeClassStudent", error);
     return { success: false, error: "No se pudo quitar al alumno." };
+  }
+}
+
+/** El alumno de la sesión sale de una clase en la que lo registraron, mientras no empezó (HU-47). */
+export async function leaveClass(bookingId: number): Promise<ActionResult<null>> {
+  try {
+    const playerId = await getSessionPlayerId();
+    if (playerId === null) {
+      return { success: false, error: "Tenés que iniciar sesión." };
+    }
+
+    const dataSource = await getDataSource();
+    const students = dataSource.getRepository<ClassStudent>("ClassStudent");
+    const registration = await students.findOne({
+      where: { booking: { id: bookingId }, player: { id: playerId } },
+      relations: { booking: true },
+    });
+    if (!registration) {
+      return { success: false, error: "No estás registrado en esa clase." };
+    }
+    if (registration.booking.bookingState === BookingState.CANCELLED) {
+      return { success: false, error: "La clase fue cancelada." };
+    }
+    if (new Date(registration.booking.fromDateTime).getTime() <= Date.now()) {
+      return { success: false, error: "La clase ya empezó: no podés salir." };
+    }
+
+    await students.delete(registration.id);
+    return { success: true, data: null };
+  } catch (error) {
+    console.error("leaveClass", error);
+    return { success: false, error: "No se pudo salir de la clase." };
   }
 }

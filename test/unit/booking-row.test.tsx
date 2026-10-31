@@ -2,11 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { refresh, updateBooking, closeMatch, leaveMatch } = vi.hoisted(() => ({
+const { refresh, updateBooking, closeMatch, leaveMatch, leaveClass } = vi.hoisted(() => ({
   refresh: vi.fn(),
   updateBooking: vi.fn(),
   closeMatch: vi.fn(),
   leaveMatch: vi.fn(),
+  leaveClass: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -14,6 +15,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
+vi.mock("@/src/actions/teacherClass", () => ({ leaveClass }));
 vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch, addPlayerToMatch: vi.fn() }));
 vi.mock("@/app/my-bookings/review-teammates-modal", () => ({
   ReviewTeammatesModal: ({ matchId }: { matchId: number }) => <div role="dialog">Calificando el partido {matchId}</div>,
@@ -59,6 +61,58 @@ describe("BookingRow", () => {
     const where = screen.getByRole("link", { name: "Quento Club · Villa Elisa" });
     expect(where.getAttribute("href")).toBe("https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA");
     expect(where.getAttribute("target")).toBe("_blank");
+  });
+
+  describe("clases (HU-47)", () => {
+    const studentClass = (overrides: Partial<MyBookingItem> = {}) =>
+      booking({
+        joinedAsParticipant: true,
+        classInfo: { role: "student", teacherName: "Lucía Profe", capacity: 4, studentsCount: 2 },
+        ...overrides,
+      });
+    const teacherClass = (overrides: Partial<MyBookingItem> = {}) =>
+      booking({ classInfo: { role: "teacher", teacherName: "Lucía Profe", capacity: 4, studentsCount: 1 }, ...overrides });
+
+    it("al alumno le muestra la clase diferenciada, con el profesor y sin el precio ni la opción de cancelar el turno", () => {
+      render(<BookingRow booking={studentClass()} now={NOW} />);
+
+      expect(screen.getByText("Clase")).toBeTruthy();
+      expect(screen.getByText("Con Lucía Profe")).toBeTruthy();
+      expect(screen.queryByText(/10\.000/)).toBeNull();
+      expect(screen.queryByText("Te sumaste a este partido")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Cancelar turno" })).toBeNull();
+    });
+
+    it("el alumno sale de la clase después de confirmar", async () => {
+      leaveClass.mockResolvedValue({ success: true, data: null });
+      render(<BookingRow booking={studentClass()} now={NOW} playerId={21} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Salir de la clase" }));
+      expect(screen.getByText("¿Salir de la clase?")).toBeTruthy();
+      expect(screen.queryByText(/se te descontarán/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Sí, salir" }));
+
+      await waitFor(() => expect(leaveClass).toHaveBeenCalledWith(10));
+      await waitFor(() => expect(refresh).toHaveBeenCalled());
+    });
+
+    it("no ofrece salir de una clase que ya terminó", () => {
+      render(<BookingRow booking={studentClass({ fromDateTime: new Date("2026-09-20T18:00:00") })} now={NOW} />);
+
+      expect(screen.queryByRole("button", { name: "Salir de la clase" })).toBeNull();
+    });
+
+    it("al profesor le marca la clase que da, con sus alumnos, y al cancelarla le dice que se les avisa sin penalizarlo", () => {
+      // Faltan 2 horas: si fuera un turno común, cancelar descontaría puntos.
+      render(<BookingRow booking={teacherClass({ fromDateTime: new Date("2026-10-01T12:00:00") })} now={NOW} />);
+
+      expect(screen.getByText("Clase que das")).toBeTruthy();
+      expect(screen.getByText("1/4 alumnos")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar turno" }));
+
+      expect(screen.getByText("¿Cancelar la clase? Se les avisa a los alumnos.")).toBeTruthy();
+      expect(screen.queryByText(/se te descontarán/)).toBeNull();
+    });
   });
 
   describe("turno fijo", () => {

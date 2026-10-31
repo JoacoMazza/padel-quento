@@ -22,6 +22,15 @@ export type MyBookingItem = {
   canReview: boolean;
   /** true si es una fecha de un turno fijo (HU-41): solo el club la puede liberar. */
   isFixed: boolean;
+  /** Si es una clase (HU-47): si el jugador la da o es alumno, el profesor, el cupo y los alumnos registrados. */
+  classInfo?: ClassInfo | null;
+};
+
+export type ClassInfo = {
+  role: "teacher" | "student";
+  teacherName: string;
+  capacity: number;
+  studentsCount: number;
 };
 
 export type DateFilter = "all" | "today" | "week" | "month";
