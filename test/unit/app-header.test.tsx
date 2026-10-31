@@ -33,6 +33,20 @@ describe("AppHeader", () => {
     );
   });
 
+  it("a un profesor le suma el link a sus clases (HU-42)", () => {
+    render(<AppHeader active="/teacher" userRole={Role.PLAYER} isTeacher />);
+
+    const link = screen.getAllByRole("link", { name: "Mis clases" })[0];
+    expect(link.getAttribute("href")).toBe("/teacher");
+    expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("a un jugador que no es profesor no le muestra el link a las clases", () => {
+    render(<AppHeader active="/" userRole={Role.PLAYER} />);
+
+    expect(screen.queryByRole("link", { name: "Mis clases" })).toBeNull();
+  });
+
   it("marca como página actual el link activo", () => {
     render(<AppHeader active="/open-matches" />);
 

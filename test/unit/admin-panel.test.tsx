@@ -44,6 +44,14 @@ vi.mock("@/src/actions/outOfService", () => ({
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
+const { getTeachersAdmin } = vi.hoisted(() => ({ getTeachersAdmin: vi.fn() }));
+vi.mock("@/src/actions/teacher", () => ({
+  getTeachersAdmin,
+  createTeacher: vi.fn(),
+  assignTeacherRole: vi.fn(),
+  setTeacherActive: vi.fn(),
+  removeTeacherRole: vi.fn(),
+}));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
@@ -361,6 +369,24 @@ describe("AdminPanel", () => {
     expect(nav.getByRole("button", { name: "Canchas" })).toBeTruthy();
     expect(nav.queryByText("Estado de Canchas")).toBeNull();
     expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
+  });
+
+  it("un trabajador también gestiona los profesores, que se piden recién al abrir su sección (HU-42)", async () => {
+    getTeachersAdmin.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 1, playerId: 10, names: "Lucía", lastnames: "Profe", email: "l@test.com", phoneNumber: "221", isActive: true },
+      ],
+    });
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+    expect(getTeachersAdmin).not.toHaveBeenCalled();
+
+    openSection("Profesores");
+    await flush();
+
+    expect(getTeachersAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Lucía Profe")).toBeTruthy();
   });
 
   it("pide las canchas recién al abrir su sección y las muestra", async () => {

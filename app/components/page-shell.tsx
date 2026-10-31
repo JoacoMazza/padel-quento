@@ -16,7 +16,7 @@ export function PageShell({
 }: {
   active: HeaderActiveTab;
   /** Usuario de la sesión, o null para un visitante sin sesión. */
-  user: { name?: string | null; email?: string | null; role?: string | null } | null;
+  user: { name?: string | null; email?: string | null; role?: string | null; isTeacher?: boolean } | null;
   width?: keyof typeof WIDTH_CLASSES;
   children: React.ReactNode;
 }) {
@@ -28,6 +28,7 @@ export function PageShell({
         userEmail={user?.email}
         userRole={user?.role}
         guest={user === null}
+        isTeacher={user?.isTeacher ?? false}
       />
       <main className={`w-full flex-1 ${WIDTH_CLASSES[width]}`}>{children}</main>
       <AppFooter />
