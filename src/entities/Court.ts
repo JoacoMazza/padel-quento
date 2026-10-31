@@ -1,6 +1,7 @@
 import "reflect-metadata";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { CourtState } from "@/src/domain/enums";
+import type { Complex } from "@/src/entities/Complex";
 
 @Entity({ name: "courts" })
 export class Court {
@@ -23,6 +24,10 @@ export class Court {
     },
   })
   price!: number;
+
+  @ManyToOne("Complex", "courts", { nullable: false })
+  @JoinColumn({ name: "complex_id" })
+  complex!: Complex;
 
   @OneToMany("Booking", (booking: any) => booking.court)
   bookings!: any[];

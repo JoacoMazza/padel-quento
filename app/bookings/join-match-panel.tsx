@@ -50,7 +50,7 @@ export function JoinMatchPanel({
 
       <SummaryFeedback feedback={feedback} />
 
-      <SummaryCourt courtNumber={selectedMatch.courtNumber} />
+      <SummaryCourt courtNumber={selectedMatch.courtNumber} location={selectedMatch.location} />
 
       <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />

@@ -1,6 +1,6 @@
-import { X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { CourtTag } from "@/app/components/ui/court-tag";
-import { CLUB_LOCATION } from "@/app/components/club-info";
+import type { ComplexLocation } from "@/src/domain/complex";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { formatPrice } from "@/app/bookings/slot-utils";
 
@@ -37,13 +37,25 @@ export function SummaryHeader({
     </div>
   );
 }
-export function SummaryCourt({ courtNumber }: { courtNumber: number }) {
+/** La cancha elegida y el complejo donde está, con link a su ubicación. */
+export function SummaryCourt({ courtNumber, location }: { courtNumber: number; location?: ComplexLocation }) {
   return (
     <div className="flex items-center gap-4 border-b border-white/10 py-5">
       <CourtTag number={courtNumber} size="lg" tone="light" />
       <div>
         <p className="text-2xl font-extrabold tracking-tight">Cancha {courtNumber}</p>
-        <p className="text-xs text-white/50">{CLUB_LOCATION} · Quento Club</p>
+        {location ? (
+          <a
+            href={location.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Ver ubicación en Google Maps"
+            className="flex items-center gap-1 text-xs text-white/50 transition-colors hover:text-white"
+          >
+            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+            {location.name} · {location.address}, {location.city}
+          </a>
+        ) : null}
       </div>
     </div>
   );

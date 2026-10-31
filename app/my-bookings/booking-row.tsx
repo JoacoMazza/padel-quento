@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, Star, UserPlus, Users, X } from "lucide-react";
-import { CLUB_LOCATION, CLUB_MAPS_URL } from "@/app/components/club-info";
 import { ShareLinkButton } from "@/app/components/share-link-button";
 import { AddPlayerForm } from "@/app/open-matches/add-player-form";
 import { BookingState } from "@/src/domain/enums";
@@ -167,16 +166,18 @@ export function BookingRow({
             <Clock className="h-3.5 w-3.5" />
             {dateToTimeLabel(booking.fromDateTime)} – {dateToTimeLabel(end)}
           </span>
-          <a
-            href={CLUB_MAPS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 transition-colors hover:text-primary"
-            title="Ver ubicación en Google Maps"
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            {CLUB_LOCATION}
-          </a>
+          {booking.location ? (
+            <a
+              href={booking.location.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 transition-colors hover:text-primary"
+              title="Ver ubicación en Google Maps"
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              {booking.location.name} · {booking.location.city}
+            </a>
+          ) : null}
         </p>
         <p className="flex flex-wrap items-center gap-3 text-sm">
           <span className="font-bold text-foreground">{formatPrice(booking.price)}</span>

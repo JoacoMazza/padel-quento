@@ -72,8 +72,7 @@ La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-match
 
 - `createBooking` y `joinOpenMatch` toman el jugador de la sesión, nunca del id que manda el cliente; la lógica que recibe el id vive en [src/lib/bookings.ts](src/lib/bookings.ts) y solo se usa desde el servidor.
 - La grilla pública usa `getPublicBookings` ([src/lib/public-bookings.ts](src/lib/public-bookings.ts)), sin datos de quién reservó ni de quiénes juegan, y los partidos abiertos se muestran a los visitantes sin nombres ni chat.
-- El WhatsApp de contacto de la landing está en [app/components/club-info.ts](app/components/club-info.ts) (`CLUB_WHATSAPP_NUMBER`).
-- Todas las páginas muestran un botón flotante de WhatsApp abajo a la derecha ([app/components/whatsapp-button.tsx](app/components/whatsapp-button.tsx)), que abre `wa.me` con el número y el mensaje inicial de `NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER` y `NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE`. Sin número no se muestra. En mobile, el footer, el login/registro y el panel de admin dejan lugar abajo para que no tape ningún control.
+- Todas las páginas muestran un botón flotante de WhatsApp abajo a la derecha ([app/components/whatsapp-button.tsx](app/components/whatsapp-button.tsx)), y la landing tiene su botón "Escribinos por WhatsApp". Los dos abren `wa.me` con el número y el mensaje inicial del complejo del club (ver [Complejos](#complejos)); sin número cargado no se muestran. En mobile, el footer, el login/registro y el panel de admin dejan lugar abajo para que el botón flotante no tape ningún control.
 
 ## Turnos fijos
 
@@ -83,6 +82,16 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
+
+## Complejos
+
+Cada cancha pertenece a un complejo (`courts.complex_id`, obligatoria), que guarda su ubicación: nombre, dirección, ciudad, provincia, país, código postal, latitud, longitud y, opcional, el link a Google Maps (tabla `complexes`, entidad [src/entities/Complex.ts](src/entities/Complex.ts)).
+
+- La base valida que la latitud esté entre -90 y 90 y la longitud entre -180 y 180 (`CHK_complexes_latitude` y `CHK_complexes_longitude`).
+- Cada complejo tiene su WhatsApp de contacto (`whatsapp_number`, con código de país y como lo escribe el admin, por ejemplo "+54 9 221 604-9987", que es como se muestra; el link de wa.me usa sus dígitos. Y `whatsapp_message`, el mensaje con que se abre el chat). Lo carga cualquier administrador desde el panel (sección **Canchas**, "WhatsApp de contacto"). El botón flotante y el de la landing usan el del complejo del club; sin número no se muestran. La migración `AddComplexWhatsApp` carga el del club.
+- La migración `AddComplexes` crea el complejo del club (Quento Club, Cam. Centenario 8907, Villa Elisa) y le asigna las canchas que ya existían, sin tocar sus turnos. `AddComplexCountry` agrega el país (obligatorio) y deja los complejos existentes en Argentina.
+- Los complejos no se crean ni se editan desde el panel (salvo su WhatsApp de contacto): las canchas nuevas (alta del dueño y seeds) se asocian al complejo del club, el primero que se cargó ([src/lib/club-complex.ts](src/lib/club-complex.ts)).
+- El complejo y su ubicación se ven en la tabla de canchas del panel, en `/bookings` (arriba y en el resumen del turno elegido) y en Mis turnos. El link lleva a Google Maps; si el complejo no tiene uno cargado, se arma con la latitud y la longitud.
 
 ## Administradores: dueño y trabajador
 
@@ -132,7 +141,6 @@ Variables relevantes en `.env`:
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
-| `NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER` / `NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE` | Número y mensaje inicial del botón flotante de WhatsApp (opcional: sin número no se muestra). Se fijan al hacer el build |
 | `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |
 
@@ -217,7 +225,7 @@ Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migraci
 pnpm db:seed
 ```
 
-Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
@@ -289,7 +297,6 @@ Las variables de la terminal tienen prioridad sobre las de `.env`.
    | `NEXTAUTH_SECRET` | Un secreto nuevo, distinto del de desarrollo (`openssl rand -base64 32`) |
    | `NEXTAUTH_URL` | La URL pública de la app |
    | `SMTP_*` / `WHATSAPP_*` | Las de producción, si se usan los avisos |
-   | `NEXT_PUBLIC_WHATSAPP_CONTACT_*` | Número y mensaje del botón de WhatsApp; tienen que estar al hacer el build |
 
    Si el panel del hosting no acepta valores de varias líneas, `DATABASE_SSL_CA` se puede cargar en una sola, con `\n` en lugar de cada salto. Este comando la imprime así:
 

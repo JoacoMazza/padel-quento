@@ -6,6 +6,7 @@ import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
 import { TeachersPanel } from "@/app/admin/teachers-panel";
 import { getTeachersAdmin } from "@/src/actions/teacher";
+import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/fixed-bookings-panel";
@@ -16,6 +17,7 @@ import { TeamPanel } from "@/app/admin/team-panel";
 import { getTeam } from "@/src/actions/admin";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
+import { toComplexLocation } from "@/src/domain/complex";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
@@ -86,6 +88,7 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
         state: c.state,
         price: c.price,
         activeOutOfService: active ? { id: active.id, reason: active.reason, toDateTime: active.toDateTime } : null,
+        location: c.complex ? toComplexLocation(c.complex) : undefined,
       };
     }),
   };
@@ -93,7 +96,12 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 
 function CourtsSection({ isOwner }: { isOwner: boolean }) {
   const state = useSectionData(loadCourts);
-  return state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />;
+  return (
+    <div className="space-y-6">
+      {state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />}
+      <ComplexContactPanel />
+    </div>
+  );
 }
 
 type FixedBookingsData = {

@@ -5,6 +5,7 @@ import { Court } from "@/src/entities/Court";
 import { BookingState, CourtState } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
+import { findClubComplex } from "@/src/lib/club-complex";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { notifyCourtUnavailable } from "@/src/lib/match-notifications";
 import { ForbiddenError, UnauthorizedError, requireAdmin, requireOwner } from "@/src/lib/rbac";
@@ -28,7 +29,7 @@ function authErrorMessage(error: unknown): string | null {
   return error instanceof ForbiddenError || error instanceof UnauthorizedError ? error.message : null;
 }
 
-/** Alta de una cancha: solo el dueño del complejo. */
+/** Alta de una cancha, en el complejo del club: solo el dueño del complejo. */
 export async function createCourt(
   input: CreateCourtInput,
 ): Promise<ActionResult<Court>> {
@@ -40,11 +41,16 @@ export async function createCourt(
 
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
+    const complex = await findClubComplex(dataSource);
+    if (!complex) {
+      return { success: false, error: "No hay un complejo cargado para asociar la cancha." };
+    }
 
     const court = courts.create({
       number: input.number,
       state: input.state ?? CourtState.AVAILABLE,
       price: input.price,
+      complex,
     });
 
     const saved = await courts.save(court);
@@ -64,7 +70,7 @@ export async function getCourts(): Promise<ActionResult<Court[]>> {
   try {
     const dataSource = await getDataSource();
     const courts = dataSource.getRepository<Court>("Court");
-    const data = await courts.find();
+    const data = await courts.find({ relations: { complex: true } });
     return { success: true, data: toPlain(data) };
   } catch (error) {
     console.error("getCourts", error);
