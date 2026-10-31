@@ -41,10 +41,19 @@ describe("AppHeader", () => {
     expect(link.getAttribute("aria-current")).toBe("page");
   });
 
+  it("a un profesor le suma el link para reservar sus turnos de clase (HU-43)", () => {
+    render(<AppHeader active="/teacher/book" userRole={Role.PLAYER} isTeacher />);
+
+    const link = screen.getAllByRole("link", { name: "Reservar clase" })[0];
+    expect(link.getAttribute("href")).toBe("/teacher/book");
+    expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
   it("a un jugador que no es profesor no le muestra el link a las clases", () => {
     render(<AppHeader active="/" userRole={Role.PLAYER} />);
 
     expect(screen.queryByRole("link", { name: "Mis clases" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Reservar clase" })).toBeNull();
   });
 
   it("marca como página actual el link activo", () => {

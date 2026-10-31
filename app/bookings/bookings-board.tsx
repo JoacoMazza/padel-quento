@@ -7,7 +7,7 @@ import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/co
 import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { AvailabilityGrid } from "@/app/bookings/availability-grid";
 import { BookingSummary } from "@/app/bookings/booking-summary";
-import { DayStrip, type DayOption } from "@/app/bookings/day-strip";
+import { DayStrip, dayCaption, dayLabel, type DayOption } from "@/app/bookings/day-strip";
 import { JoinMatchPanel } from "@/app/bookings/join-match-panel";
 import {
   SLOT_DURATION_MINUTES,
@@ -31,13 +31,6 @@ import type {
 /** Cantidad de días que se muestran en la tira de fechas, empezando por hoy. */
 const DAY_STRIP_LENGTH = 5;
 
-const DAY_CAPTION_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long" });
-const DAY_LABEL_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short" });
-const DAY_LABEL_MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", { month: "short" });
-
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1).replace(".", "");
-}
 
 /** Turno que se había elegido antes de ir a iniciar sesión (llega en la URL de /bookings). */
 export type InitialSelection = { date: string; courtId: number; time: string; isOpenMatch?: boolean };
@@ -76,10 +69,6 @@ function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp
 }
 
 /** "Mié 14 Oct". */
-function dayLabel(date: Date) {
-  return `${capitalize(DAY_LABEL_WEEKDAY_FORMATTER.format(date))} ${date.getDate()} ${capitalize(DAY_LABEL_MONTH_FORMATTER.format(date))}`;
-}
-
 export function BookingsBoard({
   playerId,
   isGuest,
@@ -177,7 +166,7 @@ export function BookingsBoard({
     const slotsByCourt = slotsForDay(date, courts).map((c) => c.slots);
     return {
       iso: toISODate(date),
-      caption: offset === 0 ? "Hoy" : offset === 1 ? "Mañana" : DAY_CAPTION_FORMATTER.format(date),
+      caption: dayCaption(date, offset),
       label: dayLabel(date),
       free: summarizeSlots(slotsByCourt).free,
       hasSchedule: slotsByCourt.some((slots) => slots.length > 0),
