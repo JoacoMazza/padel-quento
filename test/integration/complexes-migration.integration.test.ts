@@ -7,7 +7,7 @@ const migrationModules = import.meta.glob<Record<string, unknown>>("../../src/mi
 const migrations = Object.values(migrationModules).flatMap((module) =>
   Object.values(module).filter((value): value is new () => object => typeof value === "function"),
 );
-// AddComplexes y las que la siguen (AddComplexWhatsApp, que necesita la tabla).
+// AddComplexes y las que la siguen (AddComplexWhatsApp y AddComplexCountry, que necesitan la tabla).
 const isComplexesMigration = (migration: new () => object) => migration.name.startsWith("AddComplex");
 
 const CHECK_DATABASE = "padel_quento_complexes_migration_check";
@@ -51,7 +51,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
 
   it("crea el complejo por defecto con los datos del club", async () => {
     const complexes = await db.query(
-      `SELECT "name", "address", "city", "province", "postal_code", "latitude"::float AS "latitude",
+      `SELECT "name", "address", "city", "province", "country", "postal_code", "latitude"::float AS "latitude",
               "longitude"::float AS "longitude", "maps_url" FROM "complexes"`,
     );
 
@@ -61,6 +61,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
         address: "Cam. Centenario 8907",
         city: "Villa Elisa",
         province: "Buenos Aires",
+        country: "Argentina",
         postal_code: "B1894",
         latitude: -34.863726,
         longitude: -58.061057,
@@ -94,6 +95,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
   });
 
   it("se puede revertir sin perder las canchas", async () => {
+    await db.undoLastMigration();
     await db.undoLastMigration();
     await db.undoLastMigration();
 

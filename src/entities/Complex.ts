@@ -27,6 +27,9 @@ export class Complex {
   @Column({ type: "varchar", length: 100 })
   province!: string;
 
+  @Column({ type: "varchar", length: 100 })
+  country!: string;
+
   @Column({ type: "varchar", length: 10, name: "postal_code" })
   postalCode!: string;
 

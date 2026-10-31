@@ -11,6 +11,7 @@ const VALID = {
   address: "Calle 1 123",
   city: "La Plata",
   province: "Buenos Aires",
+  country: "Argentina",
   postalCode: "1900",
   latitude: -34.9214,
   longitude: -57.9545,
@@ -49,6 +50,10 @@ describe("complejos (integración con Postgres real)", () => {
     ["longitud menor a -180", { longitude: -180.5 }],
   ])("rechaza una %s", async (_, overrides) => {
     await expect(saveComplex(overrides)).rejects.toBeInstanceOf(QueryFailedError);
+  });
+
+  it("el país es obligatorio", async () => {
+    await expect(saveComplex({ country: null as unknown as string })).rejects.toBeInstanceOf(QueryFailedError);
   });
 
   it("una cancha no se puede guardar sin complejo", async () => {

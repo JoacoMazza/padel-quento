@@ -57,6 +57,7 @@ export async function ensureTestComplex() {
       address: "Cam. Centenario 8907",
       city: "Villa Elisa",
       province: "Buenos Aires",
+      country: "Argentina",
       postalCode: "B1894",
       latitude: -34.863726,
       longitude: -58.061057,
