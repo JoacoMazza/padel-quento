@@ -11,6 +11,7 @@ export type HeaderActiveTab =
   | "/my-bookings"
   | "/profile"
   | "/teacher"
+  | "/teacher/book"
   | "/admin";
 
 const NAV_ITEMS = [
@@ -20,8 +21,11 @@ const NAV_ITEMS = [
   { href: "/my-bookings", label: "Mis reservas", guest: false },
 ];
 
-/** Sección del profesor (HU-42): solo para jugadores con el rol de profesor activo. */
-const TEACHER_NAV_ITEM = { href: "/teacher", label: "Mis clases", guest: false };
+/** Secciones del profesor (HU-42 y HU-43): solo para jugadores con el rol de profesor activo. */
+const TEACHER_NAV_ITEMS = [
+  { href: "/teacher", label: "Mis clases", guest: false },
+  { href: "/teacher/book", label: "Reservar clase", guest: false },
+];
 
 const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
 
@@ -57,7 +61,7 @@ export function AppHeader({
   /** Profesor activo (de la sesión): suma el link a sus clases. */
   isTeacher?: boolean;
 }) {
-  const navItems = [...NAV_ITEMS, ...(isTeacher ? [TEACHER_NAV_ITEM] : [])].filter((item) => !guest || item.guest);
+  const navItems = [...NAV_ITEMS, ...(isTeacher ? TEACHER_NAV_ITEMS : [])].filter((item) => !guest || item.guest);
 
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">

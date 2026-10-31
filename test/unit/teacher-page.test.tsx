@@ -14,6 +14,12 @@ vi.mock("@/src/lib/rbac", async (importOriginal) => {
   return { ...actual, requireTeacher };
 });
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
+vi.mock("@/src/actions/teacherClass", () => ({
+  getTeacherClasses: vi.fn(async () => ({ success: true, data: [] })),
+  searchStudents: vi.fn(),
+  addClassStudent: vi.fn(),
+  removeClassStudent: vi.fn(),
+}));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));

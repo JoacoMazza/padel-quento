@@ -6,6 +6,7 @@ import type { Match } from "@/src/entities/Match";
 import type { Player } from "@/src/entities/Player";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
+  classCancelledNotice,
   courtUnavailableNotice,
   fixedBookingCancelledNotice,
   fixedDateReleasedNotice,
@@ -250,5 +251,26 @@ export async function notifyFixedBookingCancelled(fixedBookingId: number): Promi
     );
   } catch (error) {
     console.error("notifyFixedBookingCancelled", error);
+  }
+}
+
+/** Avisa a los alumnos de cada clase que se canceló porque el profesor dejó de dar clases (HU-42). */
+export async function notifyClassesCancelled(bookingIds: number[]): Promise<void> {
+  try {
+    const dataSource = await getDataSource();
+    for (const bookingId of bookingIds) {
+      const booking = await dataSource.getRepository<Booking>("Booking").findOne({
+        where: { id: bookingId },
+        relations: { court: true, booker: true, classStudents: { player: { account: true } } },
+      });
+      if (!booking) continue;
+
+      await send(
+        booking.classStudents.map((student) => toRecipient(student.player)),
+        (recipient) => classCancelledNotice(recipient.names, fullName(booking.booker), noticeBookingOf(booking)),
+      );
+    }
+  } catch (error) {
+    console.error("notifyClassesCancelled", error);
   }
 }
