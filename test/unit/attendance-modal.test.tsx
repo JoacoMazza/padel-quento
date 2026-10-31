@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const { setBookingAttendance, setMatchPlayerAttendance } = vi.hoisted(() => ({
   setBookingAttendance: vi.fn(),
@@ -31,6 +31,7 @@ function simpleBooking(overrides: Partial<AdminBookingProp> = {}): AdminBookingP
     attended: true,
     matchPlayers: [],
     fixedBookingDateId: null,
+    classInfo: null,
     ...overrides,
   };
 }
@@ -54,6 +55,44 @@ describe("AttendanceModal", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("en una clase muestra al profesor y a los alumnos, sin marcar asistencia porque no mueve puntos (HU-48)", () => {
+    render(
+      <AttendanceModal
+        booking={simpleBooking({
+          bookerName: "Lucía Profe",
+          classInfo: {
+            capacity: 4,
+            students: [
+              { id: 21, name: "Ana Alumna" },
+              { id: 22, name: "Bruno Alumno" },
+            ],
+          },
+        })}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Clase" });
+    expect(within(dialog).getByText("Clase de Lucía Profe")).toBeTruthy();
+    expect(within(dialog).getByText("2/4 alumnos")).toBeTruthy();
+    expect(within(dialog).getByText("Ana Alumna")).toBeTruthy();
+    expect(within(dialog).getByText("Bruno Alumno")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: /Presente|Ausente/ })).toBeNull();
+  });
+
+  it("una clase sin alumnos lo dice", () => {
+    render(
+      <AttendanceModal
+        booking={simpleBooking({ bookerName: "Lucía Profe", classInfo: { capacity: 2, students: [] } })}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Todavía no tiene alumnos registrados.")).toBeTruthy();
   });
 
   it("muestra al jugador de un turno simple como presente por defecto", () => {

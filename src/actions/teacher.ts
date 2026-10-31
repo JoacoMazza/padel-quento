@@ -8,10 +8,11 @@ import type { Teacher } from "@/src/entities/Teacher";
 import { PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
-import type { ActionResult } from "@/src/lib/action-result";
+import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { parseRegisterForm } from "@/src/lib/register-validation";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
-import { cancelFutureClassesOf } from "@/src/lib/teacher-classes";
+import { cancelFutureClassesOf, findAgendaOf } from "@/src/lib/teacher-classes";
+import type { TeacherClassItem } from "@/src/actions/teacherClass";
 import { notifyClassesCancelled } from "@/src/lib/match-notifications";
 
 /** Profesor como lo muestra el panel: sus datos de jugador y si está activo. */
@@ -192,5 +193,22 @@ export async function removeTeacherRole(id: number): Promise<ActionResult<null>>
     if (authError) return { success: false, error: authError };
     console.error("removeTeacherRole", error);
     return { success: false, error: "No se pudo quitar el rol de profesor." };
+  }
+}
+
+/** Clases de un profesor (como su agenda: próximas y finalizadas recientes) para supervisarlas (HU-48). Cualquier administrador. */
+export async function getTeacherClassesAdmin(id: number): Promise<ActionResult<TeacherClassItem[]>> {
+  try {
+    await requireAdmin();
+    const teacher = await findTeacher(id);
+    if (!teacher) {
+      return { success: false, error: NOT_FOUND_ERROR };
+    }
+    return { success: true, data: toPlain(await findAgendaOf(teacher.player.id)) };
+  } catch (error) {
+    const authError = authErrorMessage(error);
+    if (authError) return { success: false, error: authError };
+    console.error("getTeacherClassesAdmin", error);
+    return { success: false, error: "No se pudieron obtener las clases del profesor." };
   }
 }

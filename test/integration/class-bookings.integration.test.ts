@@ -6,16 +6,19 @@ import type { ClassStudent } from "@/src/entities/ClassStudent";
 import type { Teacher } from "@/src/entities/Teacher";
 import { getDataSource } from "@/src/lib/db";
 import { createBookingForPlayer } from "@/src/lib/bookings";
+import { getPlayerBookings } from "@/src/lib/player-bookings";
 import { createPlayer } from "@/src/actions/player";
 import { updateBooking } from "@/src/actions/booking";
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import type { Penalty } from "@/src/entities/Penalty";
-import { removeTeacherRole, setTeacherActive } from "@/src/actions/teacher";
+import { getTeacherClassesAdmin, removeTeacherRole, setTeacherActive } from "@/src/actions/teacher";
+import { getScheduleBoardData } from "@/src/actions/scheduleBoard";
 import {
   addClassStudent,
   createClassBooking,
   getTeacherClasses,
   getTeacherStudents,
+  leaveClass,
   removeClassStudent,
   searchStudents,
 } from "@/src/actions/teacherClass";
@@ -435,6 +438,107 @@ describe("clases (HU-43 y HU-44, integración con Postgres real)", () => {
         success: false,
         error: "Acceso denegado: Se requiere el rol de Profesor",
       });
+    });
+  });
+
+  describe("las clases del alumno (HU-47)", () => {
+    it("Mis turnos del alumno trae las clases en las que está registrado, con el profesor", async () => {
+      const id = await newClass(4);
+      await addClassStudent(id, carla.id);
+
+      const bookings = await getPlayerBookings(carla.id);
+
+      const lesson = bookings.find((b) => b.id === id);
+      expect(lesson).toMatchObject({ classCapacity: 4, booker: { id: teacher.id, names: "Profe" } });
+      expect(lesson?.classStudents.map((s) => s.player.id)).toEqual([carla.id]);
+    });
+
+    it("el alumno sale de la clase mientras no empezó, y libera su lugar", async () => {
+      const id = await newClass(1);
+      await addClassStudent(id, carla.id);
+      signInAs(carla.email);
+
+      expect(await leaveClass(id)).toEqual({ success: true, data: null });
+
+      expect((await getPlayerBookings(carla.id)).some((b) => b.id === id)).toBe(false);
+      signInAs(teacher.email);
+      expect(await addClassStudent(id, bruno.id)).toEqual({ success: true, data: null });
+    });
+
+    it("no sale de una clase que ya empezó, ni de una en la que no está", async () => {
+      const started = await newClass(4);
+      await addClassStudent(started, carla.id);
+      await moveToPast(started, 1);
+      const other = await newClass(4);
+      signInAs(carla.email);
+
+      expect(await leaveClass(started)).toEqual({ success: false, error: "La clase ya empezó: no podés salir." });
+      expect(await leaveClass(other)).toEqual({ success: false, error: "No estás registrado en esa clase." });
+    });
+
+    it("sin sesión no puede salir de una clase", async () => {
+      vi.mocked(getServerSession).mockResolvedValue(null);
+
+      expect(await leaveClass(1)).toEqual({ success: false, error: "Tenés que iniciar sesión." });
+    });
+  });
+
+  describe("supervisión desde el panel (HU-48)", () => {
+    it("la grilla del admin trae cada clase con su cupo y sus alumnos", async () => {
+      const id = await newClass(3);
+      await addClassStudent(id, ana.id);
+      signInAs(staffEmail, Role.ADMIN);
+
+      const board = await getScheduleBoardData();
+
+      if (!board.success) throw new Error(board.error);
+      const lesson = board.data.bookings.find((b) => b.id === id);
+      expect(lesson).toMatchObject({ classCapacity: 3, booker: { id: teacher.id } });
+      expect(lesson?.classStudents.map((s) => s.player.names)).toEqual(["Ana"]);
+    });
+
+    it("el admin ve las clases de un profesor, como su agenda", async () => {
+      const upcoming = await newClass(3);
+      await addClassStudent(upcoming, ana.id);
+      signInAs(staffEmail, Role.ADMIN);
+
+      const result = await getTeacherClassesAdmin(teacherId);
+
+      if (!result.success) throw new Error(result.error);
+      expect(result.data.find((c) => c.id === upcoming)).toMatchObject({
+        classCapacity: 3,
+        isFinished: false,
+        students: [{ id: ana.id }],
+      });
+    });
+
+    it("un jugador no ve las clases de un profesor desde el panel", async () => {
+      signInAs(ana.email);
+
+      expect(await getTeacherClassesAdmin(teacherId)).toEqual({
+        success: false,
+        error: "Acceso denegado: Se requieren permisos de Administrador",
+      });
+    });
+
+    it("devuelve error si el profesor no existe", async () => {
+      signInAs(staffEmail, Role.ADMIN);
+
+      expect(await getTeacherClassesAdmin(999_999)).toEqual({ success: false, error: "El profesor no existe." });
+    });
+  });
+
+  describe("cuando el profesor cancela una clase desde Mis reservas", () => {
+    it("se les avisa a los alumnos registrados", async () => {
+      const id = await newClass(4);
+      await addClassStudent(id, ana.id);
+      await addClassStudent(id, bruno.id);
+      vi.clearAllMocks();
+
+      expect(await updateBooking(id, { bookingState: BookingState.CANCELLED })).toMatchObject({ success: true });
+
+      const recipients = notify.mock.calls.flatMap((call) => (call as unknown[])[0] as { names: string }[]);
+      expect(recipients.map((r) => r.names).sort()).toEqual(["Ana", "Bruno"]);
     });
   });
 

@@ -1,24 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Power, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { CalendarDays, Power, UserMinus, UserPlus, Users, X } from "lucide-react";
 import {
   assignTeacherRole,
   createTeacher,
+  getTeacherClassesAdmin,
   getTeachersAdmin,
   removeTeacherRole,
   setTeacherActive,
   type TeacherAdminItem,
 } from "@/src/actions/teacher";
 import { getPlayersAdmin, type PlayerAdminItem } from "@/src/actions/player";
+import type { TeacherClassItem } from "@/src/actions/teacherClass";
+import { dateToTimeLabel } from "@/src/domain/time-format";
+import { formatLongDate } from "@/app/bookings/slot-utils";
 import { INPUT_CLASS, LABEL_CLASS } from "@/app/admin/holder-fields";
 
-type Dialog = "create" | "assign";
+type Dialog = "create" | "assign" | { classesOf: TeacherAdminItem };
 
 /**
  * Sección Profesores del panel (HU-42), para cualquier administrador: alta de
  * un profesor nuevo o el rol de profesor para un jugador que ya existe, y
- * desactivar, reactivar o quitarle el rol (sigue siendo jugador).
+ * desactivar, reactivar o quitarle el rol (sigue siendo jugador). También se
+ * consultan las clases de cada profesor (HU-48).
  */
 export function TeachersPanel({ teachers: initialTeachers }: { teachers: TeacherAdminItem[] }) {
   const [teachers, setTeachers] = useState(initialTeachers);
@@ -117,6 +122,15 @@ export function TeachersPanel({ teachers: initialTeachers }: { teachers: Teacher
                         <>
                           <button
                             type="button"
+                            aria-label={`Ver las clases de ${fullName}`}
+                            title="Ver las clases"
+                            onClick={() => setDialog({ classesOf: teacher })}
+                            className="icon-btn"
+                          >
+                            <CalendarDays className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
                             aria-label={`${teacher.isActive ? "Desactivar" : "Reactivar"} a ${fullName}`}
                             title={teacher.isActive ? "Desactivar" : "Reactivar"}
                             onClick={() => run(() => setTeacherActive(teacher.id, !teacher.isActive))}
@@ -152,7 +166,60 @@ export function TeachersPanel({ teachers: initialTeachers }: { teachers: Teacher
           onSaved={handleSaved}
         />
       ) : null}
+      {dialog !== null && typeof dialog === "object" ? (
+        <TeacherClassesDialog teacher={dialog.classesOf} onClose={() => setDialog(null)} />
+      ) : null}
     </div>
+  );
+}
+
+/** Clases de un profesor (próximas y de los últimos días), para supervisar el uso de las canchas (HU-48). */
+function TeacherClassesDialog({ teacher, onClose }: { teacher: TeacherAdminItem; onClose: () => void }) {
+  const [classes, setClasses] = useState<TeacherClassItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fullName = `${teacher.names} ${teacher.lastnames}`;
+
+  useEffect(() => {
+    getTeacherClassesAdmin(teacher.id).then((result) => {
+      if (result.success) setClasses(result.data);
+      else setError(result.error);
+    });
+  }, [teacher.id]);
+
+  return (
+    <DialogFrame title={`Clases de ${fullName}`} onClose={onClose}>
+      {error ? <div className="alert-error">{error}</div> : null}
+      {classes === null && !error ? <p className="text-sm text-foreground/60">Cargando clases...</p> : null}
+      {classes?.length === 0 ? (
+        <p className="text-sm text-foreground/60">No tiene clases próximas ni de los últimos 7 días.</p>
+      ) : null}
+      <ul className="space-y-3">
+        {classes?.map((lesson) => {
+          const start = new Date(lesson.fromDateTime);
+          const end = new Date(start.getTime() + lesson.durationMinutes * 60_000);
+          const titleId = `admin-class-${lesson.id}`;
+          return (
+            <li key={lesson.id} aria-labelledby={titleId} className="rounded-xl border border-line p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p id={titleId} className="font-semibold text-foreground">
+                  Cancha {lesson.courtNumber} · {formatLongDate(start)} · {dateToTimeLabel(start)} – {dateToTimeLabel(end)}
+                </p>
+                <span className="badge badge-neutral">
+                  {lesson.isFinished ? "Finalizado" : `${lesson.students.length}/${lesson.classCapacity} alumnos`}
+                </span>
+              </div>
+              {lesson.students.length > 0 ? (
+                <p className="mt-2 text-sm text-foreground/70">
+                  {lesson.students.map((student) => `${student.names} ${student.lastnames}`).join(", ")}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-foreground/50">Sin alumnos registrados.</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </DialogFrame>
   );
 }
 

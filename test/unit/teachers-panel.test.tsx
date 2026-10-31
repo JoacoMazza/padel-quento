@@ -2,15 +2,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-const { getTeachersAdmin, createTeacher, assignTeacherRole, setTeacherActive, removeTeacherRole, getPlayersAdmin } =
-  vi.hoisted(() => ({
-    getTeachersAdmin: vi.fn(),
-    createTeacher: vi.fn(),
-    assignTeacherRole: vi.fn(),
-    setTeacherActive: vi.fn(),
-    removeTeacherRole: vi.fn(),
-    getPlayersAdmin: vi.fn(),
-  }));
+const {
+  getTeachersAdmin,
+  createTeacher,
+  assignTeacherRole,
+  setTeacherActive,
+  removeTeacherRole,
+  getPlayersAdmin,
+  getTeacherClassesAdmin,
+} = vi.hoisted(() => ({
+  getTeachersAdmin: vi.fn(),
+  createTeacher: vi.fn(),
+  assignTeacherRole: vi.fn(),
+  setTeacherActive: vi.fn(),
+  removeTeacherRole: vi.fn(),
+  getPlayersAdmin: vi.fn(),
+  getTeacherClassesAdmin: vi.fn(),
+}));
 
 vi.mock("@/src/actions/teacher", () => ({
   getTeachersAdmin,
@@ -18,6 +26,7 @@ vi.mock("@/src/actions/teacher", () => ({
   assignTeacherRole,
   setTeacherActive,
   removeTeacherRole,
+  getTeacherClassesAdmin,
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin }));
 
@@ -158,6 +167,51 @@ describe("TeachersPanel (HU-42)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sí, quitar el rol" }));
 
     await waitFor(() => expect(removeTeacherRole).toHaveBeenCalledWith(1));
+  });
+
+  it("muestra las clases de un profesor, próximas y finalizadas, con sus alumnos (HU-48)", async () => {
+    getTeacherClassesAdmin.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 7,
+          fromDateTime: new Date(2099, 9, 14, 18, 0),
+          durationMinutes: 90,
+          courtNumber: 3,
+          classCapacity: 4,
+          isFinished: false,
+          students: [{ id: 21, names: "Ana", lastnames: "Alumna", email: "ana@test.com" }],
+        },
+        {
+          id: 5,
+          fromDateTime: new Date(2026, 9, 10, 18, 0),
+          durationMinutes: 90,
+          courtNumber: 1,
+          classCapacity: 2,
+          isFinished: true,
+          students: [],
+        },
+      ],
+    });
+    render(<TeachersPanel teachers={[lucia]} />);
+
+    fireEvent.click(within(rowOf("Lucía Profe")).getByRole("button", { name: "Ver las clases de Lucía Profe" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Clases de Lucía Profe" });
+    expect(getTeacherClassesAdmin).toHaveBeenCalledWith(1);
+    const upcoming = within(dialog).getByRole("listitem", { name: /Cancha 3/ });
+    expect(within(upcoming).getByText("1/4 alumnos")).toBeTruthy();
+    expect(within(upcoming).getByText("Ana Alumna")).toBeTruthy();
+    expect(within(within(dialog).getByRole("listitem", { name: /Cancha 1/ })).getByText("Finalizado")).toBeTruthy();
+  });
+
+  it("un profesor sin clases lo dice", async () => {
+    getTeacherClassesAdmin.mockResolvedValue({ success: true, data: [] });
+    render(<TeachersPanel teachers={[lucia]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver las clases de Lucía Profe" }));
+
+    expect(await screen.findByText("No tiene clases próximas ni de los últimos 7 días.")).toBeTruthy();
   });
 
   it("muestra el error si no se pudo cambiar el estado", async () => {
