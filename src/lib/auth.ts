@@ -27,7 +27,7 @@ export const authOptions: NextAuthOptions = {
           const accounts = dataSource.getRepository<Account>("Account");
           const account = await accounts.findOne({
             where: { email },
-            relations: { admin: true, player: true },
+            relations: { admin: true, player: { teacher: true } },
           });
 
           if (!account) {
@@ -57,6 +57,8 @@ export const authOptions: NextAuthOptions = {
             // Solo para mostrar u ocultar secciones del panel: los permisos del dueño se
             // verifican contra la base en cada acción (ver requireOwner).
             isOwner: account.admin?.accessLevel === AdminAccessLevel.OWNER,
+            // Igual para el profesor (HU-42): sus acciones lo verifican con requireTeacher.
+            isTeacher: account.player?.teacher?.isActive === true,
           };
         } catch (error) {
           console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);
@@ -79,6 +81,7 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name;
         token.role = user.role;
         token.isOwner = user.isOwner;
+        token.isTeacher = user.isTeacher;
       }
       return token;
     },
@@ -89,6 +92,7 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name ?? session.user.name;
         session.user.role = token.role ?? session.user.role;
         session.user.isOwner = token.isOwner ?? false;
+        session.user.isTeacher = token.isTeacher ?? false;
       }
       return session;
     },

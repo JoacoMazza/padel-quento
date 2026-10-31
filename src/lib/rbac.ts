@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/src/lib/auth";
 import { AdminAccessLevel, Role } from "@/src/domain/enums";
 import type { Admin } from "@/src/entities/Admin";
+import type { Teacher } from "@/src/entities/Teacher";
 import { getDataSource } from "@/src/lib/db";
 
 export const OWNER_ONLY_MESSAGE = "Solo el dueño del complejo puede hacer esto.";
@@ -96,4 +97,31 @@ export async function requireRole(allowedRoles: Role | Role[]) {
   }
 
   return session.user;
+}
+
+const TEACHER_ONLY_MESSAGE = "Acceso denegado: Se requiere el rol de Profesor";
+
+/**
+ * Verifica que el usuario sea un profesor activo (HU-42): un jugador con el rol
+ * de profesor. Se lee de la base y no de la sesión, así una desactivación o un
+ * cambio de rol aplica en el momento. Devuelve los ids del profesor y su jugador.
+ */
+export async function requireTeacher() {
+  const session = await getCurrentUserSession();
+  if (!session?.user?.email) {
+    throw new UnauthorizedError();
+  }
+  if (session.user.role !== Role.PLAYER) {
+    throw new ForbiddenError(TEACHER_ONLY_MESSAGE);
+  }
+
+  const dataSource = await getDataSource();
+  const teacher = await dataSource.getRepository<Teacher>("Teacher").findOne({
+    where: { player: { account: { email: session.user.email } } },
+    relations: { player: true },
+  });
+  if (!teacher?.isActive) {
+    throw new ForbiddenError(TEACHER_ONLY_MESSAGE);
+  }
+  return { ...session.user, teacherId: teacher.id, playerId: teacher.player.id };
 }
