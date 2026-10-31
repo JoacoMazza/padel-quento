@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  classCancelledByTeacherNotice,
   classCancelledNotice,
   courtUnavailableNotice,
   fixedBookingCancelledNotice,
@@ -209,6 +210,19 @@ describe("classCancelledNotice", () => {
     );
     expect(notice.whatsappTemplate).toEqual({
       name: "quento_clase_cancelada",
+      parameters: ["Ana", "Lucía Profe", "sábado 17 de octubre", "19:30", "3"],
+    });
+  });
+});
+
+describe("classCancelledByTeacherNotice", () => {
+  it("avisa al alumno que el profesor canceló la clase", () => {
+    const notice = classCancelledByTeacherNotice("Ana", "Lucía Profe", booking);
+
+    expect(notice.subject).toBe("Tu clase del sábado 17 de octubre fue cancelada");
+    expect(notice.text).toBe("Hola Ana, Lucía Profe canceló la clase del sábado 17 de octubre a las 19:30 en la cancha 3.");
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_clase_cancelada_profesor",
       parameters: ["Ana", "Lucía Profe", "sábado 17 de octubre", "19:30", "3"],
     });
   });

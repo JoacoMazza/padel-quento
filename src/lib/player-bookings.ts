@@ -8,15 +8,17 @@ import { getDataSource } from "@/src/lib/db";
 const BOOKING_RELATIONS = {
   booker: true,
   court: { complex: true },
+  classStudents: { player: true },
   match: { matchPlayers: { player: true }, chat: true },
 } as const;
 
 /**
- * Turnos del jugador para Mis turnos: los que reservó y los partidos de otros a
- * los que se sumó. Trae todos los próximos (o en curso), los últimos
- * MY_BOOKINGS_PAST_LIMIT que ya terminaron y, aunque no estén entre esos, los
- * partidos que todavía puede calificar (issue #77: no cancelados, asistió y
- * terminaron hace menos de REVIEW_WINDOW_HOURS). Sin cargar los turnos del resto del club.
+ * Turnos del jugador para Mis turnos: los que reservó, los partidos de otros a
+ * los que se sumó y las clases en las que un profesor lo registró (HU-47).
+ * Trae todos los próximos (o en curso), los últimos MY_BOOKINGS_PAST_LIMIT que
+ * ya terminaron y, aunque no estén entre esos, los partidos que todavía puede
+ * calificar (issue #77: no cancelados, asistió y terminaron hace menos de
+ * REVIEW_WINDOW_HOURS). Sin cargar los turnos del resto del club.
  */
 export async function getPlayerBookings(playerId: number, now: Date = new Date()): Promise<Booking[]> {
   const dataSource = await getDataSource();
@@ -29,6 +31,8 @@ export async function getPlayerBookings(playerId: number, now: Date = new Date()
         `(booker.id = :playerId OR EXISTS (
           SELECT 1 FROM "match_players" "mp" INNER JOIN "matches" "m" ON "m"."id" = "mp"."match_id"
           WHERE "m"."booking_id" = booking.id AND "mp"."player_id" = :playerId
+        ) OR EXISTS (
+          SELECT 1 FROM "class_students" "cs" WHERE "cs"."booking_id" = booking.id AND "cs"."player_id" = :playerId
         ))`,
         { playerId },
       );

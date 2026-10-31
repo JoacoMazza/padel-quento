@@ -4,7 +4,22 @@ import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ban, Calendar, CalendarCheck, Clock, Lock, LogOut, MapPin, MessageCircle, Repeat, Star, UserPlus, Users, X } from "lucide-react";
+import {
+  Ban,
+  Calendar,
+  CalendarCheck,
+  Clock,
+  GraduationCap,
+  Lock,
+  LogOut,
+  MapPin,
+  MessageCircle,
+  Repeat,
+  Star,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { ShareLinkButton } from "@/app/components/share-link-button";
 import { AddPlayerForm } from "@/app/open-matches/add-player-form";
 import { BookingState } from "@/src/domain/enums";
@@ -12,6 +27,7 @@ import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from 
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { updateBooking } from "@/src/actions/booking";
 import { closeMatch, leaveMatch } from "@/src/actions/match";
+import { leaveClass } from "@/src/actions/teacherClass";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import {
@@ -34,7 +50,15 @@ const CONFIRM_LABELS = {
   cancel: { question: "¿Cancelar turno?", confirm: "Sí, cancelar", pending: "Cancelando…" },
   close: { question: "¿Cerrar búsqueda de jugadores?", confirm: "Sí, cerrar", pending: "Cerrando…" },
   leave: { question: "¿Darte de baja del partido?", confirm: "Sí, darme de baja", pending: "Dándote de baja…" },
+  leaveClass: { question: "¿Salir de la clase?", confirm: "Sí, salir", pending: "Saliendo…" },
+  cancelClass: {
+    question: "¿Cancelar la clase? Se les avisa a los alumnos.",
+    confirm: "Sí, cancelar",
+    pending: "Cancelando…",
+  },
 };
+
+type PendingAction = keyof typeof CONFIRM_LABELS;
 
 export function BookingRow({
   booking,
@@ -48,13 +72,18 @@ export function BookingRow({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [pendingAction, setPendingAction] = useState<"cancel" | "close" | "leave" | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
 
   const end = getBookingEnd(booking);
   const tone = getBookingTone(booking, now);
+  const isStudentClass = booking.classInfo?.role === "student";
+  const isTeacherClass = booking.classInfo?.role === "teacher";
+  // El alumno sale de la clase mientras no empezó (el servidor lo verifica); el
+  // turno es del profesor, así que no lo puede cancelar.
+  const canLeaveClass = isStudentClass && tone === "confirmed" && booking.fromDateTime > now;
   // Quien se sumó a un partido de otro jugador no puede cancelar el turno completo.
   const canCancel = (tone === "confirmed" || tone === "pending") && !booking.joinedAsParticipant && !booking.isFixed;
   // En cambio, sí puede darse de baja del partido y liberar su lugar.
@@ -84,6 +113,19 @@ export function BookingRow({
       const result = await updateBooking(booking.id, { bookingState: BookingState.CANCELLED });
       // La fila sigue montada tras el refresh (los cancelados se siguen listando),
       // así que la confirmación se cierra siempre, salga bien o mal.
+      setPendingAction(null);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleLeaveClass() {
+    setError(null);
+    startTransition(async () => {
+      const result = await leaveClass(booking.id);
       setPendingAction(null);
       if (!result.success) {
         setError(result.error);
@@ -156,6 +198,18 @@ export function BookingRow({
               Turno fijo
             </span>
           ) : null}
+          {booking.classInfo ? (
+            <span className="badge badge-neutral">
+              <GraduationCap className="h-3 w-3" />
+              {isTeacherClass ? "Clase que das" : "Clase"}
+            </span>
+          ) : null}
+          {isTeacherClass ? (
+            <span className="badge badge-neutral">
+              <Users className="h-3 w-3" />
+              {booking.classInfo!.studentsCount}/{booking.classInfo!.capacity} alumnos
+            </span>
+          ) : null}
         </div>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
           <span className="flex items-center gap-1.5">
@@ -180,8 +234,13 @@ export function BookingRow({
           ) : null}
         </p>
         <p className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-bold text-foreground">{formatPrice(booking.price)}</span>
-          {booking.joinedAsParticipant ? (
+          {/* El alumno no paga la cancha: la clase la reservó el profesor. */}
+          {isStudentClass ? (
+            <span className="font-semibold text-foreground">Con {booking.classInfo!.teacherName}</span>
+          ) : (
+            <span className="font-bold text-foreground">{formatPrice(booking.price)}</span>
+          )}
+          {booking.joinedAsParticipant && !booking.classInfo ? (
             <span className="flex items-center gap-1 text-xs font-medium text-primary">
               <UserPlus className="h-3.5 w-3.5" />
               Te sumaste a este partido
@@ -211,7 +270,13 @@ export function BookingRow({
               type="button"
               disabled={isPending}
               onClick={
-                pendingAction === "cancel" ? handleCancel : pendingAction === "leave" ? handleLeave : handleClose
+                pendingAction === "cancel" || pendingAction === "cancelClass"
+                  ? handleCancel
+                  : pendingAction === "leave"
+                    ? handleLeave
+                    : pendingAction === "leaveClass"
+                      ? handleLeaveClass
+                      : handleClose
               }
               className={`btn btn-sm ${pendingAction === "close" ? "btn-dark" : "bg-danger text-white hover:bg-danger/90"}`}
             >
@@ -281,10 +346,20 @@ export function BookingRow({
                 <LogOut className="h-4 w-4" />
               </button>
             ) : null}
+            {canLeaveClass ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("leaveClass")}
+                className="btn btn-sm btn-danger-soft"
+              >
+                <LogOut className="h-4 w-4" />
+                Salir de la clase
+              </button>
+            ) : null}
             {canCancel ? (
               <button
                 type="button"
-                onClick={() => setPendingAction("cancel")}
+                onClick={() => setPendingAction(isTeacherClass ? "cancelClass" : "cancel")}
                 className="btn btn-sm btn-danger-soft"
                 aria-label="Cancelar turno"
               >

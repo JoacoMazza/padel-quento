@@ -9,7 +9,7 @@ import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { getSessionPlayerId } from "@/src/lib/session-player";
-import { notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
+import { notifyClassCancelledByTeacher, notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
 import {
   BOOKER_NOT_FOUND_MESSAGE,
   BookerNotFoundError,
@@ -63,6 +63,7 @@ const BOOKING_RELATIONS = {
   booker: true,
   court: true,
   match: { matchPlayers: { player: true }, chat: true },
+  classStudents: { player: true },
 } as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
@@ -180,9 +181,11 @@ export async function updateBooking(
       await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
     }
 
-    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19); si era una
+    // clase, a sus alumnos (HU-47).
     if (cancelled) {
       await notifyMatchCancelledByCreator(id);
+      await notifyClassCancelledByTeacher(id);
     }
 
     return { success: true, data: toPlain(saved) };

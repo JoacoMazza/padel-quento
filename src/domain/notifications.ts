@@ -51,6 +51,20 @@ export function classCancelledNotice(recipientName: string, teacherName: string,
   };
 }
 
+/** Clase cancelada por el profesor (HU-47). */
+export function classCancelledByTeacherNotice(
+  recipientName: string,
+  teacherName: string,
+  booking: NoticeBooking,
+): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Tu clase del ${day} fue cancelada`,
+    text: `Hola ${recipientName}, ${teacherName} canceló la clase del ${day} a las ${time} en la cancha ${court}.`,
+    whatsappTemplate: { name: "quento_clase_cancelada_profesor", parameters: [recipientName, teacherName, day, time, court] },
+  };
+}
+
 /** Turno cancelado porque la cancha quedó fuera de servicio. */
 export function courtUnavailableNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
   const { day, time, court } = describeBooking(booking);
