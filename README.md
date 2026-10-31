@@ -83,6 +83,7 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
+- Las fechas y horas se calculan en el servidor con la zona horaria del club (`America/Argentina/Buenos_Aires`, ver [src/lib/club-time-zone.ts](src/lib/club-time-zone.ts)), que se fija al arrancar en `instrumentation.ts` y en `src/lib/data-source.ts` (seeds y comandos de TypeORM), y también con la variable `TZ`: un turno fijo de las 18:00 cae a las 18:00 de City Bell aunque el servidor esté desplegado en otra zona.
 
 ## Administradores: dueño y trabajador
 
@@ -125,6 +126,7 @@ Variables relevantes en `.env`:
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
+| `TZ` | Zona horaria del proceso (`America/Argentina/Buenos_Aires`); definirla también en el despliegue de producción |
 | `NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER` / `NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE` | Número y mensaje inicial del botón flotante de WhatsApp (opcional: sin número no se muestra). Se fijan al hacer el build |
 | `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |

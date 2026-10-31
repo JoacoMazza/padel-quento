@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import bcrypt from "bcrypt";
+import { Role } from "@/src/domain/enums";
 
 vi.mock("bcrypt", () => ({
   default: { compare: vi.fn() },
@@ -128,8 +129,8 @@ describe("authorize (CredentialsProvider)", () => {
 
       const token = await jwtCallback({
         token: {},
-        user: { id: "123", email: "admin@test.com", name: "Admin Test", role: "admin" as any },
-      } as any);
+        user: { id: "123", email: "admin@test.com", name: "Admin Test", role: Role.ADMIN },
+      } as never);
 
       expect(token).toMatchObject({
         id: "123",
@@ -145,9 +146,9 @@ describe("authorize (CredentialsProvider)", () => {
       if (!sessionCallback) throw new Error("session callback missing");
 
       const session = await sessionCallback({
-        session: { user: { email: "admin@test.com", name: "Admin" }, expires: "1" } as any,
-        token: { id: "123", email: "admin@test.com", name: "Admin", role: "admin" as any },
-      } as any);
+        session: { user: { email: "admin@test.com", name: "Admin" }, expires: "1" },
+        token: { id: "123", email: "admin@test.com", name: "Admin", role: Role.ADMIN },
+      } as never);
 
       expect(session.user).toMatchObject({
         id: "123",

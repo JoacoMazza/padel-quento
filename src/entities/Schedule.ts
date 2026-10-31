@@ -17,7 +17,7 @@ export class Schedule {
   @Column({ type: "time", default: '23:00:00', name: "closing_time" })
   closingTime!: Date;
 
-  @ManyToOne("Court", (court: any) => court.schedules)
+  @ManyToOne("Court", "schedules")
   @JoinColumn({ name: "court_id" })
   court!: Court;
 }

@@ -111,7 +111,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     const result = await createBookingAdmin({
       courtId,
       date,
-      startTime: "20:00",
+      startTime: "19:30",
       holder: { names: "Carla", lastnames: "Mostrador", phoneNumber },
     });
 
@@ -145,7 +145,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     });
     expect(existing.success).toBe(true);
 
-    const result = await createBookingAdmin({ courtId, date, startTime: "19:00", holder: { playerId: player.id } });
+    const result = await createBookingAdmin({ courtId, date, startTime: "18:00", holder: { playerId: player.id } });
 
     expect(result).toEqual({ success: false, error: "Ese horario ya está ocupado en esta cancha." });
   });
@@ -171,6 +171,15 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     const result = await createBookingAdmin({ courtId, date, startTime: "22:00", holder: { playerId: player.id } });
 
     expect(result).toEqual({ success: false, error: "La cancha no está abierta en ese horario ese día." });
+  });
+
+  it("no agenda en una hora que no coincide con el inicio de un turno de la cancha", async () => {
+    const courtId = await newCourt();
+
+    // La cancha abre a las 09:00: los turnos empiezan a las 09:00, 10:30, 12:00…
+    const result = await createBookingAdmin({ courtId, date, startTime: "10:00", holder: { playerId: player.id } });
+
+    expect(result).toEqual({ success: false, error: "Ese horario no corresponde a un turno de la cancha." });
   });
 
   it("no agenda en un horario que ya pasó", async () => {

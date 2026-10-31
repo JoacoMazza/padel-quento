@@ -10,6 +10,7 @@ const {
   getOccupancyReportData,
   getFixedBookingsAdmin,
   createFixedBooking,
+  releaseFixedBookingDate,
   getAttendanceReport,
   createBookingAdmin,
   getAvailableSlotsAdmin,
@@ -19,6 +20,7 @@ const {
   getTeam: vi.fn(),
   getAvailableSlotsAdmin: vi.fn(),
   createFixedBooking: vi.fn(),
+  releaseFixedBookingDate: vi.fn(),
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
   getOutOfServices: vi.fn(),
@@ -45,12 +47,12 @@ vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin, getAvailableS
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
   createFixedBooking,
-  releaseFixedBookingDate: vi.fn(),
+  releaseFixedBookingDate,
   restoreFixedBookingDate: vi.fn(),
   cancelFixedBooking: vi.fn(),
 }));
 
-import { CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
+import { BookingState, CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
 import { formatPrice } from "@/app/bookings/slot-utils";
 
@@ -315,6 +317,8 @@ describe("AdminPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Registrar turno fijo" }));
     fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+    await flush();
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "18:00" } });
     fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear turno fijo" }));
     await flush();
@@ -322,6 +326,46 @@ describe("AdminPanel", () => {
     expect(createFixedBooking).toHaveBeenCalledTimes(1);
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Turno fijo creado.")).toBeTruthy();
+  });
+
+  it("al liberar una fecha desde la grilla actualiza también el listado de turnos fijos", async () => {
+    vi.setSystemTime(new Date(2026, 9, 12, 9, 0));
+    releaseFixedBookingDate.mockResolvedValue({ success: true, data: null });
+    getScheduleBoardData.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_BOARD.data,
+        courts: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
+        schedules: [
+          { id: 1, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "23:00:00", court: { id: 1 } },
+        ],
+        bookings: [
+          {
+            id: 5,
+            fromDateTime: new Date(2026, 9, 12, 18, 0),
+            durationMinutes: 90,
+            bookingState: BookingState.RESERVED,
+            price: 10000,
+            attended: false,
+            court: { id: 1 },
+            booker: { id: 3, names: "Grupo", lastnames: "Lunes" },
+            match: null,
+          },
+        ],
+        fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }],
+      },
+    });
+    render(<AdminPanel isOwner />);
+    await flush();
+    expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getAllByText("Turno fijo").find((el) => el.getAttribute("role") === "button")!);
+    fireEvent.click(screen.getByRole("button", { name: "Liberar esta fecha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    await flush();
+
+    expect(releaseFixedBookingDate).toHaveBeenCalledWith(9);
+    expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(2);
   });
 
   it("pide las métricas de ocupación recién al abrir su sección", async () => {
