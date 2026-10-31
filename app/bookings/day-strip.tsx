@@ -11,6 +11,24 @@ export type DayOption = {
   hasSchedule: boolean;
 };
 
+const DAY_CAPTION_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "long" });
+const DAY_LABEL_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short" });
+const DAY_LABEL_MONTH_FORMATTER = new Intl.DateTimeFormat("es-AR", { month: "short" });
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1).replace(".", "");
+}
+
+/** "Hoy", "Mañana" o el día de la semana, según cuántos días faltan. */
+export function dayCaption(date: Date, offset: number): string {
+  return offset === 0 ? "Hoy" : offset === 1 ? "Mañana" : DAY_CAPTION_FORMATTER.format(date);
+}
+
+/** "Mié 14 Oct". */
+export function dayLabel(date: Date): string {
+  return `${capitalize(DAY_LABEL_WEEKDAY_FORMATTER.format(date))} ${date.getDate()} ${capitalize(DAY_LABEL_MONTH_FORMATTER.format(date))}`;
+}
+
 /** Tira de próximos días con la cantidad de turnos libres, más un selector para cualquier otra fecha. */
 export function DayStrip({
   days,

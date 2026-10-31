@@ -106,6 +106,9 @@ Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) 
 Un profesor es un jugador con el rol de profesor (tabla `teachers`, entidad [src/entities/Teacher.ts](src/entities/Teacher.ts)): da clases en el complejo y sigue siendo jugador (reserva turnos, se suma a partidos).
 
 - Cualquier administrador los gestiona desde el panel (sección **Profesores**): da de alta un profesor nuevo (crea el jugador con su cuenta) o le da el rol a un jugador que ya existe, y puede desactivarlo, volver a activarlo o quitarle el rol.
+- **Turnos de clase (HU-43):** el profesor los reserva en `/teacher/book` ("Reservar clase"), con la misma disponibilidad y las mismas reglas que cualquier reserva, al precio de la cancha. El turno queda a su nombre, marcado como clase con el cupo de alumnos que elige (de 1 a 8, `bookings.class_capacity`; la base lo valida con `CHK_bookings_class_capacity`), y el horario deja de estar disponible para los demás. Las clases no suman ni descuentan puntos: ni por asistencia ni por cancelarlas tarde.
+- **Alumnos (HU-44):** en "Mis clases" el profesor ve sus próximos turnos de clase y les suma jugadores registrados (los busca por nombre o email) hasta el cupo, o los quita mientras la clase no empezó (tabla `class_students`; un alumno no puede estar dos veces en la misma clase).
+- Si el administrador desactiva a un profesor o le quita el rol, se cancelan sus clases futuras y se avisa a los alumnos, sin penalizar a nadie.
 - El profesor tiene su sección en `/teacher` ("Mis clases" en el encabezado). `proxy.ts` la deja solo para quien inició sesión como profesor, y el servidor lo verifica contra la base con `requireTeacher()` ([src/lib/rbac.ts](src/lib/rbac.ts)): una desactivación o un cambio de rol aplica en el momento. La sesión trae `isTeacher` solo para mostrar u ocultar la sección; a quien le dan el rol, el link le aparece al volver a iniciar sesión.
 
 ## Configuración del proyecto

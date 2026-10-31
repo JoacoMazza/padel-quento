@@ -7,6 +7,7 @@ import { Admin } from "../../src/entities/Admin";
 import { Booker } from "../../src/entities/Booker";
 import { Booking } from "../../src/entities/Booking";
 import { Chat } from "../../src/entities/Chat";
+import { ClassStudent } from "../../src/entities/ClassStudent";
 import { Complex } from "../../src/entities/Complex";
 import { Court } from "../../src/entities/Court";
 import { FixedBooking } from "../../src/entities/FixedBooking";
@@ -34,7 +35,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [Account, Admin, Booker, Player, Penalty, Complex, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, FixedBooking, FixedBookingDate, PlayerReview, Teacher],
+    entities: [Account, Admin, Booker, Player, Penalty, Complex, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, FixedBooking, FixedBookingDate, PlayerReview, Teacher, ClassStudent],
     synchronize: true,
     dropSchema: true,
   });
