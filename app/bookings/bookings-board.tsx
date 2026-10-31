@@ -50,7 +50,14 @@ function loginUrlFor(courtId: number, start: Date) {
 }
 
 function toSelectedSlot(court: CourtProp, slot: Slot): SelectedSlot {
-  return { courtId: court.id, courtNumber: court.number, price: court.price, start: slot.start, end: slot.end };
+  return {
+    courtId: court.id,
+    courtNumber: court.number,
+    location: court.location,
+    price: court.price,
+    start: slot.start,
+    end: slot.end,
+  };
 }
 
 function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp[]): SelectedOpenMatch {
@@ -59,6 +66,7 @@ function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp
     bookingId: slot.bookingId!,
     courtId: court.id,
     courtNumber: court.number,
+    location: court.location,
     price: openBooking?.price ?? court.price,
     start: slot.start,
     end: slot.end,

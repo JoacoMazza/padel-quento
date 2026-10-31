@@ -1,6 +1,14 @@
 import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
+import type { ComplexLocation } from "@/src/domain/complex";
 
-export type CourtProp = { id: number; number: number; state: CourtState; price: number };
+export type CourtProp = {
+  id: number;
+  number: number;
+  state: CourtState;
+  price: number;
+  /** Complejo donde está la cancha. */
+  location?: ComplexLocation;
+};
 
 export type ScheduleProp = {
   id: number;
@@ -48,6 +56,7 @@ export type Slot = {
 export type SelectedSlot = {
   courtId: number;
   courtNumber: number;
+  location?: ComplexLocation;
   price: number;
   start: Date;
   end: Date;
@@ -57,6 +66,7 @@ export type SelectedOpenMatch = {
   bookingId: number;
   courtId: number;
   courtNumber: number;
+  location?: ComplexLocation;
   price: number;
   start: Date;
   end: Date;

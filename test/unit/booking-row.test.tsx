@@ -53,6 +53,14 @@ describe("BookingRow", () => {
     cleanup();
   });
 
+  it("muestra el complejo de la cancha, que lleva a su ubicación en Google Maps", () => {
+    render(<BookingRow booking={booking({ location: { name: "Quento Club", address: "Cam. Centenario 8907", city: "Villa Elisa", mapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA" } })} now={NOW} />);
+
+    const where = screen.getByRole("link", { name: "Quento Club · Villa Elisa" });
+    expect(where.getAttribute("href")).toBe("https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA");
+    expect(where.getAttribute("target")).toBe("_blank");
+  });
+
   describe("turno fijo", () => {
     it("lo marca como turno fijo y no permite cancelarlo desde la app", () => {
       render(<BookingRow booking={booking({ isFixed: true })} now={NOW} />);

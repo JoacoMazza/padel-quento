@@ -31,6 +31,13 @@ const {
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
 vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateAllCourtsPrice: vi.fn() }));
+vi.mock("@/src/actions/complex", () => ({
+  getComplexContacts: vi.fn(async () => ({
+    success: true,
+    data: [{ id: 1, name: "Quento Club", whatsappNumber: "+54 9 221 604-9987", whatsappMessage: null }],
+  })),
+  updateComplexContact: vi.fn(),
+}));
 vi.mock("@/src/actions/outOfService", () => ({
   getOutOfServices,
   createOutOfService: vi.fn(),
@@ -368,6 +375,17 @@ describe("AdminPanel", () => {
     expect(getCourts).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Cancha 3")).toBeTruthy();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+  });
+
+  it("en la sección de canchas, también un trabajador puede cargar el WhatsApp de contacto del complejo", async () => {
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+
+    openSection("Canchas");
+    await flush();
+
+    expect(screen.getByRole("heading", { name: "WhatsApp de contacto" })).toBeTruthy();
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 604-9987");
   });
 
   it("muestra fuera de servicio la cancha con un bloqueo activo, pero no por uno programado o vencido", async () => {
