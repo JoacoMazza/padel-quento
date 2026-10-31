@@ -6,7 +6,7 @@ import type { Booking } from "@/src/entities/Booking";
 import type { ClassStudent } from "@/src/entities/ClassStudent";
 import type { Player } from "@/src/entities/Player";
 import { BookingState } from "@/src/domain/enums";
-import { MAX_CLASS_CAPACITY, MIN_CLASS_CAPACITY } from "@/src/domain/constants";
+import { FINISHED_CLASSES_DAYS, MAX_CLASS_CAPACITY, MIN_CLASS_CAPACITY } from "@/src/domain/constants";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { createBookingForPlayer } from "@/src/lib/bookings";
@@ -20,6 +20,13 @@ export type CreateClassBookingInput = { courtId: number; fromDateTime: Date; cla
 /** Jugador como lo ve el profesor al buscar o listar alumnos: nombre y email. */
 export type StudentItem = { id: number; names: string; lastnames: string; email: string };
 
+/** Alumno en el listado del profesor (HU-45): contacto, clases que ya tuvo con él y la última. */
+export type TeacherStudentItem = StudentItem & {
+  phoneNumber: string;
+  classesCount: number;
+  lastClassAt: Date | null;
+};
+
 /** Turno de clase del profesor con sus alumnos. */
 export type TeacherClassItem = {
   id: number;
@@ -27,6 +34,8 @@ export type TeacherClassItem = {
   durationMinutes: number;
   courtNumber: number;
   classCapacity: number;
+  /** Ya terminó (la agenda la muestra como "Finalizado"). */
+  isFinished: boolean;
   students: StudentItem[];
 };
 
@@ -77,11 +86,16 @@ export async function createClassBooking(input: CreateClassBookingInput): Promis
   }
 }
 
-/** Próximos turnos de clase del profesor (los que todavía no terminaron), por fecha, con sus alumnos. */
+/**
+ * Agenda del profesor (HU-46): sus turnos de clase por fecha, con sus alumnos.
+ * Trae los que todavía no terminaron y los que terminaron en los últimos
+ * FINISHED_CLASSES_DAYS días, marcados como finalizados. Sin los cancelados.
+ */
 export async function getTeacherClasses(): Promise<ActionResult<TeacherClassItem[]>> {
   try {
     const { playerId } = await requireTeacher();
     const dataSource = await getDataSource();
+    const now = new Date();
     const classes = await dataSource
       .createQueryBuilder<Booking>("Booking", "booking")
       .leftJoinAndSelect("booking.court", "court")
@@ -92,7 +106,9 @@ export async function getTeacherClasses(): Promise<ActionResult<TeacherClassItem
       .where("booker.id = :playerId", { playerId })
       .andWhere('booking."class_capacity" IS NOT NULL')
       .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
-      .andWhere('booking."datetime" + make_interval(mins => booking."duration_minutes") > :now', { now: new Date() })
+      .andWhere('booking."datetime" + make_interval(mins => booking."duration_minutes") > :since', {
+        since: new Date(now.getTime() - FINISHED_CLASSES_DAYS * 24 * 60 * 60_000),
+      })
       .orderBy('booking."datetime"', "ASC")
       .addOrderBy("student.id", "ASC")
       .getMany();
@@ -103,6 +119,7 @@ export async function getTeacherClasses(): Promise<ActionResult<TeacherClassItem
       durationMinutes: booking.durationMinutes,
       courtNumber: booking.court.number,
       classCapacity: booking.classCapacity!,
+      isFinished: new Date(booking.fromDateTime).getTime() + booking.durationMinutes * 60_000 <= now.getTime(),
       students: booking.classStudents.map((student) => toStudent(student.player)),
     }));
     return { success: true, data: toPlain(data) };
@@ -111,6 +128,65 @@ export async function getTeacherClasses(): Promise<ActionResult<TeacherClassItem
     if (known) return { success: false, error: known };
     console.error("getTeacherClasses", error);
     return { success: false, error: "No se pudieron obtener tus clases." };
+  }
+}
+
+/**
+ * Alumnos que el profesor registró alguna vez (HU-45), sin contar las clases
+ * canceladas: su contacto, cuántas clases ya terminadas tuvo con él y la fecha
+ * de la última. Ordenados por nombre.
+ */
+export async function getTeacherStudents(): Promise<ActionResult<TeacherStudentItem[]>> {
+  try {
+    const { playerId } = await requireTeacher();
+    const dataSource = await getDataSource();
+    const end = 'booking."datetime" + make_interval(mins => booking."duration_minutes")';
+    const rows = await dataSource
+      .createQueryBuilder<ClassStudent>("ClassStudent", "student")
+      .innerJoin("student.booking", "booking")
+      .innerJoin("booking.booker", "booker")
+      .innerJoin("student.player", "player")
+      .innerJoin("player.account", "account")
+      .select("player.id", "id")
+      .addSelect("player.names", "names")
+      .addSelect("player.lastnames", "lastnames")
+      .addSelect("account.email", "email")
+      .addSelect("player.phoneNumber", "phoneNumber")
+      .addSelect(`COUNT(*) FILTER (WHERE ${end} <= :now)`, "classesCount")
+      .addSelect(`MAX(booking."datetime") FILTER (WHERE ${end} <= :now)`, "lastClassAt")
+      .where("booker.id = :playerId", { playerId })
+      .andWhere('booking."class_capacity" IS NOT NULL')
+      .andWhere('booking."booking_state" != :cancelled', { cancelled: BookingState.CANCELLED })
+      .setParameter("now", new Date())
+      .groupBy("player.id")
+      .addGroupBy("account.email")
+      .orderBy("player.names", "ASC")
+      .addOrderBy("player.lastnames", "ASC")
+      .getRawMany<{
+        id: number;
+        names: string;
+        lastnames: string;
+        email: string;
+        phoneNumber: string;
+        classesCount: string;
+        lastClassAt: Date | null;
+      }>();
+
+    const data: TeacherStudentItem[] = rows.map((row) => ({
+      id: row.id,
+      names: row.names,
+      lastnames: row.lastnames,
+      email: row.email,
+      phoneNumber: row.phoneNumber,
+      classesCount: Number(row.classesCount),
+      lastClassAt: row.lastClassAt ? new Date(row.lastClassAt) : null,
+    }));
+    return { success: true, data: toPlain(data) };
+  } catch (error) {
+    const known = knownErrorMessage(error);
+    if (known) return { success: false, error: known };
+    console.error("getTeacherStudents", error);
+    return { success: false, error: "No se pudieron obtener tus alumnos." };
   }
 }
 
