@@ -20,11 +20,23 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
   const emailBlocked = `blocked.${Date.now()}@test.com`;
   const emailAdmin = `admin.${Date.now()}@test.com`;
   const emailStaff = `staff.${Date.now()}@test.com`;
+  const emailTeacher = `profe.${Date.now()}@test.com`;
   const password = "claveSegura123";
 
   beforeAll(async () => {
     // jugador normal
     await createPlayer({ email, password, names: "Login", lastnames: "Test", phoneNumber: uniquePhoneNumber() });
+    // jugador profesor (HU-42)
+    const teacher = await createPlayer({
+      email: emailTeacher,
+      password,
+      names: "Profe",
+      lastnames: "Test",
+      phoneNumber: uniquePhoneNumber(),
+    });
+    if (!teacher.success) throw new Error("no se pudo crear el profesor de prueba");
+    const teachers = (await getDataSource()).getRepository("Teacher");
+    await teachers.save(teachers.create({ player: { id: teacher.data.id }, isActive: true }));
     // jugador bloqueado
     const blocked = await createPlayer({
       email: emailBlocked,
@@ -70,6 +82,12 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
     expect(await getAuthorize()({ email: emailAdmin, password })).toMatchObject({ role: Role.ADMIN, isOwner: true });
     expect(await getAuthorize()({ email: emailStaff, password })).toMatchObject({ role: Role.ADMIN, isOwner: false });
     expect(await getAuthorize()({ email, password })).toMatchObject({ role: Role.PLAYER, isOwner: false });
+  });
+
+  it("indica si el jugador es profesor (HU-42)", async () => {
+    expect(await getAuthorize()({ email: emailTeacher, password })).toMatchObject({ role: Role.PLAYER, isTeacher: true });
+    expect(await getAuthorize()({ email, password })).toMatchObject({ role: Role.PLAYER, isTeacher: false });
+    expect(await getAuthorize()({ email: emailAdmin, password })).toMatchObject({ role: Role.ADMIN, isTeacher: false });
   });
 
   it("lleva isOwner del login a la sesión", async () => {

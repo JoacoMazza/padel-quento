@@ -101,6 +101,13 @@ Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) 
 - El servidor lo exige con `requireOwner()` ([src/lib/rbac.ts](src/lib/rbac.ts)), que lee el nivel de la base en cada acción: un cambio de nivel aplica en el momento. La sesión trae `isOwner` solo para mostrar u ocultar secciones.
 - El dueño no puede darse de baja ni cambiarse el nivel a sí mismo. Los administradores creados antes de este cambio quedaron como dueños; los nuevos arrancan como trabajadores.
 
+## Profesores
+
+Un profesor es un jugador con el rol de profesor (tabla `teachers`, entidad [src/entities/Teacher.ts](src/entities/Teacher.ts)): da clases en el complejo y sigue siendo jugador (reserva turnos, se suma a partidos).
+
+- Cualquier administrador los gestiona desde el panel (sección **Profesores**): da de alta un profesor nuevo (crea el jugador con su cuenta) o le da el rol a un jugador que ya existe, y puede desactivarlo, volver a activarlo o quitarle el rol.
+- El profesor tiene su sección en `/teacher` ("Mis clases" en el encabezado). `proxy.ts` la deja solo para quien inició sesión como profesor, y el servidor lo verifica contra la base con `requireTeacher()` ([src/lib/rbac.ts](src/lib/rbac.ts)): una desactivación o un cambio de rol aplica en el momento. La sesión trae `isTeacher` solo para mostrar u ocultar la sección; a quien le dan el rol, el link le aparece al volver a iniciar sesión.
+
 ## Configuración del proyecto
 
 ### Requisitos previos

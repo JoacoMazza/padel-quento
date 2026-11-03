@@ -35,6 +35,10 @@ function isGuestVisiblePath(pathname: string) {
   );
 }
 
+function isTeacherPath(pathname: string) {
+  return pathname === "/teacher" || pathname.startsWith("/teacher/");
+}
+
 function isAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin");
 }
@@ -71,6 +75,15 @@ export async function proxy(request: NextRequest) {
         headers: { "content-type": "text/plain; charset=utf-8" },
       });
     }
+  }
+
+  // HU-42: la sección del profesor es solo para profesores activos. El permiso
+  // real lo verifica el servidor contra la base (requireTeacher).
+  if (isTeacherPath(pathname) && !token?.isTeacher) {
+    return new NextResponse("Acceso denegado: Se requiere el rol de Profesor", {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
   }
 
   // El administrador queda encapsulado dentro del panel: cualquier ruta pública
