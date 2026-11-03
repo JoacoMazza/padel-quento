@@ -16,6 +16,7 @@ vi.mock("@/src/lib/rbac", async (importOriginal) => {
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/teacherClass", () => ({
   getTeacherClasses: vi.fn(async () => ({ success: true, data: [] })),
+  getTeacherStudents: vi.fn(async () => ({ success: true, data: [] })),
   searchStudents: vi.fn(),
   addClassStudent: vi.fn(),
   removeClassStudent: vi.fn(),

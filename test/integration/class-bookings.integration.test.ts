@@ -15,6 +15,7 @@ import {
   addClassStudent,
   createClassBooking,
   getTeacherClasses,
+  getTeacherStudents,
   removeClassStudent,
   searchStudents,
 } from "@/src/actions/teacherClass";
@@ -307,21 +308,43 @@ describe("clases (HU-43 y HU-44, integración con Postgres real)", () => {
       const later = await newClass(3, futureSlot(40));
       const sooner = await newClass(2, futureSlot(30));
       await addClassStudent(sooner, ana.id);
-      const past = await newClass(2);
-      await moveToPast(past);
 
       const result = await getTeacherClasses();
 
       if (!result.success) throw new Error(result.error);
       const ids = result.data.map((c) => c.id);
       expect(ids.indexOf(sooner)).toBeLessThan(ids.indexOf(later));
-      expect(ids).not.toContain(past);
       expect(result.data.find((c) => c.id === sooner)).toMatchObject({
         courtNumber: expect.any(Number),
         classCapacity: 2,
         durationMinutes: 90,
+        isFinished: false,
         students: [{ id: ana.id, names: "Ana", lastnames: "Clase", email: ana.email }],
       });
+    });
+
+    it("trae como finalizadas las que terminaron en los últimos 7 días, pero no las más viejas (HU-46)", async () => {
+      const recent = await newClass(2);
+      await addClassStudent(recent, ana.id);
+      await moveToPast(recent, 3);
+      const old = await newClass(2);
+      await moveToPast(old, 8 * 24 + 3);
+
+      const result = await getTeacherClasses();
+
+      if (!result.success) throw new Error(result.error);
+      expect(result.data.find((c) => c.id === recent)).toMatchObject({ isFinished: true, students: [{ id: ana.id }] });
+      expect(result.data.some((c) => c.id === old)).toBe(false);
+    });
+
+    it("una clase en curso todavía no está finalizada", async () => {
+      const ongoing = await newClass(2);
+      await moveToPast(ongoing, 1);
+
+      const result = await getTeacherClasses();
+
+      if (!result.success) throw new Error(result.error);
+      expect(result.data.find((c) => c.id === ongoing)).toMatchObject({ isFinished: false });
     });
 
     it("no trae las clases canceladas", async () => {
@@ -332,6 +355,86 @@ describe("clases (HU-43 y HU-44, integración con Postgres real)", () => {
 
       if (!result.success) throw new Error(result.error);
       expect(result.data.some((c) => c.id === id)).toBe(false);
+    });
+  });
+
+  describe("getTeacherStudents (HU-45)", () => {
+    async function freshTeacher() {
+      const profe = await newPlayer("Profe");
+      await makeTeacher(profe);
+      signInAs(profe.email);
+      return profe;
+    }
+
+    async function classOf(capacity: number, start = futureSlot()) {
+      const created = await createClassBooking({ courtId, fromDateTime: start, classCapacity: capacity });
+      if (!created.success) throw new Error(created.error);
+      return created.data.id;
+    }
+
+    it("lista a cada alumno una vez, con su contacto, la cantidad de clases que ya tuvo y la fecha de la última", async () => {
+      await freshTeacher();
+      const first = await classOf(4);
+      const second = await classOf(4);
+      const upcoming = await classOf(4);
+      for (const id of [first, second]) await addClassStudent(id, ana.id);
+      await addClassStudent(upcoming, ana.id);
+      await addClassStudent(upcoming, bruno.id);
+      await moveToPast(first, 50);
+      await moveToPast(second, 3);
+      const dataSource = await getDataSource();
+      const secondStart = (await dataSource.getRepository<Booking>("Booking").findOneByOrFail({ id: second })).fromDateTime;
+
+      const result = await getTeacherStudents();
+
+      if (!result.success) throw new Error(result.error);
+      expect(result.data).toEqual([
+        {
+          id: ana.id,
+          names: "Ana",
+          lastnames: "Clase",
+          email: ana.email,
+          phoneNumber: expect.any(String),
+          classesCount: 2,
+          lastClassAt: new Date(secondStart),
+        },
+        {
+          id: bruno.id,
+          names: "Bruno",
+          lastnames: "Clase",
+          email: bruno.email,
+          phoneNumber: expect.any(String),
+          classesCount: 0,
+          lastClassAt: null,
+        },
+      ]);
+    });
+
+    it("no incluye a los alumnos de clases canceladas ni a los de otros profesores", async () => {
+      const profe = await freshTeacher();
+      const cancelled = await classOf(4);
+      await addClassStudent(cancelled, carla.id);
+      await updateBooking(cancelled, { bookingState: BookingState.CANCELLED });
+      const kept = await classOf(4);
+      await addClassStudent(kept, ana.id);
+      await freshTeacher();
+      const theirs = await classOf(4);
+      await addClassStudent(theirs, bruno.id);
+      signInAs(profe.email);
+
+      const result = await getTeacherStudents();
+
+      if (!result.success) throw new Error(result.error);
+      expect(result.data.map((s) => s.id)).toEqual([ana.id]);
+    });
+
+    it("solo un profesor ve su listado", async () => {
+      signInAs(ana.email);
+
+      expect(await getTeacherStudents()).toEqual({
+        success: false,
+        error: "Acceso denegado: Se requiere el rol de Profesor",
+      });
     });
   });
 

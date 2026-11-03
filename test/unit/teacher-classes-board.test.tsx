@@ -26,6 +26,7 @@ function lesson(overrides = {}) {
     durationMinutes: 90,
     courtNumber: 3,
     classCapacity: 2,
+    isFinished: false,
     students: [ana],
     ...overrides,
   };
@@ -148,6 +149,28 @@ describe("TeacherClassesBoard (HU-44)", () => {
 
     await waitFor(() => expect(removeClassStudent).toHaveBeenCalledWith(7, 21));
     expect(await within(classCard()).findByText("0/2 alumnos · 2 lugares libres")).toBeTruthy();
+  });
+
+  it("muestra las clases que ya terminaron aparte, como Finalizado, sin poder cambiar sus alumnos (HU-46)", () => {
+    const finished = lesson({ id: 5, courtNumber: 1, fromDateTime: new Date(2026, 9, 10, 18, 0), isFinished: true });
+    render(<TeacherClassesBoard classes={[finished, lesson()]} />);
+
+    const upcoming = screen.getByRole("region", { name: "Próximas clases" });
+    const done = screen.getByRole("region", { name: "Finalizadas" });
+    expect(within(upcoming).getByRole("article", { name: /Cancha 3/ })).toBeTruthy();
+    const card = within(done).getByRole("article", { name: /Cancha 1/ });
+    expect(within(card).getByText("Finalizado")).toBeTruthy();
+    expect(within(card).getByText("Ana Alumna")).toBeTruthy();
+    expect(within(card).queryByLabelText("Buscar alumno")).toBeNull();
+    expect(within(card).queryByRole("button", { name: /Quitar/ })).toBeNull();
+  });
+
+  it("sin clases próximas pero con finalizadas, invita a reservar y muestra las finalizadas", () => {
+    render(<TeacherClassesBoard classes={[lesson({ isFinished: true })]} />);
+
+    expect(screen.getByText("No tenés próximos turnos de clase.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Reservar clase" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Finalizadas" })).getByText("Finalizado")).toBeTruthy();
   });
 
   it("muestra el error si no se pudo agregar", async () => {
