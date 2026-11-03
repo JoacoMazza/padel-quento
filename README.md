@@ -72,8 +72,7 @@ La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-match
 
 - `createBooking` y `joinOpenMatch` toman el jugador de la sesión, nunca del id que manda el cliente; la lógica que recibe el id vive en [src/lib/bookings.ts](src/lib/bookings.ts) y solo se usa desde el servidor.
 - La grilla pública usa `getPublicBookings` ([src/lib/public-bookings.ts](src/lib/public-bookings.ts)), sin datos de quién reservó ni de quiénes juegan, y los partidos abiertos se muestran a los visitantes sin nombres ni chat.
-- El WhatsApp de contacto de la landing está en [app/components/club-info.ts](app/components/club-info.ts) (`CLUB_WHATSAPP_NUMBER`).
-- Todas las páginas muestran un botón flotante de WhatsApp abajo a la derecha ([app/components/whatsapp-button.tsx](app/components/whatsapp-button.tsx)), que abre `wa.me` con el número y el mensaje inicial de `NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER` y `NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE`. Sin número no se muestra. En mobile, el footer, el login/registro y el panel de admin dejan lugar abajo para que no tape ningún control.
+- Todas las páginas muestran un botón flotante de WhatsApp abajo a la derecha ([app/components/whatsapp-button.tsx](app/components/whatsapp-button.tsx)), y la landing tiene su botón "Escribinos por WhatsApp". Los dos abren `wa.me` con el número y el mensaje inicial del complejo del club (ver [Complejos](#complejos)); sin número cargado no se muestran. En mobile, el footer, el login/registro y el panel de admin dejan lugar abajo para que el botón flotante no tape ningún control.
 
 ## Turnos fijos
 
@@ -85,6 +84,16 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
 - Las fechas y horas se calculan en el servidor con la zona horaria del club (`America/Argentina/Buenos_Aires`, ver [src/lib/club-time-zone.ts](src/lib/club-time-zone.ts)), que se fija al arrancar en `instrumentation.ts` y en `src/lib/data-source.ts` (seeds y comandos de TypeORM), y también con la variable `TZ`: un turno fijo de las 18:00 cae a las 18:00 de City Bell aunque el servidor esté desplegado en otra zona.
 
+## Complejos
+
+Cada cancha pertenece a un complejo (`courts.complex_id`, obligatoria), que guarda su ubicación: nombre, dirección, ciudad, provincia, país, código postal, latitud, longitud y, opcional, el link a Google Maps (tabla `complexes`, entidad [src/entities/Complex.ts](src/entities/Complex.ts)).
+
+- La base valida que la latitud esté entre -90 y 90 y la longitud entre -180 y 180 (`CHK_complexes_latitude` y `CHK_complexes_longitude`).
+- Cada complejo tiene su WhatsApp de contacto (`whatsapp_number`, con código de país y como lo escribe el admin, por ejemplo "+54 9 221 604-9987", que es como se muestra; el link de wa.me usa sus dígitos. Y `whatsapp_message`, el mensaje con que se abre el chat). Lo carga cualquier administrador desde el panel (sección **Canchas**, "WhatsApp de contacto"). El botón flotante y el de la landing usan el del complejo del club; sin número no se muestran. La migración `AddComplexWhatsApp` carga el del club.
+- La migración `AddComplexes` crea el complejo del club (Quento Club, Cam. Centenario 8907, Villa Elisa) y le asigna las canchas que ya existían, sin tocar sus turnos. `AddComplexCountry` agrega el país (obligatorio) y deja los complejos existentes en Argentina.
+- Los complejos no se crean ni se editan desde el panel (salvo su WhatsApp de contacto): las canchas nuevas (alta del dueño y seeds) se asocian al complejo del club, el primero que se cargó ([src/lib/club-complex.ts](src/lib/club-complex.ts)).
+- El complejo y su ubicación se ven en la tabla de canchas del panel, en `/bookings` (arriba y en el resumen del turno elegido) y en Mis turnos. El link lleva a Google Maps; si el complejo no tiene uno cargado, se arma con la latitud y la longitud.
+
 ## Administradores: dueño y trabajador
 
 Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) o **trabajador** (`staff`).
@@ -92,6 +101,20 @@ Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) 
 - Solo el dueño puede gestionar el equipo (sección **Equipo** del panel: alta, edición y baja de administradores), cambiar precios, dar de alta canchas o darlas de baja, y ver Métricas del Complejo y Reportes de Asistencia. El trabajador maneja la turnera, los turnos y turnos fijos, los bloqueos de canchas y los jugadores.
 - El servidor lo exige con `requireOwner()` ([src/lib/rbac.ts](src/lib/rbac.ts)), que lee el nivel de la base en cada acción: un cambio de nivel aplica en el momento. La sesión trae `isOwner` solo para mostrar u ocultar secciones.
 - El dueño no puede darse de baja ni cambiarse el nivel a sí mismo. Los administradores creados antes de este cambio quedaron como dueños; los nuevos arrancan como trabajadores.
+
+## Profesores
+
+Un profesor es un jugador con el rol de profesor (tabla `teachers`, entidad [src/entities/Teacher.ts](src/entities/Teacher.ts)): da clases en el complejo y sigue siendo jugador (reserva turnos, se suma a partidos).
+
+- Cualquier administrador los gestiona desde el panel (sección **Profesores**): da de alta un profesor nuevo (crea el jugador con su cuenta) o le da el rol a un jugador que ya existe, y puede desactivarlo, volver a activarlo o quitarle el rol.
+- **Turnos de clase (HU-43):** el profesor los reserva en `/teacher/book` ("Reservar clase"), con la misma disponibilidad y las mismas reglas que cualquier reserva, al precio de la cancha. El turno queda a su nombre, marcado como clase con el cupo de alumnos que elige (de 1 a 8, `bookings.class_capacity`; la base lo valida con `CHK_bookings_class_capacity`), y el horario deja de estar disponible para los demás. Las clases no suman ni descuentan puntos: ni por asistencia ni por cancelarlas tarde.
+- **Alumnos (HU-44):** en "Mis clases" el profesor ve sus próximos turnos de clase y les suma jugadores registrados (los busca por nombre o email) hasta el cupo, o los quita mientras la clase no empezó (tabla `class_students`; un alumno no puede estar dos veces en la misma clase).
+- **Agenda (HU-46):** "Mis clases" tiene dos pestañas. En **Agenda**, los próximos turnos de clase por fecha (cancha, horario, alumnos y lugares libres) y, aparte, los que terminaron en los últimos 7 días como "Finalizado", sin poder cambiar sus alumnos.
+- **Alumnos (HU-45):** en **Alumnos**, todos los jugadores que el profesor registró alguna vez en una clase no cancelada, con su email y teléfono, cuántas clases ya terminadas tuvo con él y la fecha de la última. Desde ahí se suma rápido a un alumno a una próxima clase con lugar.
+- **Mis turnos (HU-47):** el alumno ve sus clases marcadas como "Clase", con el profesor y sin el precio, y puede salir de una mientras no empezó (libera su lugar). El profesor ve las que da como "Clase que das", con sus alumnos; si cancela una, se les avisa a los alumnos y no se lo penaliza.
+- **Panel (HU-48):** en la Turnera Global las clases tienen su propio color ("Clase" en la referencia) y al tocarlas se ve el profesor y los alumnos. En la sección **Profesores**, cada profesor tiene un botón para ver sus clases (próximas y de los últimos 7 días).
+- Si el administrador desactiva a un profesor o le quita el rol, se cancelan sus clases futuras y se avisa a los alumnos, sin penalizar a nadie.
+- El profesor tiene su sección en `/teacher` ("Mis clases" en el encabezado). `proxy.ts` la deja solo para quien inició sesión como profesor, y el servidor lo verifica contra la base con `requireTeacher()` ([src/lib/rbac.ts](src/lib/rbac.ts)): una desactivación o un cambio de rol aplica en el momento. La sesión trae `isTeacher` solo para mostrar u ocultar la sección; a quien le dan el rol, el link le aparece al volver a iniciar sesión.
 
 ## Configuración del proyecto
 
@@ -127,7 +150,6 @@ Variables relevantes en `.env`:
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
 | `TZ` | Zona horaria del proceso (`America/Argentina/Buenos_Aires`); definirla también en el despliegue de producción |
-| `NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER` / `NEXT_PUBLIC_WHATSAPP_CONTACT_MESSAGE` | Número y mensaje inicial del botón flotante de WhatsApp (opcional: sin número no se muestra). Se fijan al hacer el build |
 | `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |
 
@@ -212,7 +234,7 @@ Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migraci
 pnpm db:seed
 ```
 
-Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
@@ -284,7 +306,6 @@ Las variables de la terminal tienen prioridad sobre las de `.env`.
    | `NEXTAUTH_SECRET` | Un secreto nuevo, distinto del de desarrollo (`openssl rand -base64 32`) |
    | `NEXTAUTH_URL` | La URL pública de la app |
    | `SMTP_*` / `WHATSAPP_*` | Las de producción, si se usan los avisos |
-   | `NEXT_PUBLIC_WHATSAPP_CONTACT_*` | Número y mensaje del botón de WhatsApp; tienen que estar al hacer el build |
 
    Si el panel del hosting no acepta valores de varias líneas, `DATABASE_SSL_CA` se puede cargar en una sola, con `\n` en lugar de cada salto. Este comando la imprime así:
 

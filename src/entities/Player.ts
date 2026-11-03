@@ -5,6 +5,7 @@ import { Booker } from "@/src/entities/Booker";
 import type { Account } from "@/src/entities/Account";
 import type { Penalty } from "@/src/entities/Penalty";
 import type { MatchPlayer } from "@/src/entities/MatchPlayer";
+import type { Teacher } from "@/src/entities/Teacher";
 
 /**
  * Jugador registrado en la plataforma: es un Booker (hereda nombre, apellido y
@@ -30,4 +31,8 @@ export class Player extends Booker {
   penalties!: Penalty[];
   @OneToMany("MatchPlayer", "player")
   matchParticipations!: MatchPlayer[];
+
+  /** Rol de profesor, si lo tiene (HU-42). */
+  @OneToOne("Teacher", "player")
+  teacher!: Teacher | null;
 }

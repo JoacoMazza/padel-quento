@@ -8,7 +8,8 @@ import {
   updateAllCourtsPrice,
   updateCourt,
 } from "@/src/actions/court";
-import { createTestAdmin, createTestCourt, uniqueCourtNumber } from "./helpers";
+import type { Court } from "@/src/entities/Court";
+import { createTestAdmin, createTestCourt, ensureTestComplex, uniqueCourtNumber } from "./helpers";
 
 vi.mock("next-auth/next", () => ({ getServerSession: vi.fn() }));
 
@@ -18,6 +19,7 @@ describe("court actions (integración con Postgres real)", () => {
   // Editar canchas es solo para administradores; precios, altas y bajas, solo para el dueño.
   let ownerEmail: string;
   let staffEmail: string;
+  let complexId: number;
 
   function signInAs(email: string) {
     vi.mocked(getServerSession).mockResolvedValue({ user: { email, role: Role.ADMIN } } as never);
@@ -26,6 +28,7 @@ describe("court actions (integración con Postgres real)", () => {
   beforeAll(async () => {
     ownerEmail = (await createTestAdmin(AdminAccessLevel.OWNER)).email;
     staffEmail = (await createTestAdmin(AdminAccessLevel.STAFF)).email;
+    complexId = (await ensureTestComplex()).id;
   });
 
   beforeEach(() => {
@@ -43,6 +46,25 @@ describe("court actions (integración con Postgres real)", () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 
+  it("un archivo que arranca después no repite números ya usados por otro anterior, aunque haya usado muchos", async () => {
+    // Cada archivo de test carga su propia copia de helpers (como en la suite): se simulan dos, el segundo 300 ms después.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(1_793_236_924_000);
+      vi.resetModules();
+      const earlierFile = await import("./helpers");
+      const used = Array.from({ length: 1100 }, () => earlierFile.uniqueCourtNumber());
+
+      vi.setSystemTime(1_793_236_924_300);
+      vi.resetModules();
+      const laterFile = await import("./helpers");
+
+      expect(laterFile.uniqueCourtNumber()).toBeGreaterThan(Math.max(...used));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("crea una cancha con el estado AVAILABLE por defecto y la persiste", async () => {
     const number = uniqueCourtNumber();
 
@@ -52,6 +74,34 @@ describe("court actions (integración con Postgres real)", () => {
     if (!result.success) throw new Error("expected success");
     expect(result.data).toMatchObject({ number, state: CourtState.AVAILABLE, price: 10000 });
     expect(result.data.id).toBeDefined();
+  });
+
+  it("asocia la cancha nueva al complejo del club", async () => {
+    const result = await createCourt({ number: uniqueCourtNumber(), price: 10000 });
+    if (!result.success) throw new Error(result.error);
+
+    const dataSource = await getDataSource();
+    const saved = await dataSource
+      .getRepository<Court>("Court")
+      .findOneOrFail({ where: { id: result.data.id }, relations: { complex: true } });
+    expect(saved.complex.id).toBe(complexId);
+  });
+
+  it("lista las canchas con su complejo y su ubicación", async () => {
+    const number = uniqueCourtNumber();
+    await createCourt({ number, price: 10000 });
+
+    const result = await getCourts();
+
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.find((c) => c.number === number)?.complex).toMatchObject({
+      id: complexId,
+      name: expect.any(String),
+      address: expect.any(String),
+      city: expect.any(String),
+      latitude: expect.any(Number),
+      longitude: expect.any(Number),
+    });
   });
 
   it("no permite crear dos canchas con el mismo número", async () => {

@@ -9,6 +9,8 @@ declare module "next-auth" {
       role?: Role;
       /** Admin dueño del complejo (ver AdminAccessLevel). */
       isOwner?: boolean;
+      /** Jugador con el rol de profesor activo (HU-42). */
+      isTeacher?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -16,6 +18,7 @@ declare module "next-auth" {
     id: string;
     role?: Role;
     isOwner?: boolean;
+    isTeacher?: boolean;
   }
 }
 
@@ -24,5 +27,6 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: Role;
     isOwner?: boolean;
+    isTeacher?: boolean;
   }
 }

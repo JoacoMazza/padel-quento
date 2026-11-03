@@ -1,4 +1,5 @@
 import { CourtState, OutOfServiceReason } from "@/src/domain/enums";
+import type { ComplexLocation } from "@/src/domain/complex";
 
 export const STATE_LABELS: Record<CourtState, string> = {
   [CourtState.AVAILABLE]: "Disponible",
@@ -48,6 +49,8 @@ export type CourtItem = {
   state: CourtState;
   price: number;
   activeOutOfService: ActiveOutOfService | null;
+  /** Complejo donde está la cancha. */
+  location?: ComplexLocation;
 };
 
 /** Totales del tablero de canchas: habilitadas (disponibles y sin bloqueo activo) y bloqueos vigentes. */

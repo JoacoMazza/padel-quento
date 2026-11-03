@@ -8,6 +8,7 @@ import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getPlayerBookings } from "@/src/lib/player-bookings";
 import { canReviewMatch } from "@/src/domain/reputation";
+import { toComplexLocation } from "@/src/domain/complex";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
 
@@ -34,6 +35,7 @@ export default async function MyBookingsPage() {
       durationMinutes: b.durationMinutes,
       bookingState: b.bookingState,
       courtNumber: b.court?.number ?? 0,
+      location: b.court?.complex ? toComplexLocation(b.court.complex) : undefined,
       price: b.price ?? 10000,
       matchId: b.match?.id ?? null,
       needPlayers: b.match?.needPlayers ?? false,
@@ -58,6 +60,16 @@ export default async function MyBookingsPage() {
           player.id,
         ),
       isFixed: fixedDates.has(b.id),
+      // Clase (HU-47): la da quien reservó, el profesor; el resto son sus alumnos.
+      classInfo:
+        b.classCapacity !== null && b.classCapacity !== undefined
+          ? {
+              role: player && b.booker?.id === player.id ? ("teacher" as const) : ("student" as const),
+              teacherName: `${b.booker?.names ?? ""} ${b.booker?.lastnames ?? ""}`.trim(),
+              capacity: b.classCapacity,
+              studentsCount: b.classStudents?.length ?? 0,
+            }
+          : null,
     }));
 
   return (

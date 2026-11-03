@@ -10,6 +10,8 @@ export type HeaderActiveTab =
   | "/open-matches"
   | "/my-bookings"
   | "/profile"
+  | "/teacher"
+  | "/teacher/book"
   | "/admin";
 
 const NAV_ITEMS = [
@@ -17,6 +19,12 @@ const NAV_ITEMS = [
   { href: "/bookings", label: "Turnos", guest: true },
   { href: "/open-matches", label: "Partidos abiertos", guest: true },
   { href: "/my-bookings", label: "Mis reservas", guest: false },
+];
+
+/** Secciones del profesor (HU-42 y HU-43): solo para jugadores con el rol de profesor activo. */
+const TEACHER_NAV_ITEMS = [
+  { href: "/teacher", label: "Mis clases", guest: false },
+  { href: "/teacher/book", label: "Reservar clase", guest: false },
 ];
 
 const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
@@ -40,6 +48,7 @@ export function AppHeader({
   userRole,
   showNav = true,
   guest = false,
+  isTeacher = false,
 }: {
   active: HeaderActiveTab;
   userName?: string | null;
@@ -49,8 +58,10 @@ export function AppHeader({
   showNav?: boolean;
   /** Visitante sin sesión: ve solo las secciones públicas y los accesos para entrar o registrarse. */
   guest?: boolean;
+  /** Profesor activo (de la sesión): suma el link a sus clases. */
+  isTeacher?: boolean;
 }) {
-  const navItems = NAV_ITEMS.filter((item) => !guest || item.guest);
+  const navItems = [...NAV_ITEMS, ...(isTeacher ? TEACHER_NAV_ITEMS : [])].filter((item) => !guest || item.guest);
 
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">

@@ -16,7 +16,14 @@ import { CourtState, OutOfServiceReason } from "@/src/domain/enums";
 import { CourtsTable } from "@/app/admin/courts-table";
 import type { CourtItem } from "@/app/admin/court-status";
 
-const court: CourtItem = { id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000, activeOutOfService: null };
+const court: CourtItem = {
+  id: 1,
+  number: 3,
+  state: CourtState.AVAILABLE,
+  price: 10000,
+  activeOutOfService: null,
+  location: { name: "Quento Club", address: "Cam. Centenario 8907", city: "Villa Elisa", mapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA" },
+};
 
 const blockedCourt: CourtItem = {
   ...court,
@@ -34,6 +41,16 @@ describe("CourtsTable", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("muestra el complejo de cada cancha con su dirección, que lleva a Google Maps", () => {
+    render(<CourtsTable isOwner courts={[court]} />);
+
+    expect(screen.getByRole("columnheader", { name: "Complejo" })).toBeTruthy();
+    expect(screen.getByText("Quento Club")).toBeTruthy();
+    const address = screen.getByRole("link", { name: "Cam. Centenario 8907, Villa Elisa" });
+    expect(address.getAttribute("href")).toBe("https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA");
+    expect(address.getAttribute("target")).toBe("_blank");
   });
 
   it("al dueño le ofrece editar la cancha y cambiar el precio de todas", () => {

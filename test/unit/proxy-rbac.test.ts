@@ -216,4 +216,41 @@ describe("proxy RBAC and Route Protection", () => {
       expect(res.status).toBe(200);
     });
   });
+
+  describe("Sección del profesor (/teacher, HU-42)", () => {
+    it("sin sesión, manda a iniciar sesión", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce(null);
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe("http://localhost:3000/login?callbackUrl=%2Fteacher");
+    });
+
+    it("un jugador sin el rol de profesor recibe 403", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "j@test.com", role: Role.PLAYER, isTeacher: false });
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(403);
+      expect(await res.text()).toBe("Acceso denegado: Se requiere el rol de Profesor");
+    });
+
+    it("un administrador recibe 403", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "a@test.com", role: Role.ADMIN });
+
+      const res = await proxy(createMockRequest("/teacher/alumnos"));
+
+      expect(res.status).toBe(403);
+    });
+
+    it("un profesor entra", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "p@test.com", role: Role.PLAYER, isTeacher: true });
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+  });
 });

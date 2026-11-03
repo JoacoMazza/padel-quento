@@ -33,6 +33,8 @@ export type CreateBookingInput = {
   /** Quien reserva el turno: debe ser un jugador registrado (Player hereda de Booker). */
   bookerId: number;
   courtId: number;
+  /** Cupo de alumnos si es un turno de clase de un profesor (HU-43). */
+  classCapacity?: number;
 };
 
 export type UpdateBookingInput = Partial<
@@ -205,6 +207,8 @@ export async function createBookingForPlayer(
         // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
         booker: { id: player.id, phoneNumber: player.phoneNumber },
         court: { id: input.courtId },
+        // Turno de clase (HU-43): no mueve puntos, así que el job de asistencia lo da por procesado.
+        ...(input.classCapacity !== undefined ? { classCapacity: input.classCapacity, pointsAwarded: true } : {}),
       });
 
       const saved = await bookings.save(booking);

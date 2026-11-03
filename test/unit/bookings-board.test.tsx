@@ -17,7 +17,8 @@ vi.mock("@/src/actions/booking", () => ({ createBooking, joinOpenMatch }));
 import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
 
-const courts = [{ id: 1, number: 1, state: CourtState.AVAILABLE, price: 18000 }];
+const location = { name: "Quento Club", address: "Cam. Centenario 8907", city: "Villa Elisa", mapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA" };
+const courts = [{ id: 1, number: 1, state: CourtState.AVAILABLE, price: 18000, location }];
 const schedules = [
   { id: 1, dayOfWeek: DayOfWeek.MONDAY, openingTime: "18:00:00", closingTime: "21:00:00", courtId: 1 },
 ];
@@ -75,6 +76,23 @@ describe("BookingsBoard", () => {
 
     expect(screen.getByRole("button", { name: "Cancha 1, 18:00, seleccionado" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Reservar turno/ })).toBeTruthy();
+  });
+
+  it("el resumen del turno elegido muestra el complejo y la dirección de la cancha", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+
+    const where = screen.getByRole("link", { name: "Quento Club · Cam. Centenario 8907, Villa Elisa" });
+    expect(where.getAttribute("href")).toBe(location.mapsUrl);
+  });
+
+  it("al elegir un partido abierto también muestra dónde queda la cancha", () => {
+    renderBoard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" }));
+
+    expect(screen.getByRole("link", { name: "Quento Club · Cam. Centenario 8907, Villa Elisa" })).toBeTruthy();
   });
 
   it("el turno seleccionado usa el fondo oscuro del resumen y apila el ícono sobre el texto", () => {

@@ -33,12 +33,27 @@ const {
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
 vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateAllCourtsPrice: vi.fn() }));
+vi.mock("@/src/actions/complex", () => ({
+  getComplexContacts: vi.fn(async () => ({
+    success: true,
+    data: [{ id: 1, name: "Quento Club", whatsappNumber: "+54 9 221 604-9987", whatsappMessage: null }],
+  })),
+  updateComplexContact: vi.fn(),
+}));
 vi.mock("@/src/actions/outOfService", () => ({
   getOutOfServices,
   createOutOfService: vi.fn(),
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
+const { getTeachersAdmin } = vi.hoisted(() => ({ getTeachersAdmin: vi.fn() }));
+vi.mock("@/src/actions/teacher", () => ({
+  getTeachersAdmin,
+  createTeacher: vi.fn(),
+  assignTeacherRole: vi.fn(),
+  setTeacherActive: vi.fn(),
+  removeTeacherRole: vi.fn(),
+}));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
@@ -400,6 +415,24 @@ describe("AdminPanel", () => {
     expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
   });
 
+  it("un trabajador también gestiona los profesores, que se piden recién al abrir su sección (HU-42)", async () => {
+    getTeachersAdmin.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 1, playerId: 10, names: "Lucía", lastnames: "Profe", email: "l@test.com", phoneNumber: "221", isActive: true },
+      ],
+    });
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+    expect(getTeachersAdmin).not.toHaveBeenCalled();
+
+    openSection("Profesores");
+    await flush();
+
+    expect(getTeachersAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Lucía Profe")).toBeTruthy();
+  });
+
   it("pide las canchas recién al abrir su sección y las muestra", async () => {
     render(<AdminPanel isOwner />);
     await flush();
@@ -412,6 +445,17 @@ describe("AdminPanel", () => {
     expect(getCourts).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Cancha 3")).toBeTruthy();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+  });
+
+  it("en la sección de canchas, también un trabajador puede cargar el WhatsApp de contacto del complejo", async () => {
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+
+    openSection("Canchas");
+    await flush();
+
+    expect(screen.getByRole("heading", { name: "WhatsApp de contacto" })).toBeTruthy();
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 604-9987");
   });
 
   it("muestra fuera de servicio la cancha con un bloqueo activo, pero no por uno programado o vencido", async () => {

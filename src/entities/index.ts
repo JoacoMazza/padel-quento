@@ -3,6 +3,8 @@ import { Admin } from "@/src/entities/Admin";
 import { Booker } from "@/src/entities/Booker";
 import { Booking } from "@/src/entities/Booking";
 import { Chat } from "@/src/entities/Chat";
+import { ClassStudent } from "@/src/entities/ClassStudent";
+import { Complex } from "@/src/entities/Complex";
 import { Court } from "@/src/entities/Court";
 import { FixedBooking } from "@/src/entities/FixedBooking";
 import { FixedBookingDate } from "@/src/entities/FixedBookingDate";
@@ -14,5 +16,6 @@ import { Penalty } from "@/src/entities/Penalty";
 import { Player } from "@/src/entities/Player";
 import { PlayerReview } from "@/src/entities/PlayerReview";
 import { Schedule } from "@/src/entities/Schedule";
+import { Teacher } from "@/src/entities/Teacher";
 
-export { Account, Admin, Booker, Booking, Chat, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, PlayerReview, Schedule };
+export { Account, Admin, Booker, Booking, Chat, ClassStudent, Complex, Court, FixedBooking, FixedBookingDate, Match, MatchPlayer, Message, OutOfService, Penalty, Player, PlayerReview, Schedule, Teacher };

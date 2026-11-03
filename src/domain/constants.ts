@@ -68,3 +68,10 @@ export const FIXED_BOOKING_HORIZON_DAYS = 182;
 
 /** Turnos pasados que se muestran en Mis turnos, los más recientes (issue #68). */
 export const MY_BOOKINGS_PAST_LIMIT = 3;
+
+/** Cupo de alumnos que el profesor puede fijar para un turno de clase (HU-43). */
+export const MIN_CLASS_CAPACITY = 1;
+export const MAX_CLASS_CAPACITY = 8;
+
+/** Días hacia atrás de las clases terminadas que la agenda del profesor muestra como "Finalizado" (HU-46). */
+export const FINISHED_CLASSES_DAYS = 7;

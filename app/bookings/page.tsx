@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth/next";
 import { MapPin } from "lucide-react";
 import { PageShell } from "@/app/components/page-shell";
 import { PageHeading } from "@/app/components/ui/page-heading";
-import { CLUB_MAPS_URL, CLUB_SHORT_ADDRESS } from "@/app/components/club-info";
 import { BookingsBoard } from "@/app/bookings/bookings-board";
 import { parseInitialSelection } from "@/app/bookings/initial-selection";
 import { authOptions } from "@/src/lib/auth";
@@ -11,6 +10,7 @@ import { getPublicBookings } from "@/src/lib/public-bookings";
 import { getCourts } from "@/src/actions/court";
 import { getSchedules } from "@/src/actions/schedule";
 import { getOutOfServices } from "@/src/actions/outOfService";
+import { toComplexLocation, uniqueComplexLocations } from "@/src/domain/complex";
 import { pageMetadata } from "@/app/site-metadata";
 
 export const metadata = pageMetadata("Turnos", "/bookings");
@@ -32,6 +32,14 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
   const courts = courtsResult.success ? courtsResult.data : [];
   const schedules = schedulesResult.success ? schedulesResult.data : [];
   const outOfServices = outOfServicesResult.success ? outOfServicesResult.data : [];
+  const courtProps = courts.map((c) => ({
+    id: c.id,
+    number: c.number,
+    state: c.state,
+    price: c.price,
+    location: c.complex ? toComplexLocation(c.complex) : undefined,
+  }));
+  const locations = uniqueComplexLocations(courtProps.map((c) => c.location));
 
   return (
     <PageShell active="/bookings" user={isGuest ? null : session.user}>
@@ -41,16 +49,22 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
         accentDot={false}
         description="Elegí el día y encontrá tu turno libre sin rodeos."
         actions={
-          <a
-            href={CLUB_MAPS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Ver ubicación en Google Maps"
-            className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-xs font-medium text-foreground/70 transition-colors hover:border-primary/40 hover:text-primary"
-          >
-            <MapPin className="h-3.5 w-3.5 text-primary" />
-            {CLUB_SHORT_ADDRESS}
-          </a>
+          // Dónde están las canchas: un link a Google Maps por complejo.
+          <div className="flex flex-wrap gap-2">
+            {locations.map((location) => (
+              <a
+                key={location.mapsUrl}
+                href={location.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Ver ubicación en Google Maps"
+                className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-xs font-medium text-foreground/70 transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                <MapPin className="h-3.5 w-3.5 text-primary" />
+                {location.name} · {location.address}, {location.city}
+              </a>
+            ))}
+          </div>
         }
       />
 
@@ -59,12 +73,7 @@ export default async function BookingsPage({ searchParams }: PageProps<"/booking
         isGuest={isGuest}
         hasCategory={await playerHasCategory(playerId)}
         initialSelection={parseInitialSelection(await searchParams)}
-        courts={courts.map((c) => ({
-          id: c.id,
-          number: c.number,
-          state: c.state,
-          price: c.price,
-        }))}
+        courts={courtProps}
         schedules={schedules.map((s) => ({
           id: s.id,
           dayOfWeek: s.dayOfWeek,

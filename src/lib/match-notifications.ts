@@ -6,6 +6,8 @@ import type { Match } from "@/src/entities/Match";
 import type { Player } from "@/src/entities/Player";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
+  classCancelledByTeacherNotice,
+  classCancelledNotice,
   courtUnavailableNotice,
   fixedBookingCancelledNotice,
   fixedDateReleasedNotice,
@@ -250,5 +252,47 @@ export async function notifyFixedBookingCancelled(fixedBookingId: number): Promi
     );
   } catch (error) {
     console.error("notifyFixedBookingCancelled", error);
+  }
+}
+
+async function findClass(bookingId: number) {
+  const dataSource = await getDataSource();
+  return dataSource.getRepository<Booking>("Booking").findOne({
+    where: { id: bookingId },
+    relations: { court: true, booker: true, classStudents: { player: { account: true } } },
+  });
+}
+
+function classStudents(booking: Booking): NotificationRecipient[] {
+  return booking.classStudents.map((student) => toRecipient(student.player));
+}
+
+/** Avisa a los alumnos de cada clase que se canceló porque el profesor dejó de dar clases (HU-42). */
+export async function notifyClassesCancelled(bookingIds: number[]): Promise<void> {
+  try {
+    for (const bookingId of bookingIds) {
+      const booking = await findClass(bookingId);
+      if (!booking) continue;
+
+      await send(classStudents(booking), (recipient) =>
+        classCancelledNotice(recipient.names, fullName(booking.booker), noticeBookingOf(booking)),
+      );
+    }
+  } catch (error) {
+    console.error("notifyClassesCancelled", error);
+  }
+}
+
+/** Avisa a los alumnos que el profesor canceló la clase (HU-47). No hace nada si el turno no es una clase. */
+export async function notifyClassCancelledByTeacher(bookingId: number): Promise<void> {
+  try {
+    const booking = await findClass(bookingId);
+    if (!booking || booking.classCapacity === null) return;
+
+    await send(classStudents(booking), (recipient) =>
+      classCancelledByTeacherNotice(recipient.names, fullName(booking.booker), noticeBookingOf(booking)),
+    );
+  } catch (error) {
+    console.error("notifyClassCancelledByTeacher", error);
   }
 }

@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, GraduationCap, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
+import { TeachersPanel } from "@/app/admin/teachers-panel";
+import { getTeachersAdmin } from "@/src/actions/teacher";
+import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/fixed-bookings-panel";
@@ -14,6 +17,7 @@ import { TeamPanel } from "@/app/admin/team-panel";
 import { getTeam } from "@/src/actions/admin";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
+import { toComplexLocation } from "@/src/domain/complex";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
@@ -28,6 +32,7 @@ const SECTIONS = [
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true, ownerOnly: true },
   { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true, ownerOnly: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true, ownerOnly: false },
+  { id: "teachers", label: "Profesores", icon: GraduationCap, available: true, ownerOnly: false },
   { id: "team", label: "Equipo", icon: UserCog, available: true, ownerOnly: true },
 ] as const;
 
@@ -83,6 +88,7 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
         state: c.state,
         price: c.price,
         activeOutOfService: active ? { id: active.id, reason: active.reason, toDateTime: active.toDateTime } : null,
+        location: c.complex ? toComplexLocation(c.complex) : undefined,
       };
     }),
   };
@@ -90,7 +96,12 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 
 function CourtsSection({ isOwner }: { isOwner: boolean }) {
   const state = useSectionData(loadCourts);
-  return state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />;
+  return (
+    <div className="space-y-6">
+      {state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />}
+      <ComplexContactPanel />
+    </div>
+  );
 }
 
 type FixedBookingsData = {
@@ -215,6 +226,11 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
 function UsersSection() {
   const state = useSectionData(getPlayersAdmin);
   return state.status === "ready" ? <UsersTable players={state.data} /> : <SectionStatus state={state} />;
+}
+
+function TeachersSection() {
+  const state = useSectionData(getTeachersAdmin);
+  return state.status === "ready" ? <TeachersPanel teachers={state.data} /> : <SectionStatus state={state} />;
 }
 
 function TeamSection() {
@@ -351,6 +367,11 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
         {visitedSections.includes("users") ? (
           <div hidden={activeSection !== "users"}>
             <UsersSection />
+          </div>
+        ) : null}
+        {visitedSections.includes("teachers") ? (
+          <div hidden={activeSection !== "teachers"}>
+            <TeachersSection />
           </div>
         ) : null}
         {visitedSections.includes("team") ? (
