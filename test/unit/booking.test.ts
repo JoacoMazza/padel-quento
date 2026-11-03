@@ -88,7 +88,11 @@ const { notifyPlayerJoined, notifyMatchCancelledByCreator } = vi.hoisted(() => (
   notifyPlayerJoined: vi.fn(async () => {}),
   notifyMatchCancelledByCreator: vi.fn(async () => {}),
 }));
-vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined, notifyMatchCancelledByCreator }));
+vi.mock("@/src/lib/match-notifications", () => ({
+  notifyPlayerJoined,
+  notifyMatchCancelledByCreator,
+  notifyClassCancelledByTeacher: vi.fn(async () => {}),
+}));
 
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
@@ -662,6 +666,7 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
+          classStudents: { player: true },
         },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
@@ -688,6 +693,7 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
+          classStudents: { player: true },
         },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });

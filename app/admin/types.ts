@@ -21,7 +21,11 @@ export type AdminBookingProp = BookingProp & {
   matchPlayers: AdminMatchPlayerProp[];
   /** Id de la fecha de turno fijo (HU-41) si el turno es parte de uno; si no, null. */
   fixedBookingDateId: number | null;
+  /** Si el turno es una clase (HU-48): su cupo y sus alumnos. El profesor es quien reservó (bookerName). */
+  classInfo: AdminClassInfo | null;
 };
+
+export type AdminClassInfo = { capacity: number; students: { id: number; name: string }[] };
 
 /**
  * Arma un AdminBookingProp a partir de la entidad Booking devuelta por
@@ -52,5 +56,15 @@ export function mapBookingToAdminProp(booking: Booking, fixedBookingDateId: numb
       attended: mp.attended,
     })),
     fixedBookingDateId,
+    classInfo:
+      booking.classCapacity !== null && booking.classCapacity !== undefined
+        ? {
+            capacity: booking.classCapacity,
+            students: (booking.classStudents ?? []).map((student) => ({
+              id: student.player.id,
+              name: `${student.player.names} ${student.player.lastnames}`,
+            })),
+          }
+        : null,
   };
 }
