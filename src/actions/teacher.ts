@@ -11,6 +11,8 @@ import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors"
 import type { ActionResult } from "@/src/lib/action-result";
 import { parseRegisterForm } from "@/src/lib/register-validation";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
+import { cancelFutureClassesOf } from "@/src/lib/teacher-classes";
+import { notifyClassesCancelled } from "@/src/lib/match-notifications";
 
 /** Profesor como lo muestra el panel: sus datos de jugador y si está activo. */
 export type TeacherAdminItem = {
@@ -139,7 +141,18 @@ export async function assignTeacherRole(playerId: number): Promise<ActionResult<
   }
 }
 
-/** Desactiva (o vuelve a activar) a un profesor: desactivado no accede a sus secciones. Cualquier administrador. */
+/** Cancela las clases futuras del profesor y avisa a sus alumnos (sin penalizar a nadie). */
+async function cancelClassesOf(teacher: Teacher) {
+  const cancelledIds = await cancelFutureClassesOf(teacher.player.id);
+  if (cancelledIds.length > 0) {
+    await notifyClassesCancelled(cancelledIds);
+  }
+}
+
+/**
+ * Desactiva (o vuelve a activar) a un profesor: desactivado no accede a sus
+ * secciones y se cancelan sus clases futuras. Cualquier administrador.
+ */
 export async function setTeacherActive(id: number, isActive: boolean): Promise<ActionResult<TeacherAdminItem>> {
   try {
     await requireAdmin();
@@ -150,6 +163,9 @@ export async function setTeacherActive(id: number, isActive: boolean): Promise<A
 
     const dataSource = await getDataSource();
     await dataSource.getRepository<Teacher>("Teacher").update(id, { isActive });
+    if (!isActive) {
+      await cancelClassesOf(teacher);
+    }
     return { success: true, data: toAdminItem({ ...teacher, isActive }) };
   } catch (error) {
     const authError = authErrorMessage(error);
@@ -159,15 +175,17 @@ export async function setTeacherActive(id: number, isActive: boolean): Promise<A
   }
 }
 
-/** Le quita el rol de profesor: sigue siendo jugador. Cualquier administrador. */
+/** Le quita el rol de profesor (sigue siendo jugador) y cancela sus clases futuras. Cualquier administrador. */
 export async function removeTeacherRole(id: number): Promise<ActionResult<null>> {
   try {
     await requireAdmin();
-    const dataSource = await getDataSource();
-    const result = await dataSource.getRepository<Teacher>("Teacher").delete(id);
-    if (!result.affected) {
+    const teacher = await findTeacher(id);
+    if (!teacher) {
       return { success: false, error: NOT_FOUND_ERROR };
     }
+    const dataSource = await getDataSource();
+    await dataSource.getRepository<Teacher>("Teacher").delete(id);
+    await cancelClassesOf(teacher);
     return { success: true, data: null };
   } catch (error) {
     const authError = authErrorMessage(error);

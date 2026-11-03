@@ -1,11 +1,13 @@
 import "reflect-metadata";
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Check, Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
 import type { Booker } from "@/src/entities/Booker";
 import type { Court } from "@/src/entities/Court";
 import type { Match } from "@/src/entities/Match";
+import type { ClassStudent } from "@/src/entities/ClassStudent";
 
 @Entity({ name: "bookings" })
+@Check("CHK_bookings_class_capacity", `"class_capacity" BETWEEN 1 AND 8`)
 export class Booking {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -61,4 +63,15 @@ export class Booking {
    */
   @Column({ type: "boolean", default: false, name: "points_awarded" })
   pointsAwarded!: boolean;
+
+  /**
+   * Cupo de alumnos si el turno es una clase (HU-43): la reserva de un profesor
+   * (quien reservó) para dar clase. Null en cualquier otro turno.
+   */
+  @Column({ type: "int", nullable: true, name: "class_capacity" })
+  classCapacity!: number | null;
+
+  /** Alumnos registrados en la clase (HU-44). */
+  @OneToMany("ClassStudent", "booking")
+  classStudents!: ClassStudent[];
 }

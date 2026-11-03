@@ -130,11 +130,13 @@ export async function updateBooking(
       }
 
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
-      // turno previo a la migración puede no tener quien reservó.
+      // turno previo a la migración puede no tener quien reservó. Las clases no
+      // mueven puntos, tampoco al cancelarlas tarde.
       if (
         input.bookingState === BookingState.CANCELLED &&
         booking.bookingState !== BookingState.CANCELLED &&
         booking.booker &&
+        (booking.classCapacity ?? null) === null &&
         isLateCancellation(booking.fromDateTime)
       ) {
         lateCancellationPlayerId = booking.booker.id;
