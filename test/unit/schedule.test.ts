@@ -12,7 +12,7 @@ const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoist
   const save = vi.fn(async (entity: unknown) => entity);
   const find = vi.fn();
   const findOne = vi.fn();
-  const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+  const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
   const deleteFn = vi.fn();
   const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
   const getDataSource = vi.fn(async () => ({ getRepository }));
@@ -36,7 +36,7 @@ describe("schedule actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
   });
 
   describe("createSchedule", () => {

@@ -57,13 +57,13 @@ function uniquePastFromDateTime() {
 function mockAdminSession() {
   vi.mocked(getServerSession).mockResolvedValue({
     user: { email: "admin@test.com", name: "Admin", role: Role.ADMIN },
-  } as any);
+  } as never);
 }
 
 function mockPlayerSession() {
   vi.mocked(getServerSession).mockResolvedValue({
     user: { email: "jugador@test.com", name: "Jugador", role: Role.PLAYER },
-  } as any);
+  } as never);
 }
 
 describe("attendance actions (integración con Postgres real)", () => {

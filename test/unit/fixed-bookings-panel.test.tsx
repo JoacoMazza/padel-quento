@@ -10,6 +10,7 @@ const { createFixedBooking, getFixedBookingsAdmin, releaseFixedBookingDate, rest
     restoreFixedBookingDate: vi.fn(),
     cancelFixedBooking: vi.fn(),
   }));
+const { getAvailableSlotsAdmin } = vi.hoisted(() => ({ getAvailableSlotsAdmin: vi.fn() }));
 
 vi.mock("@/src/actions/fixedBooking", () => ({
   createFixedBooking,
@@ -18,6 +19,8 @@ vi.mock("@/src/actions/fixedBooking", () => ({
   restoreFixedBookingDate,
   cancelFixedBooking,
 }));
+
+vi.mock("@/src/actions/adminBooking", () => ({ getAvailableSlotsAdmin }));
 
 import { FixedBookingDateState, FixedBookingFrequency } from "@/src/domain/enums";
 import { FixedBookingsPanel } from "@/app/admin/fixed-bookings-panel";
@@ -54,8 +57,8 @@ const players = [{ id: 7, name: "Ana Gómez", phoneNumber: "2215550102" }];
 const onCloseCreate = vi.fn();
 const onChanged = vi.fn();
 
-function renderPanel(items = [fixedBooking()], { isCreating = false } = {}) {
-  return render(
+function panel(items = [fixedBooking()], { isCreating = false, refreshKey = 0 } = {}) {
+  return (
     <FixedBookingsPanel
       fixedBookings={items}
       courts={courts}
@@ -63,14 +66,28 @@ function renderPanel(items = [fixedBooking()], { isCreating = false } = {}) {
       isCreating={isCreating}
       onCloseCreate={onCloseCreate}
       onChanged={onChanged}
-    />,
+      refreshKey={refreshKey}
+    />
   );
+}
+
+function renderPanel(items = [fixedBooking()], options: { isCreating?: boolean; refreshKey?: number } = {}) {
+  return render(panel(items, options));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe("FixedBookingsPanel", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [fixedBooking()] });
+    getAvailableSlotsAdmin.mockResolvedValue({ success: true, data: ["18:00", "19:30"] });
   });
 
   afterEach(() => {
@@ -168,10 +185,62 @@ describe("FixedBookingsPanel", () => {
     expect(screen.queryByRole("button", { name: "Dar de baja el turno fijo de la cancha 3" })).toBeNull();
   });
 
+  describe("refresco del listado (refreshKey)", () => {
+    it("vuelve a pedir el listado cuando cambia refreshKey", async () => {
+      getFixedBookingsAdmin.mockResolvedValue({ success: true, data: [fixedBooking({ holderName: "Otro Titular" })] });
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("Otro Titular")).toBeTruthy();
+    });
+
+    it("muestra el error si no se pudo actualizar el listado", async () => {
+      getFixedBookingsAdmin.mockResolvedValue({ success: false, error: "No autorizado." });
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("No autorizado.")).toBeTruthy();
+    });
+
+    it("muestra un error si el pedido del listado falla", async () => {
+      getFixedBookingsAdmin.mockRejectedValue(new Error("network"));
+      const { rerender } = renderPanel();
+
+      rerender(panel(undefined, { refreshKey: 1 }));
+
+      expect(await screen.findByText("No se pudo actualizar el listado de turnos fijos.")).toBeTruthy();
+    });
+
+    it("una respuesta vieja no pisa a la más nueva", async () => {
+      const stale = deferred<unknown>();
+      const fresh = deferred<unknown>();
+      getFixedBookingsAdmin.mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise);
+      releaseFixedBookingDate.mockResolvedValue({ success: true, data: null });
+      const { rerender } = renderPanel();
+
+      // La grilla pide refrescar y, antes de que llegue la respuesta, se libera una fecha desde el listado.
+      rerender(panel(undefined, { refreshKey: 1 }));
+      fireEvent.click(screen.getByRole("button", { name: "Ver fechas del turno fijo de la cancha 3" }));
+      fireEvent.click(screen.getByRole("button", { name: "Liberar la fecha 2026-10-19" }));
+      await waitFor(() => expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(2));
+
+      fresh.resolve({ success: true, data: [fixedBooking({ holderName: "Listado Nuevo" })] });
+      expect(await screen.findByText("Listado Nuevo")).toBeTruthy();
+      stale.resolve({ success: true, data: [fixedBooking({ holderName: "Listado Viejo" })] });
+      await stale.promise;
+
+      await waitFor(() => expect(screen.getByText("Listado Nuevo")).toBeTruthy());
+      expect(screen.queryByText("Listado Viejo")).toBeNull();
+    });
+  });
+
   describe("alta", () => {
-    function fillCommonFields() {
+    async function fillCommonFields() {
       fireEvent.change(screen.getByLabelText("Cancha"), { target: { value: "11" } });
       fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+      await screen.findByRole("option", { name: "19:30" });
       fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "19:30" } });
       fireEvent.change(screen.getByLabelText("Frecuencia"), { target: { value: FixedBookingFrequency.BIWEEKLY } });
       fireEvent.change(screen.getByLabelText("Fecha de fin (opcional)"), { target: { value: "2026-12-31" } });
@@ -181,7 +250,7 @@ describe("FixedBookingsPanel", () => {
       createFixedBooking.mockResolvedValue({ success: true, data: { id: 2, conflicts: ["2026-11-03"] } });
       renderPanel(undefined, { isCreating: true });
 
-      fillCommonFields();
+      await fillCommonFields();
       fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
       fireEvent.click(screen.getByRole("button", { name: "Crear turno fijo" }));
 
@@ -203,7 +272,7 @@ describe("FixedBookingsPanel", () => {
       createFixedBooking.mockResolvedValue({ success: true, data: { id: 2, conflicts: [] } });
       renderPanel(undefined, { isCreating: true });
 
-      fillCommonFields();
+      await fillCommonFields();
       fireEvent.click(screen.getByLabelText("Sin cuenta"));
       fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Grupo" } });
       fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "De Los Martes" } });
@@ -223,13 +292,38 @@ describe("FixedBookingsPanel", () => {
       createFixedBooking.mockResolvedValue({ success: false, error: "La cancha no está abierta en ese horario ese día." });
       renderPanel(undefined, { isCreating: true });
 
-      fillCommonFields();
+      await fillCommonFields();
       fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
       fireEvent.click(screen.getByRole("button", { name: "Crear turno fijo" }));
 
       expect(await screen.findByText("La cancha no está abierta en ese horario ese día.")).toBeTruthy();
       expect(getFixedBookingsAdmin).not.toHaveBeenCalled();
       expect(onCloseCreate).not.toHaveBeenCalled();
+    });
+
+    it("solo ofrece las horas de los turnos de la cancha y el día elegidos", async () => {
+      renderPanel(undefined, { isCreating: true });
+
+      fireEvent.change(screen.getByLabelText("Cancha"), { target: { value: "11" } });
+      fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+
+      const timeSelect = screen.getByRole("combobox", { name: "Hora" });
+      await within(timeSelect).findByRole("option", { name: "19:30" });
+      expect(getAvailableSlotsAdmin).toHaveBeenLastCalledWith({ courtId: 11, date: "2026-10-20" });
+      expect(within(timeSelect).getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Elegí un horario",
+        "18:00",
+        "19:30",
+      ]);
+    });
+
+    it("avisa si la cancha no tiene turnos libres ese día", async () => {
+      getAvailableSlotsAdmin.mockResolvedValue({ success: true, data: [] });
+      renderPanel(undefined, { isCreating: true });
+
+      fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+
+      expect(await screen.findByText("No hay horarios libres en esa cancha ese día.")).toBeTruthy();
     });
 
     it("muestra las fechas como día/mes/año", () => {

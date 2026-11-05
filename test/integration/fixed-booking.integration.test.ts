@@ -256,6 +256,21 @@ describe("turnos fijos (integración con Postgres real)", () => {
       expect(result).toEqual({ success: false, error: "La cancha no está abierta en ese horario ese día." });
     });
 
+    it("rechaza una hora que no coincide con el inicio de un turno de la cancha", async () => {
+      const court = await newCourt();
+
+      // La cancha abre a las 09:00: los turnos empiezan a las 09:00, 10:30, 12:00…
+      const result = await createFixedBooking({
+        courtId: court.id,
+        startDate,
+        startTime: "10:00",
+        frequency: FixedBookingFrequency.WEEKLY,
+        holder: { playerId: player.id },
+      });
+
+      expect(result).toEqual({ success: false, error: "Ese horario no corresponde a un turno de la cancha." });
+    });
+
     it("rechaza una cancha dada de baja", async () => {
       const court = await newCourt();
       await updateCourt(court.id, { state: CourtState.CLOSED_DOWN });

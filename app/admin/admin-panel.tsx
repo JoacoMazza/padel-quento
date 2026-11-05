@@ -142,7 +142,8 @@ async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
  * Turnera Global: la grilla con los botones para agendar un turno común y para
  * registrar un turno fijo junto a Actualizar y, debajo, el listado de turnos
  * fijos. Un turno común también se agenda haciendo click en una celda libre.
- * Después de cada alta o cambio se refresca la grilla para que se vea.
+ * Después de cada alta o cambio se refresca la grilla para que se vea, y al
+ * liberar una fecha desde la grilla se refresca el listado de turnos fijos.
  */
 function ScheduleSection({ isActive }: { isActive: boolean }) {
   const fixedState = useSectionData(loadFixedBookings);
@@ -151,6 +152,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
   const [bookingNotice, setBookingNotice] = useState<string | null>(null);
   const [boardRefreshKey, setBoardRefreshKey] = useState(0);
   const refreshBoard = useCallback(() => setBoardRefreshKey((key) => key + 1), []);
+  const [fixedListRefreshKey, setFixedListRefreshKey] = useState(0);
   const isReady = fixedState.status === "ready";
 
   function openBooking(draft: BookingDraft) {
@@ -172,6 +174,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
           isActive={isActive}
           refreshKey={boardRefreshKey}
           onAvailableSlotClick={isReady ? openBooking : undefined}
+          onFixedBookingDateReleased={() => setFixedListRefreshKey((key) => key + 1)}
           toolbarActions={
             <>
               <button
@@ -211,6 +214,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
           isCreating={isCreatingFixed}
           onCloseCreate={() => setIsCreatingFixed(false)}
           onChanged={refreshBoard}
+          refreshKey={fixedListRefreshKey}
         />
       ) : (
         <SectionStatus state={fixedState} />
