@@ -16,13 +16,13 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 
 ### Diagrama de clases
 
-![Diagrama de clases](docs/classes/class_model.png)
+![Diagrama de clases](docs/classes/Diagrama%20de%20Clases%20Padel%20Quento.png)
 
-El diagrama fuente (editable) se encuentra en [docs/classes/class_diagram.EAP](docs/classes/class_diagram.EAP).
+El diagrama fuente (editable) se encuentra en [docs/classes/Diagrama de clases.EAP](docs/classes/Diagrama%20de%20clases.EAP).
 
 ### Diagrama Entidad-Relación (DER)
 
-![DER](docs/der/DER%20Padel%20Quento.png)
+![DER](docs/der/DER%20Padel%20Quento.jpg)
 
 El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quento.drawio](docs/der/DER%20Padel%20Quento.drawio).
 
