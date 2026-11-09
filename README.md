@@ -236,7 +236,7 @@ pnpm db:seed
 
 Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
 
-También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
+También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) una de jugador (`jugador@quento.com` / `jugador123`) y una de profesor (`profesor@quento.com` / `profesor123`): un jugador con el rol de profesor, para probar las clases.
 
 Para tener datos con los que revisar las métricas de ocupación del panel admin, hay un seed aparte de turnos (requiere haber corrido antes `pnpm db:seed`):
 
@@ -244,7 +244,7 @@ Para tener datos con los que revisar las métricas de ocupación del panel admin
 pnpm db:seed:bookings
 ```
 
-Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Si hay un profesor activo (el de `pnpm db:seed`), la mitad de los turnos de la mañana (antes de las 12:00) son clases suyas, con cupo de 4 y de 1 a 4 alumnos; el profesor no reserva turnos comunes. Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
 
 > Los seeds no crean el esquema: sobre una base sin migraciones fallan con `no existe la relación «courts»`. Correr antes `pnpm migration:run`.
 

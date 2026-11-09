@@ -7,6 +7,8 @@ export type GenerateSeedBookingsInput = {
   courts: Array<{ id: number; price: number }>;
   schedules: Array<{ courtId: number; dayOfWeek: DayOfWeek; openingTime: string; closingTime: string }>;
   playerIds: number[];
+  /** Profesor (uno de playerIds): parte de los turnos de la mañana pasan a ser clases suyas. */
+  teacherId?: number;
   /** Turnos activos ya cargados: los días que tienen alguno no se tocan. */
   existing: Array<{ courtId: number; fromDateTime: Date; durationMinutes: number }>;
   pastDays?: number;
@@ -24,6 +26,9 @@ export type SeedBooking = {
   price: number;
   attended: boolean;
   pointsAwarded: boolean;
+  /** Solo en los turnos de clase: cupo y alumnos registrados. */
+  classCapacity?: number;
+  studentIds?: number[];
 };
 
 // Date.getDay(): 0 = domingo.
@@ -40,6 +45,10 @@ const DAY_OF_WEEK_BY_INDEX: DayOfWeek[] = [
 const CANCELLED_RATE = 0.08;
 const NO_SHOW_RATE = 0.06;
 const MAX_DEMAND = 0.95;
+const CLASS_RATE = 0.5;
+const CLASS_CAPACITY = 4;
+// Las clases se dan a la mañana, cuando las canchas están menos pedidas.
+const CLASS_LATEST_START_MINUTES = 12 * 60;
 
 /** Generador pseudoaleatorio con semilla (mulberry32). */
 function seededRandom(seed: number): () => number {
@@ -56,6 +65,13 @@ function seededRandom(seed: number): () => number {
 function timeToMinutes(value: string): number {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+/** Entre 1 y CLASS_CAPACITY alumnos distintos, elegidos al azar. */
+function pickStudents(candidates: number[], random: () => number): number[] {
+  const pool = [...candidates];
+  const count = 1 + Math.floor(random() * Math.min(CLASS_CAPACITY, pool.length));
+  return Array.from({ length: count }, () => pool.splice(Math.floor(random() * pool.length), 1)[0]);
 }
 
 /** Probabilidad de que un turno esté reservado: más demanda a la tarde-noche y los fines de semana. */
@@ -82,9 +98,11 @@ export function generateSeedBookings({
   existing,
   pastDays = 90,
   futureDays = 30,
+  teacherId,
   seed = 42,
 }: GenerateSeedBookingsInput): SeedBooking[] {
-  if (playerIds.length === 0) return [];
+  const bookerIds = playerIds.filter((id) => id !== teacherId);
+  if (bookerIds.length === 0) return [];
   const random = seededRandom(seed);
   const sortedCourts = [...courts].sort((a, b) => a.id - b.id);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -116,12 +134,14 @@ export function generateSeedBookings({
         const demand = Math.min(MAX_DEMAND, slotDemand(slot, isWeekend) * courtFactor * fillFactor);
         if (random() >= demand) continue;
 
-        const bookerId = playerIds[Math.floor(random() * playerIds.length)];
+        const bookerId = bookerIds[Math.floor(random() * bookerIds.length)];
+        const isClass =
+          teacherId !== undefined && slot < CLASS_LATEST_START_MINUTES && random() < CLASS_RATE;
         const isPast = start < now.getTime();
         const outcome = random();
         generated.push({
           courtId: court.id,
-          bookerId,
+          bookerId: isClass ? teacherId : bookerId,
           fromDateTime,
           durationMinutes: SLOT_DURATION_MINUTES,
           bookingState: !isPast
@@ -132,6 +152,7 @@ export function generateSeedBookings({
           price: court.price,
           attended: !isPast || outcome >= CANCELLED_RATE + NO_SHOW_RATE,
           pointsAwarded: isPast,
+          ...(isClass ? { classCapacity: CLASS_CAPACITY, studentIds: pickStudents(bookerIds, random) } : {}),
         });
       }
     });

@@ -3,9 +3,11 @@ import { Between, Not } from "typeorm";
 import dataSource from "@/src/lib/data-source";
 import { Account } from "@/src/entities/Account";
 import { Booking } from "@/src/entities/Booking";
+import { ClassStudent } from "@/src/entities/ClassStudent";
 import { Court } from "@/src/entities/Court";
 import { Player } from "@/src/entities/Player";
 import { Schedule } from "@/src/entities/Schedule";
+import { Teacher } from "@/src/entities/Teacher";
 import { BookingState } from "@/src/domain/enums";
 import { generateSeedBookings } from "./booking-seed";
 
@@ -46,6 +48,8 @@ async function main() {
   const courts = await dataSource.getRepository(Court).find();
   const schedules = await dataSource.getRepository(Schedule).find({ relations: { court: true } });
   const players = await dataSource.getRepository(Player).find();
+  // El profesor de `pnpm db:seed`, si está: parte de los turnos de la mañana son sus clases.
+  const teacher = await dataSource.getRepository(Teacher).findOne({ where: { isActive: true }, relations: { player: true } });
   const bookings = dataSource.getRepository(Booking);
   // Los cancelados no ocupan la cancha: se puede generar un turno en su lugar.
   const existing = await bookings.find({
@@ -71,6 +75,7 @@ async function main() {
         closingTime: String(s.closingTime),
       })),
     playerIds: players.map((p) => p.id),
+    teacherId: teacher?.player.id,
     existing: existing
       .filter((b) => b.court)
       .map((b) => ({ courtId: b.court.id, fromDateTime: b.fromDateTime, durationMinutes: b.durationMinutes })),
@@ -79,7 +84,7 @@ async function main() {
   });
 
   const phoneById = new Map(players.map((p) => [p.id, p.phoneNumber]));
-  await bookings.save(
+  const saved = await bookings.save(
     generated.map((b) =>
       bookings.create({
         fromDateTime: b.fromDateTime,
@@ -88,6 +93,7 @@ async function main() {
         price: b.price,
         attended: b.attended,
         pointsAwarded: b.pointsAwarded,
+        classCapacity: b.classCapacity ?? null,
         // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
         booker: { id: b.bookerId, phoneNumber: phoneById.get(b.bookerId) },
         court: { id: b.courtId },
@@ -96,9 +102,21 @@ async function main() {
     { chunk: 500 },
   );
 
+  // save() devuelve los turnos en el mismo orden que generated: así se ubica cada clase.
+  const classStudents = dataSource.getRepository(ClassStudent);
+  const students = generated.flatMap((b, i) =>
+    (b.studentIds ?? []).map((id) => classStudents.create({ booking: { id: saved[i].id }, player: { id } })),
+  );
+  await classStudents.save(students, { chunk: 500 });
+
   console.log(`Jugadores de ejemplo creados: ${playersCreated} (contraseña: ${SEED_PLAYER_PASSWORD})`);
   console.log(
     `Turnos creados: ${generated.length} (del ${from.toLocaleDateString("es-AR")} al ${to.toLocaleDateString("es-AR")})`,
+  );
+  console.log(
+    teacher
+      ? `Clases del profesor: ${generated.filter((b) => b.classCapacity !== undefined).length}, con ${students.length} alumnos`
+      : "Sin profesor activo: no se generaron clases.",
   );
 
   await dataSource.destroy();

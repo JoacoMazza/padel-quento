@@ -3,6 +3,7 @@ import dataSource from "@/src/lib/data-source";
 import { Account } from "@/src/entities/Account";
 import { Admin } from "@/src/entities/Admin";
 import { Player } from "@/src/entities/Player";
+import { Teacher } from "@/src/entities/Teacher";
 import { AdminAccessLevel } from "@/src/domain/enums";
 import { seedCourts } from "./production-seed";
 
@@ -52,6 +53,19 @@ async function main() {
       players.create({ account, names: "Juan", lastnames: "Perez", phoneNumber: "2215550000" }),
     );
     console.log("Usuario Jugador creado: jugador@quento.com / jugador123");
+  }
+
+  // Un profesor (jugador con el rol de profesor) para probar sus clases.
+  const teacherEmail = "profesor@quento.com";
+  const existingTeacher = await accounts.findOne({ where: { email: teacherEmail } });
+  if (!existingTeacher) {
+    const passwordHash = await bcrypt.hash("profesor123", 12);
+    const account = await accounts.save(accounts.create({ email: teacherEmail, passwordHash }));
+    const player = await players.save(
+      players.create({ account, names: "Laura", lastnames: "Gómez", phoneNumber: "2215550001" }),
+    );
+    await dataSource.getRepository(Teacher).save({ player: { id: player.id } });
+    console.log("Usuario Profesor creado: profesor@quento.com / profesor123");
   }
 
   await dataSource.destroy();

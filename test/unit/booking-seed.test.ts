@@ -124,4 +124,34 @@ describe("generateSeedBookings", () => {
   it("sin jugadores no genera turnos", () => {
     expect(generateSeedBookings(input({ playerIds: [] }))).toEqual([]);
   });
+
+  it("sin profesor no genera clases", () => {
+    const bookings = generateSeedBookings(input());
+
+    expect(bookings.some((b) => b.classCapacity !== undefined || b.studentIds !== undefined)).toBe(false);
+  });
+
+  it("con un profesor, parte de los turnos de la mañana son clases suyas con alumnos", () => {
+    const playerIds = [100, 200, 300, 400];
+    const bookings = generateSeedBookings(input({ playerIds, teacherId: 400 }));
+    const classes = bookings.filter((b) => b.classCapacity !== undefined);
+
+    expect(classes.length).toBeGreaterThan(0);
+    expect(bookings.some((b) => minutesOfDay(b.fromDateTime) < 720 && b.classCapacity === undefined)).toBe(true);
+    for (const c of classes) {
+      expect(c.bookerId).toBe(400);
+      expect(minutesOfDay(c.fromDateTime)).toBeLessThan(720);
+      expect(c.classCapacity).toBe(4);
+      expect(c.studentIds!.length).toBeGreaterThanOrEqual(1);
+      expect(c.studentIds!.length).toBeLessThanOrEqual(c.classCapacity!);
+      expect(new Set(c.studentIds).size).toBe(c.studentIds!.length);
+      expect(c.studentIds!.every((id) => id !== 400 && playerIds.includes(id))).toBe(true);
+    }
+  });
+
+  it("el profesor solo reserva sus clases, no turnos comunes", () => {
+    const bookings = generateSeedBookings(input({ playerIds: [100, 200, 300, 400], teacherId: 400 }));
+
+    expect(bookings.filter((b) => b.bookerId === 400).every((b) => b.classCapacity !== undefined)).toBe(true);
+  });
 });
