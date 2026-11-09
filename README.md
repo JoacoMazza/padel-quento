@@ -22,7 +22,7 @@ El diagrama fuente (editable) se encuentra en [docs/classes/Diagrama de clases.E
 
 ### Diagrama Entidad-Relación (DER)
 
-![DER](docs/der/DER%20Padel%20Quento.jpg)
+![DER](docs/der/DER%20Padel%20Quento.png)
 
 El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quento.drawio](docs/der/DER%20Padel%20Quento.drawio).
 
