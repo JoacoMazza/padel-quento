@@ -37,9 +37,18 @@ classDiagram
         -scoring: float
     }
 
-    class Teacher {
+    class Lesson {
+        -classCapacity: int
         -createdAt: LocalDateTime
+        -fromLocalDatetime: LocalDateTime
         -isActive: boolean
+        -toLocalDatetime: LocalDateTime
+    }
+
+    class LessonSchedule {
+        -dayOfWeek: DayOfWeek
+        -endTime: LocalTime
+        -startTime: LocalTime
     }
 
     class Penalty {
@@ -90,7 +99,6 @@ classDiagram
 
     class Booking {
         -bookingState: BookingState
-        -classCapacity: int [0..1]
         -durationMinutes: int
         -fromDatetime: LocalDateTime
         -isPaid: boolean
@@ -227,7 +235,6 @@ classDiagram
 
     %% Inheritance
     Booker <|-- Player
-    Teacher <|-- Player
 
     %% Accounts
     Admin "0..1" -- Account
@@ -250,11 +257,17 @@ classDiagram
 
     %% Bookings
     Booker -- "*" Booking
-    Booking "1" -- "0..*" Inscription : +alumnos
     Booking "0..1" -- FixedBookingDate
     Booker -- "*" FixedBooking
     FixedBooking -- "*" FixedBookingDate
     FixedBooking -- Court
+
+    %% Lessons
+    Player -- "0..*" Lesson : +teacher
+    Lesson -- "*" Inscription
+    Lesson "0..1" -- "*" Booking
+    Lesson *-- "1..*" LessonSchedule
+    Court -- "0..*" LessonSchedule
 
     %% Courts
     Complex -- "*" Court

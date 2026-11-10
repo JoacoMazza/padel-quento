@@ -9,7 +9,8 @@ config:
 %% Composite constraints and indexes:
 %%   UQ_players_reviews_match_reviewer_reviewed: UNIQUE (match_id, reviewer_id, reviewed_id)
 %%   UQ_match_players_match_player: UNIQUE (match_id, player_id)
-%%   UQ_inscriptions_booking_player: UNIQUE (booking_id, player_id)
+%%   UQ_inscriptions_lesson_player: UNIQUE (lesson_id, player_id)
+%%   UQ_lesson_schedules_lesson_day_start: UNIQUE (lesson_id, day_of_week, start_time)
 %%   IDX_messages_chat_id: INDEX (chat_id)
 erDiagram
     accounts {
@@ -39,11 +40,23 @@ erDiagram
         float scoring
     }
 
-    teachers {
+    lessons {
         int id PK
-        int player_id FK, UK
+        int teacher_id FK
+        int class_capacity
         boolean is_active
         datetime created_at
+        datetime from_local_datetime
+        datetime to_local_datetime
+    }
+
+    lesson_schedules {
+        int id PK
+        int lesson_id FK "UQ (lesson_id, day_of_week, start_time)"
+        int court_id FK
+        enum day_of_week
+        time start_time
+        time end_time
     }
 
     penalties {
@@ -98,17 +111,17 @@ erDiagram
         int id PK
         int booker_id FK
         int court_id FK
+        int lesson_id FK "nullable"
         enum booking_state
         datetime datetime
         int duration_minutes
         decimal price "decimal(10,2)"
         boolean is_paid
-        int class_capacity "nullable"
     }
 
     inscriptions {
         int id PK
-        int booking_id FK "UQ (booking_id, player_id)"
+        int lesson_id FK "UQ (lesson_id, player_id)"
         int player_id FK
         datetime created_at
     }
@@ -178,7 +191,7 @@ erDiagram
 
     accounts ||--o| admins : "account_id"
     accounts ||--o| bookers : "account_id"
-    bookers ||--o| teachers : "player_id"
+    bookers ||--o{ lessons : "teacher_id"
     bookers ||--o{ penalties : "player_id"
     bookers ||--o{ bookings : "booker_id"
     bookers ||--o{ fixed_bookings : "booker_id"
@@ -192,7 +205,10 @@ erDiagram
     courts ||--o{ out_of_services : "court_id"
     courts ||--o{ bookings : "court_id"
     courts ||--o{ fixed_bookings : "court_id"
-    bookings ||--o{ inscriptions : "booking_id"
+    courts ||--o{ lesson_schedules : "court_id"
+    lessons ||--o{ inscriptions : "lesson_id"
+    lessons |o--o{ bookings : "lesson_id"
+    lessons ||--|{ lesson_schedules : "lesson_id"
     bookings ||--o| matches : "booking_id"
     bookings |o--o| fixed_booking_dates : "booking_id"
     fixed_bookings ||--o{ fixed_booking_dates : "fixed_booking_id"
