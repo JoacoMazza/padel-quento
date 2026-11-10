@@ -1,0 +1,263 @@
+---
+title: Diagrama de Clases Padel Quento
+config:
+  layout: elk
+---
+%% Source of truth for the class diagram (rendered to classes.jpg).
+%% Convention: an association end without multiplicity means exactly 1.
+classDiagram
+    direction TB
+
+    class Account {
+        -email: char
+        -isBlocked: boolean
+        -passwordHashed: char
+        +block()
+        +register()
+        +signIn()
+        +signOut()
+        +unBlock()
+    }
+
+    class Admin {
+        -accessLevel: AdminAccessLevel
+        -dni: int
+        -lastNames: char
+        -names: char
+    }
+
+    class Booker {
+        -lastNames: char
+        -names: char
+        -phoneNumber: char
+    }
+
+    class Player {
+        -category: PlayerCategory
+        -scoring: float
+    }
+
+    class Teacher {
+        -createdAt: LocalDateTime
+        -isActive: boolean
+    }
+
+    class Penalty {
+        -createdAt: LocalDateTime
+        -penalizedScoring: float
+        -reason: char
+        +calculateAmount() float
+    }
+
+    class Complex {
+        -address: char
+        -city: char
+        -country: char
+        -latitude: float
+        -longitude: float
+        -mapsUrl: char
+        -name: char
+        -postalCode: char
+        -province: char
+        -whatsappMessage: char
+        -whatsappNumber: char
+    }
+
+    class Court {
+        -number: int
+        -price: float
+        -state: CourtState
+        +block()
+        +checkAvailability()
+        +unBlock()
+    }
+
+    class Schedule {
+        -closingTime: LocalTime
+        -dayOfWeek: DayOfWeek
+        -openingTime: LocalTime
+        +isWithinOpeningHours() boolean
+    }
+
+    class OutOfService {
+        -description: char
+        -fromDatetime: DateTime
+        -reason: OutOfServiceReason
+        -toDatetime: DateTime
+        +cancelAffectedBookings()
+        +isActive() boolean
+    }
+
+    class Booking {
+        -bookingState: BookingState
+        -classCapacity: int [0..1]
+        -durationMinutes: int
+        -fromDatetime: LocalDateTime
+        -isPaid: boolean
+        -price: float
+        +cancel()
+        +checkAvailability() int
+    }
+
+    class Inscription {
+        -createdAt: LocalDateTime
+    }
+
+    class FixedBooking {
+        -createdAt: datetime
+        -durationMinutes: int
+        -endDate: Date
+        -frequency: FixedBookingFrequency
+        -isActive: bool
+        -startDate: Date
+        -startTime: Time
+    }
+
+    class FixedBookingDate {
+        -date: Date
+        -state: FixedBookingDateState
+    }
+
+    class Match {
+        -needPlayers: boolean
+        +addPlayer()
+        +cancel()
+        +checkNeedsPlayers()
+        +close() int
+        +notifyPlayers() int
+    }
+
+    class MatchPlayer {
+        -attendedCount: int
+        -joinedAt: LocalDateTime
+        -playersCount: int
+        -pointsAwarded: int
+    }
+
+    class PlayerReview {
+        -comment: char
+        -createdAt: LocalDateTime
+        -goodAttitude: boolean
+        -level: ReviewLevel
+        -onTime: boolean
+    }
+
+    class Chat {
+        -createdAt: LocalDateTime
+        +addMessages()
+        +close()
+        +listMessages()
+    }
+
+    class Message {
+        -content: char
+        -sentAt: LocalDateTime
+        +send()
+    }
+
+    class AdminAccessLevel {
+        <<enumeration>>
+        owner
+        staff
+    }
+
+    class FixedBookingFrequency {
+        <<enumeration>>
+        weekly
+        biweekly
+    }
+
+    class FixedBookingDateState {
+        <<enumeration>>
+        booked
+        released
+        conflict
+    }
+
+    class ReviewLevel {
+        <<enumeration>>
+        lower
+        asDeclared
+        higher
+    }
+
+    class OutOfServiceReason {
+        <<enumeration>>
+        maintenance
+        free_day
+        cleaning
+        other
+    }
+
+    class CourtState {
+        <<enumeration>>
+        available
+        closed_down
+    }
+
+    class BookingState {
+        <<enumeration>>
+        reserved
+        finished
+        cancelled
+    }
+
+    class DayOfWeek {
+        <<enumeration>>
+        monday
+        tuesday
+        wednesday
+        thursday
+        friday
+        saturday
+        sunday
+    }
+
+    class PlayerCategory {
+        <<enumeration>>
+        1st
+        2nd
+        3rd
+        4th
+        5th
+        6th
+        7th
+        without_category
+    }
+
+    %% Inheritance
+    Booker <|-- Player
+    Teacher <|-- Player
+
+    %% Accounts
+    Admin "0..1" -- Account
+    Account -- "0..1" Player
+
+    %% Players
+    Player -- "*" Penalty
+    Player "1" -- "0..*" MatchPlayer
+    Player "1" -- "0..*" Inscription
+    Player -- PlayerReview : +Reviewer
+    Player -- PlayerReview : +Reviewed
+    Player -- "0..*" Message
+
+    %% Matches
+    Match *-- "1..4" MatchPlayer
+    Match *-- "0..1" Chat
+    Chat *-- "0..*" Message
+    PlayerReview -- Match
+    Match "0..1" -- Booking
+
+    %% Bookings
+    Booker -- "*" Booking
+    Booking "1" -- "0..*" Inscription : +alumnos
+    Booking "0..1" -- FixedBookingDate
+    Booker -- "*" FixedBooking
+    FixedBooking -- "*" FixedBookingDate
+    FixedBooking -- Court
+
+    %% Courts
+    Complex -- "*" Court
+    Court -- "*" Booking
+    Court -- "0..*" OutOfService
+    Schedule "1..7" -- Court
