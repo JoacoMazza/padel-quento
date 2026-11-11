@@ -18,13 +18,13 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 
 ![Diagrama de clases](docs/classes/classes.jpg)
 
-El diagrama fuente (Mermaid) se encuentra en [docs/classes/classes.mmd](docs/classes/classes.mmd).
+El diagrama fuente (Mermaid) se encuentra en [docs/classes/classes.mmd](docs/classes/classes.mmd). Hay una versión traducida al español en [docs/classes/classes.es.mmd](docs/classes/classes.es.mmd) ([render](docs/classes/classes.es.jpg)).
 
 ### Diagrama Entidad-Relación (DER)
 
 ![DER](docs/der/der.jpg)
 
-El diagrama fuente (Mermaid) se encuentra en [docs/der/der.mmd](docs/der/der.mmd).
+El diagrama fuente (Mermaid) se encuentra en [docs/der/der.mmd](docs/der/der.mmd). Hay una versión traducida al español en [docs/der/der.es.mmd](docs/der/der.es.mmd) ([render](docs/der/der.es.jpg)).
 
 Los diagramas se editan en los `.mmd` y se regeneran los JPG con `node .claude/skills/update-diagrams/scripts/render.mjs` (ver la skill [update-diagrams](.claude/skills/update-diagrams/SKILL.md)).
 

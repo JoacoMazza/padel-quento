@@ -25,8 +25,8 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 
 - [README.md](README.md): setup, variables de entorno, migraciones, seed, comandos y CI.
 - [docs/](docs/): diagramas del proyecto.
-  - `docs/classes/`: diagrama de clases (fuente Mermaid `classes.mmd` + render `classes.jpg`).
-  - `docs/der/`: Diagrama Entidad-Relación (fuente Mermaid `der.mmd` + render `der.jpg`).
+  - `docs/classes/`: diagrama de clases (fuente Mermaid `classes.mmd` + render `classes.jpg`; versión en español `classes.es.mmd` + `classes.es.jpg`).
+  - `docs/der/`: Diagrama Entidad-Relación (fuente Mermaid `der.mmd` + render `der.jpg`; versión en español `der.es.mmd` + `der.es.jpg`).
 - `node_modules/next/dist/docs/`: documentación de la versión de Next.js instalada.
 
 ## Estructura
