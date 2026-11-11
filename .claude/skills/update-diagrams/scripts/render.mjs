@@ -6,7 +6,12 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const DIAGRAMS = ["docs/der/der.mmd", "docs/classes/classes.mmd"];
+const DIAGRAMS = [
+  "docs/der/der.mmd",
+  "docs/der/der.es.mmd",
+  "docs/classes/classes.mmd",
+  "docs/classes/classes.es.mmd",
+];
 const MERMAID_CLI = "@mermaid-js/mermaid-cli@11";
 const SHARP_CLI = "sharp-cli@5";
 

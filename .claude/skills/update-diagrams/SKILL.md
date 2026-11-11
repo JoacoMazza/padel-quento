@@ -11,6 +11,10 @@ The diagrams are kept as Mermaid, which is the source of truth:
 |---|---|---|
 | Entity-Relationship (DER) | `docs/der/der.mmd` (`erDiagram`) | `docs/der/der.jpg` |
 | Class diagram | `docs/classes/classes.mmd` (`classDiagram`) | `docs/classes/classes.jpg` |
+| DER (Spanish) | `docs/der/der.es.mmd` | `docs/der/der.es.jpg` |
+| Class diagram (Spanish) | `docs/classes/classes.es.mmd` | `docs/classes/classes.es.jpg` |
+
+The `.es.mmd` files are Spanish translations of the English sources (table, column, class, attribute, method and enum names translated). The English files are the source of truth; every change to them must be mirrored in the Spanish version in the same change.
 
 Never edit the JPGs by hand; always change the `.mmd` and re-render. Both diagrams must be updated in the same change as the entity/migration.
 
