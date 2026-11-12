@@ -16,15 +16,17 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 
 ### Diagrama de clases
 
-![Diagrama de clases](docs/classes/class_model.png)
+![Diagrama de clases](docs/classes/classes.jpg)
 
-El diagrama fuente (editable) se encuentra en [docs/classes/class_diagram.EAP](docs/classes/class_diagram.EAP).
+El diagrama fuente (Mermaid) se encuentra en [docs/classes/classes.mmd](docs/classes/classes.mmd). Hay una versión traducida al español en [docs/classes/classes.es.mmd](docs/classes/classes.es.mmd) ([render](docs/classes/classes.es.jpg)).
 
 ### Diagrama Entidad-Relación (DER)
 
-![DER](docs/der/DER%20Padel%20Quento.png)
+![DER](docs/der/der.jpg)
 
-El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quento.drawio](docs/der/DER%20Padel%20Quento.drawio).
+El diagrama fuente (Mermaid) se encuentra en [docs/der/der.mmd](docs/der/der.mmd). Hay una versión traducida al español en [docs/der/der.es.mmd](docs/der/der.es.mmd) ([render](docs/der/der.es.jpg)).
+
+Los diagramas se editan en los `.mmd` y se regeneran los JPG con `node .claude/skills/update-diagrams/scripts/render.mjs` (ver la skill [update-diagrams](.claude/skills/update-diagrams/SKILL.md)).
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
@@ -54,8 +56,8 @@ test/
   unit/               Tests unitarios (no requieren base de datos)
   integration/        Tests de integración (requieren Postgres levantado)
 docs/
-  classes/            Diagrama de clases (imagen + fuente editable)
-  der/                Diagrama Entidad-Relación (imagen + fuente editable)
+  classes/            Diagrama de clases (fuente Mermaid + render JPG)
+  der/                Diagrama Entidad-Relación (fuente Mermaid + render JPG)
 ```
 
 ## Reseñas y reputación de los jugadores

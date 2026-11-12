@@ -1,0 +1,219 @@
+---
+title: DER Padel Quento
+config:
+  layout: elk
+---
+%% Source of truth for the Entity-Relationship Diagram (rendered to der.jpg).
+%% Table and column names follow the database (snake_case).
+%% Keys: PK primary key, FK foreign key, UK unique. Nullable columns are marked "nullable".
+%% Composite constraints and indexes:
+%%   UQ_players_reviews_match_reviewer_reviewed: UNIQUE (match_id, reviewer_id, reviewed_id)
+%%   UQ_match_players_match_player: UNIQUE (match_id, player_id)
+%%   UQ_inscriptions_lesson_player: UNIQUE (lesson_id, player_id)
+%%   UQ_lesson_schedules_lesson_day_start: UNIQUE (lesson_id, day_of_week, start_time)
+%%   IDX_messages_chat_id: INDEX (chat_id)
+erDiagram
+    accounts {
+        int id PK
+        string email UK
+        string password_hashed
+        boolean is_blocked
+    }
+
+    admins {
+        int id PK
+        int account_id FK, UK
+        int dni
+        string names
+        string last_names
+        enum access_level
+    }
+
+    bookers {
+        int id PK
+        int account_id FK, UK
+        string phone_number UK
+        string type
+        string names
+        string last_names
+        enum category
+        float scoring
+    }
+
+    lessons {
+        int id PK
+        int teacher_id FK
+        int class_capacity
+        boolean is_active
+        datetime created_at
+        datetime from_local_datetime
+        datetime to_local_datetime
+        decimal price "decimal(10,2)"
+    }
+
+    lesson_schedules {
+        int id PK
+        int lesson_id FK "UQ (lesson_id, day_of_week, start_time)"
+        int court_id FK
+        enum day_of_week
+        time start_time
+        time end_time
+    }
+
+    penalties {
+        int id PK
+        int player_id FK
+        float penalized_scoring
+        string reason
+        datetime created_at
+    }
+
+    complexes {
+        int id PK
+        string name
+        string address
+        string city
+        string province
+        string country
+        string postal_code
+        decimal latitude "decimal(9,6)"
+        decimal longitude "decimal(9,6)"
+        string maps_url "nullable"
+        string whatsapp_number "nullable"
+        string whatsapp_message "nullable"
+    }
+
+    courts {
+        int id PK
+        int complex_id FK
+        int number UK
+        enum state
+        decimal price "decimal(10,2)"
+    }
+
+    schedules {
+        int id PK
+        int court_id FK
+        enum day_of_week
+        time opening_time
+        time closing_time
+    }
+
+    out_of_services {
+        int id PK
+        int court_id FK
+        enum reason
+        string description "nullable"
+        datetime from_datetime
+        datetime to_datetime
+    }
+
+    bookings {
+        int id PK
+        int booker_id FK
+        int court_id FK
+        int lesson_id FK "nullable"
+        enum booking_state
+        datetime datetime
+        int duration_minutes
+        decimal price "decimal(10,2)"
+        boolean is_paid
+    }
+
+    inscriptions {
+        int id PK
+        int lesson_id FK "UQ (lesson_id, player_id)"
+        int player_id FK
+        datetime created_at
+    }
+
+    fixed_bookings {
+        int id PK
+        int booker_id FK
+        int court_id FK
+        date start_date
+        date end_date "nullable"
+        time start_time
+        int duration_minutes
+        enum frequency
+        boolean is_active
+        datetime created_at
+    }
+
+    fixed_booking_dates {
+        int id PK
+        int fixed_booking_id FK
+        int booking_id FK, UK "nullable"
+        date date
+        enum state
+    }
+
+    matches {
+        int id PK
+        int booking_id FK, UK
+        boolean need_players
+    }
+
+    match_players {
+        int id PK
+        int player_id FK
+        int match_id FK "UQ (match_id, player_id)"
+        int players_count
+        int attended_count
+        datetime joined_at
+        int points_awarded
+    }
+
+    players_reviews {
+        int id PK
+        int match_id FK "UQ (match_id, reviewer_id, reviewed_id)"
+        int reviewer_id FK
+        int reviewed_id FK
+        enum level
+        boolean good_attitude
+        boolean on_time
+        text comment "nullable"
+        datetime created_at
+    }
+
+    chats {
+        int id PK
+        int match_id FK, UK
+        datetime created_at
+    }
+
+    messages {
+        int id PK
+        int chat_id FK "INDEX IDX_messages_chat_id"
+        int sender_id FK
+        text content
+        datetime sent_at
+    }
+
+    accounts ||--o| admins : "account_id"
+    accounts ||--o| bookers : "account_id"
+    bookers ||--o{ lessons : "teacher_id"
+    bookers ||--o{ penalties : "player_id"
+    bookers ||--o{ bookings : "booker_id"
+    bookers ||--o{ fixed_bookings : "booker_id"
+    bookers ||--o{ inscriptions : "player_id"
+    bookers ||--o{ match_players : "player_id"
+    bookers ||--o{ players_reviews : "reviewer_id"
+    bookers ||--o{ players_reviews : "reviewed_id"
+    bookers ||--o{ messages : "sender_id"
+    complexes ||--o{ courts : "complex_id"
+    courts ||--o{ schedules : "court_id"
+    courts ||--o{ out_of_services : "court_id"
+    courts ||--o{ bookings : "court_id"
+    courts ||--o{ fixed_bookings : "court_id"
+    courts ||--o{ lesson_schedules : "court_id"
+    lessons ||--o{ inscriptions : "lesson_id"
+    lessons |o--o{ bookings : "lesson_id"
+    lessons ||--|{ lesson_schedules : "lesson_id"
+    bookings ||--o| matches : "booking_id"
+    bookings |o--o| fixed_booking_dates : "booking_id"
+    fixed_bookings ||--o{ fixed_booking_dates : "fixed_booking_id"
+    matches ||--o{ match_players : "match_id"
+    matches ||--o{ players_reviews : "match_id"
+    matches ||--o| chats : "match_id"
+    chats ||--o{ messages : "chat_id"
