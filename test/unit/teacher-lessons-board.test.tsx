@@ -63,6 +63,12 @@ describe("TeacherLessonsBoard (HU-44)", () => {
     expect(within(card).getByText("Ana Alumna")).toBeTruthy();
   });
 
+  it("una clase sin fecha de fin lo aclara", () => {
+    render(<TeacherLessonsBoard lessons={[lesson({ toDate: null })]} />);
+
+    expect(within(lessonCard()).getByText("Desde el 05/10/2026, sin fecha de fin")).toBeTruthy();
+  });
+
   it("busca jugadores e inscribe a uno en la clase", async () => {
     searchStudents.mockResolvedValue({ success: true, data: [bruno] });
     addLessonStudent.mockResolvedValue({ success: true, data: null });

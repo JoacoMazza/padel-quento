@@ -64,6 +64,12 @@ describe("LessonsBoard", () => {
     expect(within(card()).getByText("1/4 alumnos")).toBeTruthy();
   });
 
+  it("una clase sin fecha de fin lo aclara", () => {
+    render(<LessonsBoard lessons={[lesson({ toDate: null })]} isGuest={false} />);
+
+    expect(within(card()).getByText("Desde el 05/10/2026, sin fecha de fin")).toBeTruthy();
+  });
+
   it("el jugador se inscribe y se actualiza la página", async () => {
     enrollInLesson.mockResolvedValue({ success: true, data: null });
     render(<LessonsBoard lessons={[lesson()]} isGuest={false} />);

@@ -7,7 +7,8 @@ const migrationModules = import.meta.glob<Record<string, unknown>>("../../src/mi
 const migrations = Object.values(migrationModules).flatMap((module) =>
   Object.values(module).filter((value): value is new () => object => typeof value === "function"),
 );
-const isLessonsMigration = (migration: new () => object) => migration.name.startsWith("ReplaceTeachersWithLessons");
+const timestampOf = (migration: new () => object) => Number(migration.name.match(/\d+$/)![0]);
+const lessonsMigration = migrations.find((migration) => migration.name.startsWith("ReplaceTeachersWithLessons"))!;
 
 const CHECK_DATABASE = "padel_quento_lessons_migration_check";
 
@@ -25,8 +26,8 @@ describe("migración de profesores a clases (integración con Postgres real)", {
     await admin.query(`DROP DATABASE IF EXISTS ${CHECK_DATABASE}`);
     await admin.query(`CREATE DATABASE ${CHECK_DATABASE}`);
 
-    // Una base de antes de la migración: un profesor activo con una clase con una alumna, y una clase cancelada.
-    const before = dataSourceFor(migrations.filter((m) => !isLessonsMigration(m)));
+    // Una base de antes de la migración (solo las anteriores): un profesor activo con una clase con una alumna, y una clase cancelada.
+    const before = dataSourceFor(migrations.filter((m) => timestampOf(m) < timestampOf(lessonsMigration)));
     await before.initialize();
     await before.runMigrations();
     // El complejo del club ya lo crea la migración de complejos.

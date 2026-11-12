@@ -34,9 +34,9 @@ export class Lesson {
   @Column({ type: "timestamp", name: "from_local_datetime" })
   fromLocalDatetime!: Date;
 
-  /** Fin del último día de la clase, en hora de pared del club. */
-  @Column({ type: "timestamp", name: "to_local_datetime" })
-  toLocalDatetime!: Date;
+  /** Fin del último día de la clase, en hora de pared del club; null si no tiene fecha de fin. */
+  @Column({ type: "timestamp", name: "to_local_datetime", nullable: true })
+  toLocalDatetime!: Date | null;
 
   @Column({
     type: "decimal",

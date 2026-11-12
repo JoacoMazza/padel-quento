@@ -1,7 +1,7 @@
 "use server";
 
 import "reflect-metadata";
-import { MoreThan } from "typeorm";
+import { IsNull, type EntityManager } from "typeorm";
 import type { Booking } from "@/src/entities/Booking";
 import type { Court } from "@/src/entities/Court";
 import type { Lesson } from "@/src/entities/Lesson";
@@ -9,7 +9,13 @@ import type { LessonSchedule } from "@/src/entities/LessonSchedule";
 import type { Player } from "@/src/entities/Player";
 import { BookingState, CourtState, DayOfWeek } from "@/src/domain/enums";
 import { occurrenceStart, todayISO } from "@/src/domain/fixed-booking";
-import { lessonInputProblem, lessonOccurrenceDates, scheduleDurationMinutes } from "@/src/domain/lesson";
+import {
+  lessonEndDate,
+  lessonInputProblem,
+  lessonOccurrenceDates,
+  scheduleDurationMinutes,
+  slotStartTimes,
+} from "@/src/domain/lesson";
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
@@ -24,6 +30,7 @@ import {
   enrollStudent,
   findAgenda,
   findLesson,
+  notFinishedYet,
   toLessonItem,
   unenrollStudent,
   type LessonItem,
@@ -45,9 +52,9 @@ export type CreateLessonInput = {
   teacherId: number;
   classCapacity: number;
   price: number;
-  /** Primera y última fecha de la clase ("YYYY-MM-DD"), ambas incluidas. */
+  /** Primera y última fecha de la clase ("YYYY-MM-DD"), ambas incluidas; sin la última, no tiene fin. */
   fromDate: string;
-  toDate: string;
+  toDate: string | null;
   schedules: LessonScheduleInput[];
 };
 
@@ -81,6 +88,31 @@ function shortDate(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
 
+/** Reserva un turno de la clase a nombre del profesor, al precio de la cancha. */
+async function reserveSession(
+  manager: EntityManager,
+  lessonId: number,
+  teacher: Player,
+  court: Court,
+  start: Date,
+  durationMinutes: number,
+) {
+  const bookings = manager.getRepository<Booking>("Booking");
+  await bookings.save(
+    bookings.create({
+      fromDateTime: start,
+      durationMinutes,
+      bookingState: BookingState.RESERVED,
+      price: court.price,
+      booker: { id: teacher.id, phoneNumber: teacher.phoneNumber },
+      court: { id: court.id },
+      lesson: { id: lessonId },
+      // Las clases no mueven puntos: el job de asistencia las da por procesadas.
+      pointsAwarded: true,
+    }),
+  );
+}
+
 /** Lista todas las clases, las más nuevas primero. Cualquier administrador. */
 export async function getLessonsAdmin(): Promise<ActionResult<LessonItem[]>> {
   try {
@@ -96,10 +128,35 @@ export async function getLessonsAdmin(): Promise<ActionResult<LessonItem[]>> {
 }
 
 /**
+ * Inicios ("HH:MM") de los turnos de la grilla de la cancha ese día de la
+ * semana, para elegir el horario de una clase como en las reservas. Sin
+ * horario ese día, o con la cancha dada de baja, no hay ninguno.
+ */
+export async function getLessonSlotsAdmin(input: {
+  courtId: number;
+  dayOfWeek: DayOfWeek;
+}): Promise<ActionResult<string[]>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const court = await dataSource
+      .getRepository<Court>("Court")
+      .findOne({ where: { id: input.courtId }, relations: { schedules: true } });
+    const schedule = court?.schedules.find((s) => s.dayOfWeek === input.dayOfWeek);
+    if (!court || court.state === CourtState.CLOSED_DOWN || !schedule) return { success: true, data: [] };
+    return { success: true, data: slotStartTimes(String(schedule.openingTime), String(schedule.closingTime)) };
+  } catch (error) {
+    return failure(error, "getLessonSlotsAdmin", "No se pudieron obtener los horarios.");
+  }
+}
+
+/**
  * Alta de una clase, para cualquier administrador: asigna a un jugador
  * registrado como profesor (no se le crea una cuenta) y reserva a su nombre,
  * al precio de la cancha, cada fecha de sus horarios semanales entre la fecha
- * de inicio y la de fin. Si alguna fecha ya está ocupada no se crea nada.
+ * de inicio y la de fin (sin fecha de fin, hasta el horizonte de 6 meses; las
+ * siguientes las va reservando extendLessons). Si alguna fecha ya está ocupada
+ * no se crea nada.
  */
 export async function createLesson(input: CreateLessonInput): Promise<ActionResult<LessonItem>> {
   try {
@@ -108,6 +165,7 @@ export async function createLesson(input: CreateLessonInput): Promise<ActionResu
     if (problem) return { success: false, error: problem };
 
     const now = new Date();
+    const until = lessonEndDate(input.toDate, todayISO(now));
     const dataSource = await getDataSource();
     const lessonId = await dataSource.transaction(async (manager) => {
       const teacher = await manager.getRepository<Player>("Player").findOne({ where: { id: input.teacherId } });
@@ -127,7 +185,7 @@ export async function createLesson(input: CreateLessonInput): Promise<ActionResu
       // Cada fecha de cada horario, ya ordenadas, con su cancha.
       const sessions = input.schedules
         .flatMap((slot) =>
-          lessonOccurrenceDates(slot.dayOfWeek, input.fromDate, input.toDate).map((date) => ({
+          lessonOccurrenceDates(slot.dayOfWeek, input.fromDate, until).map((date) => ({
             slot,
             date,
             court: courts.get(slot.courtId)!,
@@ -150,7 +208,7 @@ export async function createLesson(input: CreateLessonInput): Promise<ActionResu
           price: input.price,
           isActive: true,
           fromLocalDatetime: occurrenceStart(input.fromDate, "00:00"),
-          toLocalDatetime: occurrenceStart(input.toDate, "23:59"),
+          toLocalDatetime: input.toDate ? occurrenceStart(input.toDate, "23:59") : null,
         }),
       );
       const schedules = manager.getRepository<LessonSchedule>("LessonSchedule");
@@ -166,7 +224,6 @@ export async function createLesson(input: CreateLessonInput): Promise<ActionResu
         ),
       );
 
-      const bookings = manager.getRepository<Booking>("Booking");
       for (const session of sessions) {
         if (session.start <= now) continue;
         if (await isSlotTaken(manager, session.court.id, session.start, session.durationMinutes)) {
@@ -174,19 +231,7 @@ export async function createLesson(input: CreateLessonInput): Promise<ActionResu
             `El horario del ${shortDate(session.date)} a las ${session.slot.startTime} en la cancha ${session.court.number} ya está ocupado.`,
           );
         }
-        await bookings.save(
-          bookings.create({
-            fromDateTime: session.start,
-            durationMinutes: session.durationMinutes,
-            bookingState: BookingState.RESERVED,
-            price: session.court.price,
-            booker: { id: teacher.id, phoneNumber: teacher.phoneNumber },
-            court: { id: session.court.id },
-            lesson: { id: lesson.id },
-            // Las clases no mueven puntos: el job de asistencia las da por procesadas.
-            pointsAwarded: true,
-          }),
-        );
+        await reserveSession(manager, lesson.id, teacher, session.court, session.start, session.durationMinutes);
       }
       return lesson.id;
     });
@@ -259,7 +304,7 @@ export async function getAvailableLessons(): Promise<ActionResult<AvailableLesso
     const playerId = await getSessionPlayerId();
     const dataSource = await getDataSource();
     const lessons = await dataSource.getRepository<Lesson>("Lesson").find({
-      where: { isActive: true, toLocalDatetime: MoreThan(new Date()) },
+      where: { isActive: true, toLocalDatetime: notFinishedYet() },
       relations: LESSON_RELATIONS,
       order: { fromLocalDatetime: "ASC", id: "ASC" },
     });
@@ -299,5 +344,55 @@ export async function leaveLesson(lessonId: number): Promise<ActionResult<null>>
     return { success: true, data: null };
   } catch (error) {
     return failure(error, "leaveLesson", "No se pudo darte de baja de la clase.");
+  }
+}
+
+/**
+ * Reserva los turnos nuevos de las clases activas sin fecha de fin a medida
+ * que entran en el horizonte de 6 meses (como extendFixedBookings). Las fechas
+ * que ya tienen turno, aunque se haya cancelado, no se tocan, así que se puede
+ * correr las veces que haga falta; las que están ocupadas o fuera del horario
+ * de la cancha se saltean. Pensada para el proceso en segundo plano
+ * (src/jobs/lesson-extension.ts). Devuelve cuántos turnos reservó.
+ */
+export async function extendLessons(): Promise<ActionResult<number>> {
+  try {
+    const now = new Date();
+    const today = todayISO(now);
+    const until = lessonEndDate(null, today);
+    const dataSource = await getDataSource();
+    const lessons = await dataSource.getRepository<Lesson>("Lesson").find({
+      where: { isActive: true, toLocalDatetime: IsNull() },
+      relations: { teacher: true, schedules: { court: { schedules: true } }, bookings: true },
+    });
+
+    let total = 0;
+    for (const lesson of lessons) {
+      const fromDate = todayISO(new Date(lesson.fromLocalDatetime));
+      const registered = new Set(lesson.bookings.map((booking) => new Date(booking.fromDateTime).getTime()));
+      total += await dataSource.transaction(async (manager) => {
+        let created = 0;
+        for (const schedule of lesson.schedules) {
+          const court = schedule.court;
+          if (court.state === CourtState.CLOSED_DOWN) continue;
+          const startTime = schedule.startTime.slice(0, 5);
+          const durationMinutes = scheduleDurationMinutes(schedule);
+          await lockCourt(manager, court.id);
+          for (const date of lessonOccurrenceDates(schedule.dayOfWeek, fromDate > today ? fromDate : today, until)) {
+            const start = occurrenceStart(date, startTime);
+            if (start <= now || registered.has(start.getTime())) continue;
+            if (!isWithinSchedule(court.schedules, date, startTime, durationMinutes)) continue;
+            if (await isSlotTaken(manager, court.id, start, durationMinutes)) continue;
+            await reserveSession(manager, lesson.id, lesson.teacher, court, start, durationMinutes);
+            created += 1;
+          }
+        }
+        return created;
+      });
+    }
+    return { success: true, data: total };
+  } catch (error) {
+    console.error("extendLessons", error);
+    return { success: false, error: "No se pudieron reservar los turnos nuevos de las clases." };
   }
 }

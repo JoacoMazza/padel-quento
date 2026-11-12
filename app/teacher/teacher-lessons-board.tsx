@@ -10,7 +10,7 @@ import {
   type LessonItem,
   type StudentItem,
 } from "@/src/actions/teacherClass";
-import { formatDate, occupancyLabel, scheduleLabel } from "@/app/components/lesson-labels";
+import { lessonDatesLabel, occupancyLabel, scheduleLabel } from "@/app/components/lesson-labels";
 
 const MIN_SEARCH_LENGTH = 2;
 
@@ -101,7 +101,7 @@ function LessonCard({ lesson, onChanged }: { lesson: LessonItem; onChanged: () =
           </h2>
           <p className="flex items-center gap-1.5 text-sm text-foreground/60">
             <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-            Del {formatDate(lesson.fromDate)} al {formatDate(lesson.toDate)}
+            {lessonDatesLabel(lesson.fromDate, lesson.toDate)}
           </p>
         </div>
         <span className={`badge ${isFull ? "badge-neutral" : "badge-success"}`}>

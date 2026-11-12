@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
-import { AdminAccessLevel, BookingState, DayOfWeek, Role } from "@/src/domain/enums";
+import { AdminAccessLevel, BookingState, CourtState, DayOfWeek, Role } from "@/src/domain/enums";
+import { FIXED_BOOKING_HORIZON_DAYS } from "@/src/domain/constants";
+import { lessonOccurrenceDates } from "@/src/domain/lesson";
 import { addDaysISO, dayOfWeekOfISO, occurrenceStart, todayISO } from "@/src/domain/fixed-booking";
 import type { Booking } from "@/src/entities/Booking";
+import type { Court } from "@/src/entities/Court";
 import type { Inscription } from "@/src/entities/Inscription";
 import type { Penalty } from "@/src/entities/Penalty";
 import { getDataSource } from "@/src/lib/db";
@@ -19,8 +22,10 @@ import {
   createLesson,
   deactivateLesson,
   enrollInLesson,
+  extendLessons,
   getAvailableLessons,
   getLessonClassesAdmin,
+  getLessonSlotsAdmin,
   getLessonsAdmin,
   leaveLesson,
   removeLessonStudentAdmin,
@@ -272,6 +277,135 @@ describe("clases (lessons, integración con Postgres real)", () => {
       expect(await createLesson(input)).toEqual({
         success: false,
         error: "Acceso denegado: Se requieren permisos de Administrador",
+      });
+    });
+  });
+
+  describe("clase sin fecha de fin", () => {
+    // El horizonte de 6 meses, como los turnos fijos.
+    const horizon = () => addDaysISO(todayISO(), FIXED_BOOKING_HORIZON_DAYS);
+
+    it("se crea sin fecha de fin y reserva sus fechas hasta el horizonte de 6 meses", async () => {
+      const lesson = await newLesson({ toDate: null });
+
+      expect(lesson.toDate).toBeNull();
+      const bookings = await lessonBookings(lesson.id);
+      expect(bookings.map((b) => b.fromDateTime.getTime())).toEqual(
+        lessonOccurrenceDates(lessonDay, fromDate, horizon()).map((date) => occurrenceStart(date, "10:00").getTime()),
+      );
+    });
+
+    it("sigue abierta para inscribirse y su profesor tiene el rol", async () => {
+      const lesson = await newLesson({ toDate: null });
+
+      signInAs(ana.email);
+      const available = await getAvailableLessons();
+      expect(available.success && available.data.map((l) => l.id)).toContain(lesson.id);
+      expect(await enrollInLesson(lesson.id)).toEqual({ success: true, data: null });
+
+      signInAs(teacher.email);
+      const lessons = await getTeacherLessons();
+      expect(lessons.success && lessons.data.map((l) => l.id)).toContain(lesson.id);
+    });
+
+    it("extendLessons reserva las fechas que van entrando en el horizonte, sin duplicar", async () => {
+      const lesson = await newLesson({ toDate: null });
+      const dataSource = await getDataSource();
+      const bookingsRepo = dataSource.getRepository<Booking>("Booking");
+      // Como si la última fecha todavía no hubiera entrado en el horizonte.
+      const before = await lessonBookings(lesson.id);
+      const last = before[before.length - 1];
+      await bookingsRepo.delete(last.id);
+
+      const first = await extendLessons();
+      await extendLessons();
+
+      expect(first.success && first.data).toBeGreaterThanOrEqual(1);
+      const after = await lessonBookings(lesson.id);
+      expect(after.map((b) => b.fromDateTime.getTime())).toEqual(before.map((b) => b.fromDateTime.getTime()));
+      expect(after[after.length - 1]).toMatchObject({
+        durationMinutes: 90,
+        bookingState: BookingState.RESERVED,
+        price: 12000,
+        booker: { id: teacher.id },
+        court: { id: last.court.id },
+      });
+    });
+
+    it("extendLessons no vuelve a crear un turno cancelado ni toma un horario ocupado", async () => {
+      const lesson = await newLesson({ toDate: null });
+      const dataSource = await getDataSource();
+      const bookingsRepo = dataSource.getRepository<Booking>("Booking");
+      const before = await lessonBookings(lesson.id);
+      const [cancelled] = before;
+      await bookingsRepo.update(cancelled.id, { bookingState: BookingState.CANCELLED });
+      const last = before[before.length - 1];
+      await bookingsRepo.delete(last.id);
+      const taken = await createBookingForPlayer({
+        bookerId: ana.id,
+        courtId: last.court.id,
+        fromDateTime: last.fromDateTime,
+      });
+      if (!taken.success) throw new Error(taken.error);
+
+      expect(await extendLessons()).toMatchObject({ success: true });
+
+      const after = await lessonBookings(lesson.id);
+      expect(after).toHaveLength(before.length - 1);
+      expect(after.filter((b) => b.bookingState === BookingState.CANCELLED).map((b) => b.id)).toEqual([cancelled.id]);
+    });
+
+    it("extendLessons no toca las clases con fecha de fin ni las dadas de baja", async () => {
+      const withEnd = await newLesson();
+      const inactive = await newLesson({ toDate: null });
+      expect(await deactivateLesson(inactive.id)).toMatchObject({ success: true });
+      const dataSource = await getDataSource();
+      const bookingsRepo = dataSource.getRepository<Booking>("Booking");
+      const [withEndLast] = (await lessonBookings(withEnd.id)).slice(-1);
+      await bookingsRepo.delete(withEndLast.id);
+      const inactiveCount = (await lessonBookings(inactive.id)).length;
+
+      await extendLessons();
+
+      expect((await lessonBookings(withEnd.id)).map((b) => b.id)).not.toContain(withEndLast.id);
+      expect(await lessonBookings(withEnd.id)).toHaveLength(1);
+      expect(await lessonBookings(inactive.id)).toHaveLength(inactiveCount);
+    });
+  });
+
+  describe("getLessonSlotsAdmin", () => {
+    it("trae el inicio de cada turno de la grilla de la cancha ese día", async () => {
+      const court = await newCourt();
+
+      expect(await getLessonSlotsAdmin({ courtId: court.id, dayOfWeek: DayOfWeek.MONDAY })).toEqual({
+        success: true,
+        data: ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"],
+      });
+    });
+
+    it("sin horario de la cancha ese día o con la cancha dada de baja, no trae nada", async () => {
+      const unscheduled = (await createTestCourt({ number: uniqueCourtNumber(), price: 12000 })).data;
+      const closed = await newCourt();
+      const dataSource = await getDataSource();
+      await dataSource.getRepository<Court>("Court").update(closed.id, { state: CourtState.CLOSED_DOWN });
+      signInAs(staffEmail, Role.ADMIN);
+
+      expect(await getLessonSlotsAdmin({ courtId: unscheduled.id, dayOfWeek: DayOfWeek.MONDAY })).toEqual({
+        success: true,
+        data: [],
+      });
+      expect(await getLessonSlotsAdmin({ courtId: closed.id, dayOfWeek: DayOfWeek.MONDAY })).toEqual({
+        success: true,
+        data: [],
+      });
+    });
+
+    it("es solo para administradores", async () => {
+      const court = await newCourt();
+      signInAs(ana.email);
+
+      expect(await getLessonSlotsAdmin({ courtId: court.id, dayOfWeek: DayOfWeek.MONDAY })).toMatchObject({
+        success: false,
       });
     });
   });

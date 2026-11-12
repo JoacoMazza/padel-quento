@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DayOfWeek } from "@/src/domain/enums";
 import {
+  lessonEndDate,
   lessonInputProblem,
   lessonOccurrenceDates,
   scheduleDurationMinutes,
+  slotStartTimes,
   type LessonInputToValidate,
 } from "@/src/domain/lesson";
 
@@ -47,9 +49,33 @@ describe("scheduleDurationMinutes", () => {
   });
 });
 
+describe("slotStartTimes", () => {
+  it("trae el inicio de cada turno de 90 minutos que entra entre la apertura y el cierre", () => {
+    expect(slotStartTimes("09:00:00", "14:00:00")).toEqual(["09:00", "10:30", "12:00"]);
+  });
+
+  it("sin lugar para un turno entero, no trae nada", () => {
+    expect(slotStartTimes("09:00", "10:00")).toEqual([]);
+  });
+});
+
+describe("lessonEndDate", () => {
+  it("es la fecha de fin, si la clase la tiene", () => {
+    expect(lessonEndDate("2026-10-31", TODAY)).toBe("2026-10-31");
+  });
+
+  it("sin fecha de fin, es el horizonte de 6 meses desde hoy", () => {
+    expect(lessonEndDate(null, TODAY)).toBe("2027-04-05");
+  });
+});
+
 describe("lessonInputProblem", () => {
   it("acepta una clase válida", () => {
     expect(lessonInputProblem(input(), TODAY)).toBeNull();
+  });
+
+  it("acepta una clase sin fecha de fin", () => {
+    expect(lessonInputProblem(input({ toDate: null }), TODAY)).toBeNull();
   });
 
   it("el cupo va de 1 a 8 alumnos", () => {

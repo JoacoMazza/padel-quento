@@ -17,5 +17,8 @@ export async function register() {
 
     const { startFixedBookingExtensionJob } = await import("@/src/jobs/fixed-booking-extension");
     startFixedBookingExtensionJob();
+
+    const { startLessonExtensionJob } = await import("@/src/jobs/lesson-extension");
+    startLessonExtensionJob();
   }
 }

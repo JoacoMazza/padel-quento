@@ -7,6 +7,7 @@ const {
   createLesson,
   deactivateLesson,
   getLessonClassesAdmin,
+  getLessonSlotsAdmin,
   addLessonStudentAdmin,
   removeLessonStudentAdmin,
   getPlayersAdmin,
@@ -16,6 +17,7 @@ const {
   createLesson: vi.fn(),
   deactivateLesson: vi.fn(),
   getLessonClassesAdmin: vi.fn(),
+  getLessonSlotsAdmin: vi.fn(),
   addLessonStudentAdmin: vi.fn(),
   removeLessonStudentAdmin: vi.fn(),
   getPlayersAdmin: vi.fn(),
@@ -27,6 +29,7 @@ vi.mock("@/src/actions/lesson", () => ({
   createLesson,
   deactivateLesson,
   getLessonClassesAdmin,
+  getLessonSlotsAdmin,
   addLessonStudentAdmin,
   removeLessonStudentAdmin,
 }));
@@ -85,6 +88,7 @@ describe("LessonsPanel", () => {
         { id: 4, number: 4, state: CourtState.CLOSED_DOWN },
       ],
     });
+    getLessonSlotsAdmin.mockResolvedValue({ success: true, data: ["10:00", "11:30"] });
   });
 
   afterEach(() => {
@@ -102,6 +106,12 @@ describe("LessonsPanel", () => {
     expect(within(rowOf("Pablo Profe")).getByText("Dada de baja")).toBeTruthy();
   });
 
+  it("una clase sin fecha de fin lo muestra en sus fechas", () => {
+    render(<LessonsPanel lessons={[{ ...lucia, toDate: null }]} />);
+
+    expect(within(rowOf("Lucía Profe")).getByText("05/10/2026 – sin fecha de fin")).toBeTruthy();
+  });
+
   it("sin clases, lo dice", () => {
     render(<LessonsPanel lessons={[]} />);
 
@@ -117,18 +127,28 @@ describe("LessonsPanel", () => {
     fireEvent.change(await within(dialog).findByLabelText("Buscar profesor"), { target: { value: "mar" } });
     expect(within(dialog).queryByText(/Mateo/)).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Elegir a Martina Jugador" }));
-    expect(within(dialog).getByText("Profesor: Martina Jugador")).toBeTruthy();
+    // Elegido el profesor, se ve un resumen de su perfil en lugar del buscador.
+    expect(within(dialog).getByText("Martina Jugador")).toBeTruthy();
+    expect(within(dialog).getByText(/martina@test\.com/)).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Buscar profesor")).toBeNull();
 
     fireEvent.change(within(dialog).getByLabelText("Cupo de alumnos"), { target: { value: "4" } });
     fireEvent.change(within(dialog).getByLabelText("Precio"), { target: { value: "15000" } });
     fireEvent.change(within(dialog).getByLabelText("Desde"), { target: { value: "2026-10-05" } });
-    fireEvent.change(within(dialog).getByLabelText("Hasta"), { target: { value: "2026-10-31" } });
+    fireEvent.change(within(dialog).getByLabelText("Hasta (opcional)"), { target: { value: "2026-10-31" } });
     const courtSelect = await within(dialog).findByLabelText("Cancha del horario 1");
     expect(within(courtSelect).queryByText("Cancha 4")).toBeNull();
     fireEvent.change(courtSelect, { target: { value: "3" } });
     fireEvent.change(within(dialog).getByLabelText("Día del horario 1"), { target: { value: DayOfWeek.TUESDAY } });
-    fireEvent.change(within(dialog).getByLabelText("Inicio del horario 1"), { target: { value: "10:00" } });
-    fireEvent.change(within(dialog).getByLabelText("Fin del horario 1"), { target: { value: "11:30" } });
+    // El inicio se elige entre los turnos de la grilla de esa cancha ese día, como en las reservas.
+    await waitFor(() =>
+      expect(getLessonSlotsAdmin).toHaveBeenLastCalledWith({ courtId: 3, dayOfWeek: DayOfWeek.TUESDAY }),
+    );
+    const startSelect = within(dialog).getByLabelText("Inicio del horario 1");
+    await within(startSelect).findByRole("option", { name: "11:30" });
+    fireEvent.change(startSelect, { target: { value: "10:00" } });
+    expect(within(dialog).getByText("Hasta las 11:30")).toBeTruthy();
+    expect(within(dialog).queryByLabelText("Fin del horario 1")).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Crear clase" }));
 
     await waitFor(() =>
@@ -143,6 +163,38 @@ describe("LessonsPanel", () => {
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(getLessonsAdmin).toHaveBeenCalled();
+  });
+
+  it("cambia el profesor elegido volviendo a buscar", async () => {
+    createLesson.mockResolvedValue({ success: false, error: "x" });
+    render(<LessonsPanel lessons={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nueva clase" }));
+    const dialog = screen.getByRole("dialog", { name: "Nueva clase" });
+    fireEvent.change(await within(dialog).findByLabelText("Buscar profesor"), { target: { value: "mar" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Elegir a Martina Jugador" }));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cambiar profesor" }));
+    fireEvent.change(within(dialog).getByLabelText("Buscar profesor"), { target: { value: "mateo" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Elegir a Mateo Jugador" }));
+
+    expect(within(dialog).getByText("Mateo Jugador")).toBeTruthy();
+    expect(within(dialog).queryByText("Martina Jugador")).toBeNull();
+    expect(within(dialog).queryByLabelText("Buscar profesor")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Crear clase" }));
+    await waitFor(() => expect(createLesson).toHaveBeenCalledWith(expect.objectContaining({ teacherId: 22 })));
+  });
+
+  it("la fecha de fin es opcional", async () => {
+    createLesson.mockResolvedValue({ success: false, error: "x" });
+    render(<LessonsPanel lessons={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nueva clase" }));
+    const dialog = screen.getByRole("dialog", { name: "Nueva clase" });
+    expect(within(dialog).getByLabelText("Hasta (opcional)")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Crear clase" }));
+
+    await waitFor(() => expect(createLesson).toHaveBeenCalledWith(expect.objectContaining({ toDate: null })));
   });
 
   it("suma y quita horarios de la clase", async () => {

@@ -27,6 +27,11 @@ export function formatDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** "Del 05/10/2026 al 31/10/2026", o "Desde el 05/10/2026, sin fecha de fin". */
+export function lessonDatesLabel(fromDate: string, toDate: string | null): string {
+  return toDate ? `Del ${formatDate(fromDate)} al ${formatDate(toDate)}` : `Desde el ${formatDate(fromDate)}, sin fecha de fin`;
+}
+
 /** "1/2 alumnos · 1 lugar libre", o "· completa" si no quedan lugares. */
 export function occupancyLabel(studentsCount: number, classCapacity: number): string {
   const free = classCapacity - studentsCount;

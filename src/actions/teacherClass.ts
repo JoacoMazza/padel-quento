@@ -1,7 +1,7 @@
 "use server";
 
 import "reflect-metadata";
-import { Brackets, MoreThan } from "typeorm";
+import { Brackets } from "typeorm";
 import type { Inscription } from "@/src/entities/Inscription";
 import type { Lesson } from "@/src/entities/Lesson";
 import type { Player } from "@/src/entities/Player";
@@ -16,6 +16,7 @@ import {
   enrollStudent,
   findAgenda,
   findLesson,
+  notFinishedYet,
   toLessonItem,
   toStudent,
   unenrollStudent,
@@ -61,7 +62,7 @@ export async function getTeacherLessons(): Promise<ActionResult<LessonItem[]>> {
     const { playerId } = await requireTeacher();
     const dataSource = await getDataSource();
     const lessons = await dataSource.getRepository<Lesson>("Lesson").find({
-      where: { teacher: { id: playerId }, isActive: true, toLocalDatetime: MoreThan(new Date()) },
+      where: { teacher: { id: playerId }, isActive: true, toLocalDatetime: notFinishedYet() },
       relations: LESSON_RELATIONS,
       order: { fromLocalDatetime: "ASC", id: "ASC" },
     });

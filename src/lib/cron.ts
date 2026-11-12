@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { cancelExpiredMatches } from "@/src/actions/match";
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import { extendFixedBookings } from "@/src/actions/fixedBooking";
+import { extendLessons } from "@/src/actions/lesson";
 import type { ActionResult } from "@/src/lib/action-result";
 
 /**
@@ -14,6 +15,7 @@ const CRON_JOBS: Record<string, () => Promise<ActionResult<number>>> = {
   "open-match-expiration": cancelExpiredMatches,
   "attendance-points": awardAttendancePoints,
   "fixed-booking-extension": extendFixedBookings,
+  "lesson-extension": extendLessons,
 };
 
 export type CronResult = { status: number; body: Record<string, unknown> };

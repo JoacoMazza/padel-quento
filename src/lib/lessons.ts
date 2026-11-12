@@ -5,7 +5,7 @@
  * src/actions/teacherClass.ts verifican antes quién llama.
  */
 import "reflect-metadata";
-import { In, MoreThan, Not } from "typeorm";
+import { In, IsNull, MoreThan, Not, Or } from "typeorm";
 import type { Booking } from "@/src/entities/Booking";
 import type { Inscription } from "@/src/entities/Inscription";
 import type { Lesson } from "@/src/entities/Lesson";
@@ -45,9 +45,9 @@ export type LessonItem = {
   teacherName: string;
   classCapacity: number;
   price: number;
-  /** Primera y última fecha ("YYYY-MM-DD"). */
+  /** Primera y última fecha ("YYYY-MM-DD"); null si no tiene fecha de fin. */
   fromDate: string;
-  toDate: string;
+  toDate: string | null;
   isActive: boolean;
   schedules: LessonScheduleItem[];
   students: StudentItem[];
@@ -65,6 +65,11 @@ export type TeacherClassItem = {
   isFinished: boolean;
   students: StudentItem[];
 };
+
+/** Condición sobre toLocalDatetime de una clase que todavía no terminó: sin fecha de fin o con el fin por delante. */
+export function notFinishedYet(now = new Date()) {
+  return Or(IsNull(), MoreThan(now));
+}
 
 export const LESSON_RELATIONS = {
   teacher: true,
@@ -99,7 +104,7 @@ export function toLessonItem(lesson: Lesson): LessonItem {
     classCapacity: lesson.classCapacity,
     price: lesson.price,
     fromDate: todayISO(new Date(lesson.fromLocalDatetime)),
-    toDate: todayISO(new Date(lesson.toLocalDatetime)),
+    toDate: lesson.toLocalDatetime ? todayISO(new Date(lesson.toLocalDatetime)) : null,
     isActive: lesson.isActive,
     schedules: [...(lesson.schedules ?? [])]
       .sort(
@@ -140,7 +145,9 @@ export async function enrollStudent(lessonId: number, playerId: number, now: Dat
     });
     if (!lesson) throw new LessonRuleError(LESSON_NOT_FOUND_MESSAGE);
     if (!lesson.isActive) throw new LessonRuleError("La clase fue dada de baja.");
-    if (new Date(lesson.toLocalDatetime).getTime() <= now.getTime()) throw new LessonRuleError("La clase ya terminó.");
+    if (lesson.toLocalDatetime && new Date(lesson.toLocalDatetime).getTime() <= now.getTime()) {
+      throw new LessonRuleError("La clase ya terminó.");
+    }
 
     const student = await manager.getRepository<Player>("Player").findOne({ where: { id: playerId } });
     if (!student) throw new LessonRuleError("El alumno no existe.");

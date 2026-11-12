@@ -7,6 +7,7 @@ import {
   createLesson,
   deactivateLesson,
   getLessonClassesAdmin,
+  getLessonSlotsAdmin,
   getLessonsAdmin,
   removeLessonStudentAdmin,
   type LessonItem,
@@ -15,8 +16,9 @@ import {
 import { getPlayersAdmin, type PlayerAdminItem } from "@/src/actions/player";
 import { getCourts } from "@/src/actions/court";
 import { CourtState, DayOfWeek } from "@/src/domain/enums";
-import { dateToTimeLabel } from "@/src/domain/time-format";
-import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
+import { dateToTimeLabel, minutesToTimeLabel } from "@/src/domain/time-format";
+import { PLAYER_CATEGORY_LABELS } from "@/src/domain/player-category-labels";
+import { SLOT_DURATION_MINUTES, formatLongDate, formatPrice, timeStringToMinutes } from "@/app/bookings/slot-utils";
 import { INPUT_CLASS, LABEL_CLASS } from "@/app/admin/holder-fields";
 import { DAY_LABELS, formatDate, scheduleLabel } from "@/app/components/lesson-labels";
 
@@ -103,7 +105,7 @@ export function LessonsPanel({ lessons: initialLessons }: { lessons: LessonItem[
                   ))}
                 </td>
                 <td className="table-cell text-foreground/70">
-                  {formatDate(lesson.fromDate)} – {formatDate(lesson.toDate)}
+                  {formatDate(lesson.fromDate)} – {lesson.toDate ? formatDate(lesson.toDate) : "sin fecha de fin"}
                 </td>
                 <td className="table-cell text-foreground/70">
                   {lesson.students.length}/{lesson.classCapacity}
@@ -231,15 +233,22 @@ function matchingPlayers(players: PlayerAdminItem[] | null, search: string, excl
   );
 }
 
-type ScheduleDraft = { courtId: string; dayOfWeek: DayOfWeek; startTime: string; endTime: string };
+type ScheduleDraft = { courtId: string; dayOfWeek: DayOfWeek; startTime: string };
 
-const EMPTY_SCHEDULE: ScheduleDraft = { courtId: "", dayOfWeek: DayOfWeek.MONDAY, startTime: "", endTime: "" };
+const EMPTY_SCHEDULE: ScheduleDraft = { courtId: "", dayOfWeek: DayOfWeek.MONDAY, startTime: "" };
+
+/** Fin de un horario que empieza en `startTime`: dura un turno de la grilla, como las reservas. */
+function slotEndTime(startTime: string): string {
+  return startTime ? minutesToTimeLabel(timeStringToMinutes(startTime) + SLOT_DURATION_MINUTES) : "";
+}
 
 function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
   const { players } = usePlayers();
   const [courts, setCourts] = useState<{ id: number; number: number }[]>([]);
   const [search, setSearch] = useState("");
   const [teacher, setTeacher] = useState<PlayerAdminItem | null>(null);
+  // Con un profesor elegido se muestra su resumen; el buscador vuelve al tocar "Cambiar profesor".
+  const [isChangingTeacher, setIsChangingTeacher] = useState(false);
   const [classCapacity, setClassCapacity] = useState("");
   const [price, setPrice] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -268,12 +277,12 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
       classCapacity: Number(classCapacity),
       price: Number(price),
       fromDate,
-      toDate,
+      toDate: toDate || null,
       schedules: schedules.map((schedule) => ({
         courtId: Number(schedule.courtId),
         dayOfWeek: schedule.dayOfWeek,
         startTime: schedule.startTime,
-        endTime: schedule.endTime,
+        endTime: slotEndTime(schedule.startTime),
       })),
     });
     setIsSaving(false);
@@ -284,16 +293,27 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
     await onSaved();
   }
 
-  const candidates = matchingPlayers(players, search, []);
+  const candidates = matchingPlayers(players, search, teacher ? [teacher.id] : []);
+  const isSearchingTeacher = teacher === null || isChangingTeacher;
 
   return (
     <DialogFrame title="Nueva clase" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          {teacher ? (
-            <p className="text-sm font-semibold text-foreground">Profesor: {fullName(teacher)}</p>
-          ) : null}
-          {players ? (
+          {!isSearchingTeacher && teacher ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
+              <div>
+                <p className={LABEL_CLASS}>Profesor</p>
+                <p className="text-sm font-semibold text-foreground">{fullName(teacher)}</p>
+                <p className="text-xs text-foreground/60">
+                  {PLAYER_CATEGORY_LABELS[teacher.category] ?? teacher.category} · {teacher.email} · {teacher.phoneNumber}
+                </p>
+              </div>
+              <button type="button" onClick={() => setIsChangingTeacher(true)} className="btn btn-sm btn-outline">
+                Cambiar profesor
+              </button>
+            </div>
+          ) : players ? (
             <div>
               <label htmlFor="lesson-teacher-search" className={LABEL_CLASS}>
                 Buscar profesor
@@ -310,7 +330,7 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
           ) : (
             <p className="text-sm text-foreground/60">Cargando jugadores...</p>
           )}
-          {candidates.length > 0 ? (
+          {isSearchingTeacher && candidates.length > 0 ? (
             <ul className="divide-y divide-line rounded-xl border border-line">
               {candidates.map((player) => (
                 <li key={player.id} className="flex items-center justify-between gap-3 px-4 py-2">
@@ -323,6 +343,7 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
                     aria-label={`Elegir a ${fullName(player)}`}
                     onClick={() => {
                       setTeacher(player);
+                      setIsChangingTeacher(false);
                       setSearch("");
                     }}
                     className="btn btn-sm btn-outline"
@@ -377,7 +398,7 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
           </div>
           <div>
             <label htmlFor="lesson-to" className={LABEL_CLASS}>
-              Hasta
+              Hasta (opcional)
             </label>
             <input
               id="lesson-to"
@@ -391,65 +412,20 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
 
         <fieldset className="space-y-3">
           <legend className={LABEL_CLASS}>Horarios semanales</legend>
-          {schedules.map((schedule, index) => {
-            const n = index + 1;
-            return (
-              <div key={index} className="grid grid-cols-2 gap-2 rounded-xl border border-line p-3">
-                <select
-                  aria-label={`Cancha del horario ${n}`}
-                  value={schedule.courtId}
-                  onChange={(event) => updateSchedule(index, { courtId: event.target.value })}
-                  className={INPUT_CLASS}
-                >
-                  <option value="">Cancha</option>
-                  {courts.map((court) => (
-                    <option key={court.id} value={court.id}>
-                      Cancha {court.number}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={`Día del horario ${n}`}
-                  value={schedule.dayOfWeek}
-                  onChange={(event) => updateSchedule(index, { dayOfWeek: event.target.value as DayOfWeek })}
-                  className={INPUT_CLASS}
-                >
-                  {Object.values(DayOfWeek).map((day) => (
-                    <option key={day} value={day}>
-                      {DAY_LABELS[day]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  aria-label={`Inicio del horario ${n}`}
-                  type="time"
-                  value={schedule.startTime}
-                  onChange={(event) => updateSchedule(index, { startTime: event.target.value })}
-                  className={INPUT_CLASS}
-                />
-                <div className="flex items-center gap-2">
-                  <input
-                    aria-label={`Fin del horario ${n}`}
-                    type="time"
-                    value={schedule.endTime}
-                    onChange={(event) => updateSchedule(index, { endTime: event.target.value })}
-                    className={INPUT_CLASS}
-                  />
-                  {schedules.length > 1 ? (
-                    <button
-                      type="button"
-                      aria-label={`Quitar el horario ${n}`}
-                      title="Quitar el horario"
-                      onClick={() => setSchedules((current) => current.filter((_, i) => i !== index))}
-                      className="icon-btn hover:border-danger/40 hover:text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
+          {schedules.map((schedule, index) => (
+            <ScheduleRow
+              key={index}
+              n={index + 1}
+              schedule={schedule}
+              courts={courts}
+              onChange={(change) => updateSchedule(index, change)}
+              onRemove={
+                schedules.length > 1
+                  ? () => setSchedules((current) => current.filter((_, i) => i !== index))
+                  : undefined
+              }
+            />
+          ))}
           <button
             type="button"
             onClick={() => setSchedules((current) => [...current, EMPTY_SCHEDULE])}
@@ -471,6 +447,108 @@ function CreateLessonDialog({ onClose, onSaved }: { onClose: () => void; onSaved
         </div>
       </form>
     </DialogFrame>
+  );
+}
+
+/**
+ * Un horario semanal de la clase: cancha, día y la hora de inicio, elegida
+ * entre los turnos de la grilla de esa cancha ese día (como en las reservas);
+ * termina un turno después.
+ */
+function ScheduleRow({
+  n,
+  schedule,
+  courts,
+  onChange,
+  onRemove,
+}: {
+  n: number;
+  schedule: ScheduleDraft;
+  courts: { id: number; number: number }[];
+  onChange: (change: Partial<ScheduleDraft>) => void;
+  onRemove?: () => void;
+}) {
+  // Inicios de la última cancha y día consultados.
+  const [loadedSlots, setLoadedSlots] = useState<{ key: string; slots: string[] } | null>(null);
+  const key = `${schedule.courtId}|${schedule.dayOfWeek}`;
+  // null mientras se consultan los de la cancha y el día elegidos (o si falta la cancha).
+  const slots = loadedSlots?.key === key ? loadedSlots.slots : null;
+  const { courtId, dayOfWeek, startTime } = schedule;
+
+  useEffect(() => {
+    if (!courtId) return;
+    let cancelled = false;
+    getLessonSlotsAdmin({ courtId: Number(courtId), dayOfWeek }).then((result) => {
+      if (cancelled) return;
+      const starts = result.success ? result.data : [];
+      setLoadedSlots({ key: `${courtId}|${dayOfWeek}`, slots: starts });
+      if (!starts.includes(startTime)) onChange({ startTime: "" });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Solo se vuelven a pedir al cambiar la cancha o el día.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courtId, dayOfWeek]);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-xl border border-line p-3">
+      <select
+        aria-label={`Cancha del horario ${n}`}
+        value={courtId}
+        onChange={(event) => onChange({ courtId: event.target.value })}
+        className={INPUT_CLASS}
+      >
+        <option value="">Cancha</option>
+        {courts.map((court) => (
+          <option key={court.id} value={court.id}>
+            Cancha {court.number}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label={`Día del horario ${n}`}
+        value={dayOfWeek}
+        onChange={(event) => onChange({ dayOfWeek: event.target.value as DayOfWeek })}
+        className={INPUT_CLASS}
+      >
+        {Object.values(DayOfWeek).map((day) => (
+          <option key={day} value={day}>
+            {DAY_LABELS[day]}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label={`Inicio del horario ${n}`}
+        disabled={!slots || slots.length === 0}
+        value={startTime}
+        onChange={(event) => onChange({ startTime: event.target.value })}
+        className={INPUT_CLASS}
+      >
+        <option value="">
+          {!courtId ? "Elegí la cancha" : !slots ? "Cargando horarios…" : slots.length === 0 ? "Cerrada ese día" : "Hora de inicio"}
+        </option>
+        {slots?.map((slot) => (
+          <option key={slot} value={slot}>
+            {slot}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-foreground/60">{startTime ? `Hasta las ${slotEndTime(startTime)}` : null}</span>
+        {onRemove ? (
+          <button
+            type="button"
+            aria-label={`Quitar el horario ${n}`}
+            title="Quitar el horario"
+            onClick={onRemove}
+            className="icon-btn hover:border-danger/40 hover:text-danger"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

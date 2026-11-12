@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, GraduationCap, Users } from "lucide-react";
 import { enrollInLesson, leaveLesson, type AvailableLessonItem } from "@/src/actions/lesson";
 import { formatPrice } from "@/app/bookings/slot-utils";
-import { formatDate, scheduleLabel } from "@/app/components/lesson-labels";
+import { lessonDatesLabel, scheduleLabel } from "@/app/components/lesson-labels";
 
 /**
  * Clases abiertas del club: cada una con su profesor, horarios, fechas, precio
@@ -65,7 +65,7 @@ function LessonCard({ lesson, isGuest }: { lesson: AvailableLessonItem; isGuest:
         ))}
         <p className="flex items-center gap-1.5 text-foreground/60">
           <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-          Del {formatDate(lesson.fromDate)} al {formatDate(lesson.toDate)}
+          {lessonDatesLabel(lesson.fromDate, lesson.toDate)}
         </p>
         <p className="flex items-center gap-1.5 text-foreground/60">
           <Users className="h-3.5 w-3.5" aria-hidden="true" />
