@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Between, Not } from "typeorm";
+import { Between, In, Not } from "typeorm";
 import dataSource from "@/src/lib/data-source";
 import { Account } from "@/src/entities/Account";
 import { Booking } from "@/src/entities/Booking";
@@ -10,11 +10,13 @@ import { Schedule } from "@/src/entities/Schedule";
 import { BookingState } from "@/src/domain/enums";
 import { NO_SHOW_PENALTY_REASON } from "@/src/domain/attendance";
 import { generateSeedBookings } from "./booking-seed";
+import { DEMO_TEACHER_PASSWORD, DEMO_TEACHERS, demoSlots, planDemoSeed, seedDemoData } from "./demo-seed";
 
 const PAST_DAYS = 90;
 const FUTURE_DAYS = 30;
 const SEED_PLAYER_COUNT = 6;
 const SEED_PLAYER_PASSWORD = "jugador123";
+const seedPlayerEmail = (n: number) => `seed.jugador${n}@quento.com`;
 
 /** Jugadores de ejemplo a los que se asignan los turnos (se crean si no existen). */
 async function ensureSeedPlayers(): Promise<number> {
@@ -24,7 +26,7 @@ async function ensureSeedPlayers(): Promise<number> {
   let created = 0;
 
   for (let n = 1; n <= SEED_PLAYER_COUNT; n++) {
-    const email = `seed.jugador${n}@quento.com`;
+    const email = seedPlayerEmail(n);
     const phoneNumber = `22155501${String(n).padStart(2, "0")}`;
     if (await accounts.findOne({ where: { email } })) continue;
     if (await players.findOne({ where: { phoneNumber } })) continue;
@@ -45,7 +47,7 @@ async function main() {
   const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - PAST_DAYS);
   const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + FUTURE_DAYS, 23, 59, 59, 999);
 
-  const courts = await dataSource.getRepository(Court).find();
+  const courts = await dataSource.getRepository(Court).find({ order: { number: "ASC" } });
   const schedules = await dataSource.getRepository(Schedule).find({ relations: { court: true } });
   const players = await dataSource.getRepository(Player).find();
   const bookings = dataSource.getRepository(Booking);
@@ -61,6 +63,8 @@ async function main() {
     return;
   }
 
+  // Clases, turnos fijos y partidos abiertos de ejemplo: sus horarios quedan libres de turnos sueltos.
+  const plan = planDemoSeed({ now, courts, futureDays: FUTURE_DAYS });
   const generated = generateSeedBookings({
     now,
     courts: courts.map((c) => ({ id: c.id, price: c.price })),
@@ -76,6 +80,7 @@ async function main() {
     existing: existing
       .filter((b) => b.court)
       .map((b) => ({ courtId: b.court.id, fromDateTime: b.fromDateTime, durationMinutes: b.durationMinutes })),
+    reserved: demoSlots(plan).map((slot) => ({ courtId: slot.courtId, fromDateTime: slot.start })),
     pastDays: PAST_DAYS,
     futureDays: FUTURE_DAYS,
   });
@@ -106,10 +111,27 @@ async function main() {
     { chunk: 500 },
   );
 
+  const seedEmails = Array.from({ length: SEED_PLAYER_COUNT }, (_, i) => seedPlayerEmail(i + 1));
+  const seedPlayers = await dataSource
+    .getRepository(Player)
+    .find({ where: { account: { email: In(seedEmails) } }, relations: { account: true } });
+  const playerIds = seedEmails.flatMap((email) => seedPlayers.filter((p) => p.account.email === email).map((p) => p.id));
+  const demo =
+    playerIds.length === SEED_PLAYER_COUNT ? await seedDemoData(dataSource, { plan, playerIds, now }) : null;
+
   console.log(`Jugadores de ejemplo creados: ${playersCreated} (contraseña: ${SEED_PLAYER_PASSWORD})`);
   console.log(
     `Turnos creados: ${generated.length} (del ${from.toLocaleDateString("es-AR")} al ${to.toLocaleDateString("es-AR")})`,
   );
+
+  if (demo) {
+    console.log(
+      `Datos de ejemplo: ${demo.lessons} clases, ${demo.fixedBookings} turnos fijos y ${demo.matches} partidos abiertos`,
+    );
+    console.log(`Profesores: ${DEMO_TEACHERS.map((t) => t.email).join(", ")} (contraseña: ${DEMO_TEACHER_PASSWORD})`);
+  } else {
+    console.log("Datos de ejemplo (clases, turnos fijos y partidos abiertos): ya estaban cargados.");
+  }
 
   await dataSource.destroy();
 }
