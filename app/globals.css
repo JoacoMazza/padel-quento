@@ -191,7 +191,7 @@ body {
   }
 
   .modal-backdrop {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 backdrop-blur-[2px];
+    @apply fixed inset-0 z-50 m-0! flex items-center justify-center bg-ink/50 px-4 backdrop-blur-[2px];
   }
 
   /* dvh y no vh: en el celular 100vh incluye la barra del navegador y el panel quedaría cortado. */

@@ -225,7 +225,7 @@ function TeacherClassesDialog({ teacher, onClose }: { teacher: TeacherAdminItem;
 
 function DialogFrame({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 m-0 flex items-center justify-center bg-black/40 px-4">
       <div
         role="dialog"
         aria-label={title}
