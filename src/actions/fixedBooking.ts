@@ -83,7 +83,7 @@ async function reserveDate(manager: EntityManager, fixed: FixedBooking, date: st
       durationMinutes: fixed.durationMinutes,
       bookingState: BookingState.RESERVED,
       price: fixed.court.price,
-      booker: { id: fixed.booker.id, phoneNumber: fixed.booker.phoneNumber },
+      booker: { id: fixed.booker.id },
       court: { id: fixed.court.id },
     }),
   );
@@ -166,7 +166,7 @@ export async function createFixedBooking(
       const fixed = await fixedBookings.save(
         fixedBookings.create({
           court: { id: court.id },
-          booker: { id: booker.id, phoneNumber: booker.phoneNumber },
+          booker: { id: booker.id },
           startDate: input.startDate,
           endDate: input.endDate ?? null,
           startTime: input.startTime,

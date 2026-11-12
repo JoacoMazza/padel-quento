@@ -24,12 +24,16 @@ describe("getAdminBookingStatus", () => {
     expect(getAdminBookingStatus(booking(), at(19, 30))).toBe("active");
   });
 
+  it("un turno está reservado, finalizado o cancelado; si se pagó va aparte (isPaid)", () => {
+    expect(Object.values(BookingState)).toEqual(["reserved", "finished", "cancelled"]);
+  });
+
   it("un turno cuyo horario de fin ya pasó está finalizado", () => {
     expect(getAdminBookingStatus(booking(), at(19, 31))).toBe("finished");
   });
 
-  it("un turno pagado que ya terminó también está finalizado", () => {
-    expect(getAdminBookingStatus(booking(BookingState.PAID), at(20, 0))).toBe("finished");
+  it("un turno ya dado por finalizado también está finalizado", () => {
+    expect(getAdminBookingStatus(booking(BookingState.FINISHED), at(20, 0))).toBe("finished");
   });
 
   it("un turno cancelado sigue cancelado aunque su horario ya haya pasado", () => {

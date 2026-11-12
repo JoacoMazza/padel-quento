@@ -55,7 +55,7 @@ export async function getPlayerBookings(playerId: number, now: Date = new Date()
       .andWhere(
         `EXISTS (
           SELECT 1 FROM "match_players" "rmp" INNER JOIN "matches" "rm" ON "rm"."id" = "rmp"."match_id"
-          WHERE "rm"."booking_id" = booking.id AND "rmp"."player_id" = :playerId AND "rmp"."attended" = true
+          WHERE "rm"."booking_id" = booking.id AND "rmp"."player_id" = :playerId AND "rmp"."attended_count" > 0
         )`,
         { playerId },
       )

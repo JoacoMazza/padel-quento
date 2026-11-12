@@ -26,6 +26,7 @@ import {
 } from "@/src/domain/notifications";
 import { getDataSource } from "@/src/lib/db";
 import { notify } from "@/src/lib/notifications";
+import { isPresent } from "@/src/domain/attendance";
 
 // Los avisos se mandan después de guardar los cambios y nunca deben hacer fallar
 // la operación que los originó: cualquier error al armarlos se registra y listo.
@@ -209,7 +210,7 @@ export async function notifyCourtUnavailable(bookingIds: number[]): Promise<void
 export async function notifyReviewInvite(bookingId: number): Promise<void> {
   try {
     const booking = await findBooking(bookingId);
-    const attended = (booking?.match?.matchPlayers ?? []).filter((mp) => mp.attended);
+    const attended = (booking?.match?.matchPlayers ?? []).filter(isPresent);
     if (!booking || attended.length < 2) return;
 
     await send(

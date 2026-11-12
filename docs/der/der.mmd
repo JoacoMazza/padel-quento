@@ -63,6 +63,7 @@ erDiagram
     penalties {
         int id PK
         int player_id FK
+        int booking_id FK "nullable"
         float penalized_scoring
         string reason
         datetime created_at
@@ -212,6 +213,7 @@ erDiagram
     lessons ||--|{ lesson_schedules : "lesson_id"
     bookings ||--o| matches : "booking_id"
     bookings |o--o| fixed_booking_dates : "booking_id"
+    bookings |o--o{ penalties : "booking_id"
     fixed_bookings ||--o{ fixed_booking_dates : "fixed_booking_id"
     matches ||--o{ match_players : "match_id"
     matches ||--o{ players_reviews : "match_id"

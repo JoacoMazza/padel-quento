@@ -69,9 +69,9 @@ describe("court actions", () => {
     });
 
     it("respeta el estado y precio indicados", async () => {
-      await createCourt({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+      await createCourt({ number: 5, state: CourtState.CLOSED_DOWN, price: 12000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000, complex });
+      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.CLOSED_DOWN, price: 12000, complex });
     });
 
     it("devuelve error si no hay un complejo al que asociar la cancha", async () => {
@@ -186,11 +186,11 @@ describe("court actions", () => {
     it("actualiza los campos provistos", async () => {
       findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE });
 
-      const result = await updateCourt(1, { state: CourtState.MAINTENANCE });
+      const result = await updateCourt(1, { number: 4 });
 
       expect(result).toEqual({
         success: true,
-        data: { id: 1, number: 3, state: CourtState.MAINTENANCE },
+        data: { id: 1, number: 4, state: CourtState.AVAILABLE },
       });
     });
 

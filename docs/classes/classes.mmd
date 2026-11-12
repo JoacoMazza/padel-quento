@@ -259,6 +259,7 @@ classDiagram
     %% Bookings
     Booker -- "*" Booking
     Booking "0..1" -- "0..1" FixedBookingDate
+    Booking "0..1" -- "*" Penalty
     Booker -- "*" FixedBooking
     FixedBooking -- "*" FixedBookingDate
     FixedBooking "0..*" -- Court

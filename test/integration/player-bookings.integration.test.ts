@@ -158,7 +158,7 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
       const carlaInMatch = await matchPlayers.findOneOrFail({
         where: { match: { booking: { id: reviewIds.notAttended } }, player: { id: carla } },
       });
-      await matchPlayers.update(carlaInMatch.id, { attended: false });
+      await matchPlayers.update(carlaInMatch.id, { attendedCount: 0 });
       // Dentro de las 48 horas, pero cancelado.
       reviewIds.cancelled = await matchEndedHoursAgo(30);
       await dataSource.getRepository<Booking>("Booking").update(reviewIds.cancelled, { bookingState: BookingState.CANCELLED });

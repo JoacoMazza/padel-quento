@@ -3,10 +3,12 @@ import { Between, Not } from "typeorm";
 import dataSource from "@/src/lib/data-source";
 import { Account } from "@/src/entities/Account";
 import { Booking } from "@/src/entities/Booking";
+import { Penalty } from "@/src/entities/Penalty";
 import { Court } from "@/src/entities/Court";
 import { Player } from "@/src/entities/Player";
 import { Schedule } from "@/src/entities/Schedule";
 import { BookingState } from "@/src/domain/enums";
+import { NO_SHOW_PENALTY_REASON } from "@/src/domain/attendance";
 import { generateSeedBookings } from "./booking-seed";
 
 const PAST_DAYS = 90;
@@ -78,20 +80,28 @@ async function main() {
     futureDays: FUTURE_DAYS,
   });
 
-  const phoneById = new Map(players.map((p) => [p.id, p.phoneNumber]));
-  await bookings.save(
+  const saved = await bookings.save(
     generated.map((b) =>
       bookings.create({
         fromDateTime: b.fromDateTime,
         durationMinutes: b.durationMinutes,
         bookingState: b.bookingState,
         price: b.price,
-        attended: b.attended,
-        pointsAwarded: b.pointsAwarded,
-        // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
-        booker: { id: b.bookerId, phoneNumber: phoneById.get(b.bookerId) },
+        isPaid: b.isPaid,
+        booker: { id: b.bookerId },
         court: { id: b.courtId },
       }),
+    ),
+    { chunk: 500 },
+  );
+  // Las inasistencias, ligadas a su turno. Van por 0 puntos para no tocar el
+  // saldo de los jugadores de ejemplo, que no se siembra.
+  const penalties = dataSource.getRepository(Penalty);
+  await penalties.save(
+    generated.flatMap((b, i) =>
+      b.attended
+        ? []
+        : [penalties.create({ player: { id: b.bookerId }, booking: { id: saved[i].id }, penalizedScoring: 0, reason: NO_SHOW_PENALTY_REASON })],
     ),
     { chunk: 500 },
   );

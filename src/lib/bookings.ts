@@ -202,8 +202,7 @@ export async function createBookingForPlayer(
         durationMinutes,
         bookingState,
         price,
-        // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
-        booker: { id: player.id, phoneNumber: player.phoneNumber },
+        booker: { id: player.id },
         court: { id: input.courtId },
       });
 
@@ -223,6 +222,7 @@ export async function createBookingForPlayer(
             match: { id: match.id },
             player: { id: player.id },
             playersCount: groupSize,
+            attendedCount: groupSize,
           }),
         );
       }
@@ -338,6 +338,7 @@ export async function joinOpenMatchForPlayer(
           match: { id: match.id },
           player: { id: input.playerId },
           playersCount: groupSize,
+          attendedCount: groupSize,
         }),
       );
 

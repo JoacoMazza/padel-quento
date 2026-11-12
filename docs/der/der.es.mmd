@@ -63,6 +63,7 @@ erDiagram
     penalizaciones {
         int id PK
         int jugador_id FK
+        int reserva_id FK "nullable"
         float puntaje_penalizado
         string motivo
         datetime fecha_creacion
@@ -212,6 +213,7 @@ erDiagram
     clases ||--|{ horarios_clases : "clase_id"
     reservas ||--o| partidos : "reserva_id"
     reservas |o--o| fechas_reservas_fijas : "reserva_id"
+    reservas |o--o{ penalizaciones : "reserva_id"
     reservas_fijas ||--o{ fechas_reservas_fijas : "reserva_fija_id"
     partidos ||--o{ jugadores_partidos : "partido_id"
     partidos ||--o{ resenas_jugadores : "partido_id"

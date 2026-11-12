@@ -30,7 +30,7 @@ Los diagramas se editan en los `.mmd` y se regeneran los JPG con `node .claude/s
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
-Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
+Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva: `bookings.booker_id` → `bookers.id`, igual en `fixed_bookings`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
 
 ## Estructura del proyecto
 
@@ -66,7 +66,7 @@ Después de un partido abierto, cada jugador que asistió puede calificar a sus 
 
 - La reputación se muestra en porcentajes (puntualidad, buena actitud, nivel acorde) desde las 3 reseñas, en el detalle de los partidos abiertos y en el perfil del propio jugador. Es anónima: los jugadores no ven quién dijo qué.
 - El admin ve en la ficha del jugador la reputación, alertas cuando algo baja del 70% y cada reseña con su comentario y quién la dejó. Desde ahí puede cambiarle la categoría o descontarle puntos con un motivo.
-- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
+- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `players_reviews` (una fila por reseña, una por compañero y partido).
 
 ## Acceso sin sesión
 
@@ -103,6 +103,13 @@ Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) 
 - Solo el dueño puede gestionar el equipo (sección **Equipo** del panel: alta, edición y baja de administradores), cambiar precios, dar de alta canchas o darlas de baja, y ver Métricas del Complejo y Reportes de Asistencia. El trabajador maneja la turnera, los turnos y turnos fijos, los bloqueos de canchas y los jugadores.
 - El servidor lo exige con `requireOwner()` ([src/lib/rbac.ts](src/lib/rbac.ts)), que lee el nivel de la base en cada acción: un cambio de nivel aplica en el momento. La sesión trae `isOwner` solo para mostrar u ocultar secciones.
 - El dueño no puede darse de baja ni cambiarse el nivel a sí mismo. Los administradores creados antes de este cambio quedaron como dueños; los nuevos arrancan como trabajadores.
+
+## Turnos, pagos y asistencia
+
+- Un turno (`bookings.booking_state`) está **reservado** (`reserved`), **finalizado** (`finished`) o **cancelado** (`cancelled`). El pago es aparte: `bookings.is_paid`, que solo marca un administrador (`setBookingPaid` en [src/actions/adminBooking.ts](src/actions/adminBooking.ts)) y no cambia el estado.
+- La asistencia se marca desde la Turnera Global y se guarda como penalización: una inasistencia es una penalización con motivo "Inasistencia a turno reservado" ligada a su turno (`penalties.booking_id`), que se descuenta en el momento (20 puntos por ausente, sin bajar el saldo de 0). Marcar presente de nuevo la saca y recalcula el puntaje ([src/lib/no-show-penalties.ts](src/lib/no-show-penalties.ts)).
+- En un turno simple se marca a quien reservó. En un partido abierto, cada jugador: quien vino con acompañantes tiene `match_players.attended_count` (cuántos de su grupo asistieron) y paga 20 puntos por cada ausente; cuenta como presente si asistió al menos uno.
+- Al terminar un turno reservado, un proceso en segundo plano ([src/actions/attendance.ts](src/actions/attendance.ts)) acredita 10 puntos a quien asistió (más 5 a quien se sumó al partido de otro; lo acreditado queda en `match_players.points_awarded`) y lo pasa a finalizado. Las clases se finalizan sin mover puntos.
 
 ## Clases y profesores
 
@@ -235,7 +242,7 @@ Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migraci
 pnpm db:seed
 ```
 
-Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está dada de baja, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
@@ -245,7 +252,7 @@ Para tener datos con los que revisar las métricas de ocupación del panel admin
 pnpm db:seed:bookings
 ```
 
-Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan finalizados y pagos (con algunas inasistencias, como penalizaciones de 0 puntos ligadas al turno) o cancelados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
 
 > Los seeds no crean el esquema: sobre una base sin migraciones fallan con `no existe la relación «courts»`. Correr antes `pnpm migration:run`.
 

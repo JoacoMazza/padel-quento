@@ -22,8 +22,9 @@ export type SeedBooking = {
   durationMinutes: number;
   bookingState: BookingState;
   price: number;
+  isPaid: boolean;
+  /** false si quien reservó faltó: se siembra su inasistencia (ver seed-bookings.ts). */
   attended: boolean;
-  pointsAwarded: boolean;
 };
 
 // Date.getDay(): 0 = domingo.
@@ -128,10 +129,10 @@ export function generateSeedBookings({
             ? BookingState.RESERVED
             : outcome < CANCELLED_RATE
               ? BookingState.CANCELLED
-              : BookingState.PAID,
+              : BookingState.FINISHED,
           price: court.price,
+          isPaid: isPast && outcome >= CANCELLED_RATE,
           attended: !isPast || outcome >= CANCELLED_RATE + NO_SHOW_RATE,
-          pointsAwarded: isPast,
         });
       }
     });

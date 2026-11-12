@@ -1,21 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DataSource } from "typeorm";
+import type { DataSource } from "typeorm";
+import { migrationDataSource, migrations, migrationsBefore } from "./migration-helpers";
 import { getDataSource } from "@/src/lib/db";
-
-// The CLI loads migrations from disk; here Vite bundles them so the TS sources run as-is.
-const migrationModules = import.meta.glob<Record<string, unknown>>("../../src/migrations/*.ts", { eager: true });
-const migrations = Object.values(migrationModules).flatMap((module) =>
-  Object.values(module).filter((value): value is new () => object => typeof value === "function"),
-);
-const timestampOf = (migration: new () => object) => Number(migration.name.match(/\d+$/)![0]);
-const lessonsMigration = migrations.find((migration) => migration.name.startsWith("ReplaceTeachersWithLessons"))!;
 
 const CHECK_DATABASE = "padel_quento_lessons_migration_check";
 
-function dataSourceFor(selected: (new () => object)[]) {
-  const url = new URL(process.env.DATABASE_URL!);
-  url.pathname = `/${CHECK_DATABASE}`;
-  return new DataSource({ type: "postgres", url: url.toString(), migrations: selected });
+function dataSourceFor(selected: typeof migrations) {
+  return migrationDataSource(CHECK_DATABASE, selected);
 }
 
 describe("migración de profesores a clases (integración con Postgres real)", { timeout: 120000 }, () => {
@@ -27,7 +18,7 @@ describe("migración de profesores a clases (integración con Postgres real)", {
     await admin.query(`CREATE DATABASE ${CHECK_DATABASE}`);
 
     // Una base de antes de la migración (solo las anteriores): un profesor activo con una clase con una alumna, y una clase cancelada.
-    const before = dataSourceFor(migrations.filter((m) => timestampOf(m) < timestampOf(lessonsMigration)));
+    const before = dataSourceFor(migrationsBefore("ReplaceTeachersWithLessons"));
     await before.initialize();
     await before.runMigrations();
     // El complejo del club ya lo crea la migración de complejos.

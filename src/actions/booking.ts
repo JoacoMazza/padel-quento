@@ -64,6 +64,8 @@ const BOOKING_RELATIONS = {
   court: true,
   match: { matchPlayers: { player: true }, chat: true },
   lesson: { inscriptions: { player: true } },
+  // Las inasistencias marcadas (ver bookerAttended).
+  penalties: true,
 } as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
@@ -168,7 +170,7 @@ export async function updateBooking(
 
       bookings.merge(booking, {
         ...rest,
-        ...(booker ? { booker: { id: booker.id, phoneNumber: booker.phoneNumber } } : {}),
+        ...(booker ? { booker: { id: booker.id } } : {}),
         ...(courtId ? { court: { id: courtId } } : {}),
       });
 

@@ -59,16 +59,16 @@ describe("generateSeedBookings", () => {
     expect(bookings.every((b) => b.courtId === 1 && b.fromDateTime.getDay() === 1)).toBe(true);
   });
 
-  it("los turnos pasados quedan pagos o cancelados y con los puntos ya procesados; los futuros, reservados", () => {
+  it("los turnos pasados quedan finalizados y pagos, o cancelados; los futuros, reservados y sin pagar", () => {
     const bookings = generateSeedBookings(input());
     const past = bookings.filter((b) => b.fromDateTime < now);
     const future = bookings.filter((b) => b.fromDateTime >= now);
 
-    expect(past.every((b) => [BookingState.PAID, BookingState.CANCELLED].includes(b.bookingState))).toBe(true);
+    expect(past.every((b) => [BookingState.FINISHED, BookingState.CANCELLED].includes(b.bookingState))).toBe(true);
     expect(past.some((b) => b.bookingState === BookingState.CANCELLED)).toBe(true);
     expect(past.some((b) => !b.attended)).toBe(true);
-    expect(past.every((b) => b.pointsAwarded)).toBe(true);
-    expect(future.every((b) => b.bookingState === BookingState.RESERVED && b.attended && !b.pointsAwarded)).toBe(true);
+    expect(past.every((b) => b.isPaid === (b.bookingState === BookingState.FINISHED))).toBe(true);
+    expect(future.every((b) => b.bookingState === BookingState.RESERVED && b.attended && !b.isPaid)).toBe(true);
   });
 
   it("concentra más demanda a la tarde-noche que a la mañana", () => {

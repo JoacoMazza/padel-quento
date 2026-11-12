@@ -260,6 +260,7 @@ classDiagram
     %% Reservas
     Reservante -- "*" Reserva
     Reserva "0..1" -- "0..1" FechaReservaFija
+    Reserva "0..1" -- "*" Penalizacion
     Reservante -- "*" ReservaFija
     ReservaFija -- "*" FechaReservaFija
     ReservaFija "0..*" -- Cancha

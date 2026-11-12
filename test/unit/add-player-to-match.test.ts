@@ -115,7 +115,7 @@ describe("addPlayerToMatch", () => {
       where: { account: { email: "caro@test.com" } },
       relations: { account: true },
     });
-    expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1 });
+    expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1, attendedCount: 1 });
     expect(matchPlayers.save).toHaveBeenCalledTimes(1);
     expect(matches.update).not.toHaveBeenCalled();
     expect(notifyPlayerJoined).toHaveBeenCalledWith(3, 9);
@@ -166,8 +166,8 @@ describe("addPlayerToMatch", () => {
     const result = await addPlayerToMatch(3, "caro@test.com");
 
     expect(result.success).toBe(true);
-    expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1 });
-    expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1 });
+    expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1, attendedCount: 1 });
+    expect(matchPlayers.create).toHaveBeenCalledWith({ match: { id: 2 }, player: { id: 9 }, playersCount: 1, attendedCount: 1 });
     expect(matches.update).not.toHaveBeenCalled();
   });
 
@@ -177,7 +177,7 @@ describe("addPlayerToMatch", () => {
     const result = await addPlayerToMatch(3, "caro@test.com");
 
     expect(result.success).toBe(true);
-    expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1 });
+    expect(matchPlayers.update).toHaveBeenCalledWith(30, { playersCount: 1, attendedCount: 1 });
   });
 
   it("rejects adding when there are neither free spots nor companions to replace", async () => {

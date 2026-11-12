@@ -11,6 +11,7 @@ import { canReviewMatch } from "@/src/domain/reputation";
 import { toComplexLocation } from "@/src/domain/complex";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
+import { isPresent } from "@/src/domain/attendance";
 
 export const metadata = pageMetadata("Mis reservas", "/my-bookings");
 
@@ -55,7 +56,7 @@ export default async function MyBookingsPage() {
             fromDateTime: b.fromDateTime,
             durationMinutes: b.durationMinutes,
             bookingState: b.bookingState,
-            attendedPlayerIds: (b.match.matchPlayers ?? []).filter((mp) => mp.attended).map((mp) => mp.playerId),
+            attendedPlayerIds: (b.match.matchPlayers ?? []).filter(isPresent).map((mp) => mp.playerId),
           },
           player.id,
         ),

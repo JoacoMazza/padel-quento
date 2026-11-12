@@ -3,8 +3,6 @@ import type { ComplexLocation } from "@/src/domain/complex";
 
 export const STATE_LABELS: Record<CourtState, string> = {
   [CourtState.AVAILABLE]: "Disponible",
-  [CourtState.OUT_OF_SERVICE]: "Fuera de Servicio",
-  [CourtState.MAINTENANCE]: "Mantenimiento",
   [CourtState.CLOSED_DOWN]: "Dada de Baja",
 };
 
@@ -12,14 +10,6 @@ export const STATE_BADGE_STYLES: Record<CourtState, { badge: string; dot: string
   [CourtState.AVAILABLE]: {
     badge: "badge-success",
     dot: "bg-success",
-  },
-  [CourtState.OUT_OF_SERVICE]: {
-    badge: "badge-danger",
-    dot: "bg-danger",
-  },
-  [CourtState.MAINTENANCE]: {
-    badge: "badge-warning",
-    dot: "bg-amber-500",
   },
   [CourtState.CLOSED_DOWN]: {
     badge: "badge-neutral",
@@ -34,10 +24,7 @@ export const OUT_OF_SERVICE_REASON_LABELS: Record<OutOfServiceReason, string> = 
   [OutOfServiceReason.OTHER]: "Otro",
 };
 
-/**
- * Estados que se eligen al editar una cancha. Fuera de servicio y mantenimiento
- * no se setean a mano: surgen de un bloqueo (OutOfService) activo.
- */
+/** Estados que se eligen al editar una cancha (fuera de servicio surge de un bloqueo activo, ver courtStatus). */
 export const EDITABLE_COURT_STATES = [CourtState.AVAILABLE, CourtState.CLOSED_DOWN];
 
 /** Bloqueo vigente de la cancha (ver isOutOfServiceActive), si lo tiene. */
@@ -62,12 +49,15 @@ export function summarizeCourts(courts: CourtItem[]): { total: number; enabled: 
   };
 }
 
+/** Cómo se muestra una cancha con un bloqueo (OutOfService) vigente. */
+const OUT_OF_SERVICE_STATUS = { label: "Fuera de Servicio", style: { badge: "badge-danger", dot: "bg-danger" } };
+
 /** Etiqueta y estilo del estado a mostrar: un bloqueo activo manda sobre el estado guardado. */
 export function courtStatus(court: CourtItem): { label: string; style: { badge: string; dot: string } } {
   if (court.activeOutOfService) {
     return {
-      label: `${STATE_LABELS[CourtState.OUT_OF_SERVICE]} (${OUT_OF_SERVICE_REASON_LABELS[court.activeOutOfService.reason]})`,
-      style: STATE_BADGE_STYLES[CourtState.OUT_OF_SERVICE],
+      label: `${OUT_OF_SERVICE_STATUS.label} (${OUT_OF_SERVICE_REASON_LABELS[court.activeOutOfService.reason]})`,
+      style: OUT_OF_SERVICE_STATUS.style,
     };
   }
   return { label: STATE_LABELS[court.state], style: STATE_BADGE_STYLES[court.state] };

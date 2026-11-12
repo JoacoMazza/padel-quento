@@ -102,9 +102,9 @@ describe("buildCourtSlots", () => {
     expect(result.map((s) => s.status)).toEqual(["available", "outOfService", "outOfService"]);
   });
 
-  it("marca fuera de servicio todos los turnos de una cancha fuera de servicio, aunque haya un partido abierto", () => {
+  it("marca fuera de servicio todos los turnos de una cancha dada de baja, aunque haya un partido abierto", () => {
     const result = slots({
-      court: { ...court, state: CourtState.OUT_OF_SERVICE },
+      court: { ...court, state: CourtState.CLOSED_DOWN },
       bookings: [booking({ needPlayers: true, confirmedPlayers: 2 })],
     });
     expect(result.every((s) => s.status === "outOfService")).toBe(true);

@@ -44,11 +44,16 @@ export class MatchPlayer {
   playersCount!: number;
 
   /**
-   * Asistencia de este jugador al partido. Arranca en true: el administrador
-   * solo interviene desde la turnera global para marcar la ausencia.
+   * Cuántos de su grupo (playersCount) asistieron. Arranca en playersCount: el
+   * administrador solo interviene desde la turnera global para marcar ausentes,
+   * y cada ausente penaliza a este jugador (ver src/actions/attendance.ts).
    */
-  @Column({ type: "boolean", default: true, name: "attended" })
-  attended!: boolean;
+  @Column({ type: "int", default: 1, name: "attended_count" })
+  attendedCount!: number;
+
+  /** Puntos que el job de asistencia le acreditó por este partido. */
+  @Column({ type: "int", default: 0, name: "points_awarded" })
+  pointsAwarded!: number;
 
   @CreateDateColumn({ name: "joined_at" })
   joinedAt!: Date;

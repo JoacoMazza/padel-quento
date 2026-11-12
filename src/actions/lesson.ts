@@ -104,11 +104,9 @@ async function reserveSession(
       durationMinutes,
       bookingState: BookingState.RESERVED,
       price: court.price,
-      booker: { id: teacher.id, phoneNumber: teacher.phoneNumber },
+      booker: { id: teacher.id },
       court: { id: court.id },
       lesson: { id: lessonId },
-      // Las clases no mueven puntos: el job de asistencia las da por procesadas.
-      pointsAwarded: true,
     }),
   );
 }

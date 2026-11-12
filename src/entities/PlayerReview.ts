@@ -11,22 +11,22 @@ import type { Player } from "@/src/entities/Player";
  * además le descuenta puntos de fidelidad al reseñado (issue #73, ver
  * negativeReviewPoints).
  */
-@Entity({ name: "player_reviews" })
-@Unique("UQ_player_reviews_match_reviewer_reviewed", ["match", "reviewer", "reviewed"])
+@Entity({ name: "players_reviews" })
+@Unique("UQ_players_reviews_match_reviewer_reviewed", ["match", "reviewer", "reviewed"])
 export class PlayerReview {
   @PrimaryGeneratedColumn()
   id!: number;
 
   @ManyToOne("Match", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "match_id", foreignKeyConstraintName: "FK_player_reviews_match_id" })
+  @JoinColumn({ name: "match_id", foreignKeyConstraintName: "FK_players_reviews_match_id" })
   match!: Match;
 
   @ManyToOne("Player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "reviewer_id", foreignKeyConstraintName: "FK_player_reviews_reviewer_id" })
+  @JoinColumn({ name: "reviewer_id", foreignKeyConstraintName: "FK_players_reviews_reviewer_id" })
   reviewer!: Player;
 
   @ManyToOne("Player", { onDelete: "CASCADE" })
-  @JoinColumn({ name: "reviewed_id", foreignKeyConstraintName: "FK_player_reviews_reviewed_id" })
+  @JoinColumn({ name: "reviewed_id", foreignKeyConstraintName: "FK_players_reviews_reviewed_id" })
   reviewed!: Player;
 
   @Column({ type: "enum", enum: ReviewLevel })

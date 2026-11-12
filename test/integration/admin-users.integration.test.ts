@@ -190,7 +190,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     });
     if (!matchPlayer) throw new Error("expected the player to be in the match");
     mockAdminSession();
-    await setMatchPlayerAttendance(matchPlayer.id, false);
+    await setMatchPlayerAttendance(matchPlayer.id, 0);
 
     // Turno de otro jugador en el que no participa: no debe aparecer.
     await createBookingForPlayer({
@@ -224,6 +224,8 @@ describe("admin player actions (integración con Postgres real)", () => {
     });
     expect(result.data.movements).toEqual([
       expect.objectContaining({ amount: 20, description: "Asistencia a turno reservado" }),
+      expect.objectContaining({ amount: 0, description: "Inasistencia a turno reservado" }),
+      expect.objectContaining({ amount: 0, description: "Inasistencia a turno reservado" }),
     ]);
   });
 
