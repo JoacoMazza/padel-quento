@@ -14,16 +14,12 @@ export type HeaderActiveTab =
   | "/teacher"
   | "/admin";
 
+/** Secciones públicas: las personales (Mis turnos, Mis clases) están en el menú de la cuenta. */
 const NAV_ITEMS = [
-  { href: "/", label: "Inicio", guest: true },
-  { href: "/bookings", label: "Turnos", guest: true },
-  { href: "/open-matches", label: "Partidos abiertos", guest: true },
-  { href: "/lessons", label: "Clases", guest: true },
-  { href: "/my-bookings", label: "Mis reservas", guest: false },
+  { href: "/bookings", label: "Turnos" },
+  { href: "/open-matches", label: "Partidos abiertos" },
+  { href: "/lessons", label: "Clases" },
 ];
-
-/** Sección del profesor (HU-42): solo para jugadores con una clase activa. */
-const TEACHER_NAV_ITEMS = [{ href: "/teacher", label: "Mis clases", guest: false }];
 
 const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
 
@@ -56,11 +52,9 @@ export function AppHeader({
   showNav?: boolean;
   /** Visitante sin sesión: ve solo las secciones públicas y los accesos para entrar o registrarse. */
   guest?: boolean;
-  /** Profesor activo (de la sesión): suma el link a sus clases. */
+  /** Profesor activo (de la sesión): el menú de la cuenta suma el link a sus clases. */
   isTeacher?: boolean;
 }) {
-  const navItems = [...NAV_ITEMS, ...(isTeacher ? TEACHER_NAV_ITEMS : [])].filter((item) => !guest || item.guest);
-
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-line bg-card/95 backdrop-blur">
       {/* Tres columnas en una fila: logo a la izquierda, navegación centrada y menú de usuario a la derecha.
@@ -82,7 +76,7 @@ export function AppHeader({
         {showNav ? (
           // En pantallas chicas no entra en una fila: los links pasan al menú desplegable (MobileNav).
           <nav className="hidden min-w-0 gap-1 lg:flex">
-            {navItems.map((item) => {
+            {NAV_ITEMS.map((item) => {
               const isActive = item.href === active;
               return (
                 <Link
@@ -109,9 +103,9 @@ export function AppHeader({
               </Link>
             </div>
           ) : (
-            <UserMenu name={userName} email={userEmail} role={userRole} />
+            <UserMenu name={userName} email={userEmail} role={userRole} isTeacher={isTeacher} />
           )}
-          {showNav ? <MobileNav items={navItems} active={active} /> : null}
+          {showNav ? <MobileNav items={NAV_ITEMS} active={active} /> : null}
         </div>
       </div>
     </header>

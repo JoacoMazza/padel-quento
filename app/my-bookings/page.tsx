@@ -13,7 +13,7 @@ import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
 import { isPresent } from "@/src/domain/attendance";
 
-export const metadata = pageMetadata("Mis reservas", "/my-bookings");
+export const metadata = pageMetadata("Mis turnos", "/my-bookings");
 
 export default async function MyBookingsPage() {
   const session = await getServerSession(authOptions);

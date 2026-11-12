@@ -44,7 +44,7 @@ describe("Landing", () => {
       renderLanding();
 
       // Tampoco hay links ocultos a secciones que piden sesión (un lector de pantalla los anunciaría igual).
-      for (const name of ["Iniciar sesión", "Registrarse", "Mis reservas", "Mi perfil"]) {
+      for (const name of ["Iniciar sesión", "Registrarse", "Mis turnos", "Mi perfil"]) {
         expect(screen.queryByRole("link", { name })).toBeNull();
       }
     });

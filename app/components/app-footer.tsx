@@ -2,9 +2,9 @@ import Link from "next/link";
 import { CLUB_ADDRESS, CLUB_MAPS_URL } from "@/app/components/club-info";
 
 const FOOTER_LINKS = [
-  { href: "/bookings", label: "Reservar cancha" },
+  { href: "/bookings", label: "Turnos" },
   { href: "/open-matches", label: "Partidos abiertos" },
-  { href: "/my-bookings", label: "Mis reservas" },
+  { href: "/lessons", label: "Clases" },
 ];
 
 /** Pie común de las pantallas de jugador. `showLinks` se apaga en el panel de administración. */
