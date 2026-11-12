@@ -16,10 +16,11 @@ vi.mock("@/src/lib/rbac", async (importOriginal) => {
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/teacherClass", () => ({
   getTeacherClasses: vi.fn(async () => ({ success: true, data: [] })),
+  getTeacherLessons: vi.fn(async () => ({ success: true, data: [] })),
   getTeacherStudents: vi.fn(async () => ({ success: true, data: [] })),
   searchStudents: vi.fn(),
-  addClassStudent: vi.fn(),
-  removeClassStudent: vi.fn(),
+  addLessonStudent: vi.fn(),
+  removeLessonStudent: vi.fn(),
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -42,15 +43,17 @@ describe("TeacherPage (HU-42)", () => {
   });
 
   it("a un profesor activo le muestra su sección de clases", async () => {
-    requireTeacher.mockResolvedValue({ teacherId: 1, playerId: 3 });
+    requireTeacher.mockResolvedValue({ playerId: 3 });
 
     render(await TeacherPage());
 
     expect(screen.getByRole("heading", { name: /Mis clases/ })).toBeTruthy();
     expect(screen.queryByText(/Acceso denegado/)).toBeNull();
+    // Las clases las da de alta el admin: el profesor ya no reserva sus turnos.
+    expect(screen.queryByRole("link", { name: /Reservar clase/ })).toBeNull();
   });
 
-  it("si el administrador lo desactivó, no le muestra la sección aunque su sesión diga que es profesor", async () => {
+  it("si ya no tiene clases activas, no le muestra la sección aunque su sesión diga que es profesor", async () => {
     requireTeacher.mockRejectedValue(new ForbiddenError("Acceso denegado: Se requiere el rol de Profesor"));
 
     render(await TeacherPage());

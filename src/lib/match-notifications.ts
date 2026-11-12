@@ -2,12 +2,13 @@ import "reflect-metadata";
 import type { Booker } from "@/src/entities/Booker";
 import type { Booking } from "@/src/entities/Booking";
 import type { FixedBooking } from "@/src/entities/FixedBooking";
+import type { Lesson } from "@/src/entities/Lesson";
 import type { Match } from "@/src/entities/Match";
 import type { Player } from "@/src/entities/Player";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import {
   classCancelledByTeacherNotice,
-  classCancelledNotice,
+  lessonCancelledNotice,
   courtUnavailableNotice,
   fixedBookingCancelledNotice,
   fixedDateReleasedNotice,
@@ -255,41 +256,37 @@ export async function notifyFixedBookingCancelled(fixedBookingId: number): Promi
   }
 }
 
-async function findClass(bookingId: number) {
-  const dataSource = await getDataSource();
-  return dataSource.getRepository<Booking>("Booking").findOne({
-    where: { id: bookingId },
-    relations: { court: true, booker: true, classStudents: { player: { account: true } } },
-  });
+function lessonStudents(lesson: Lesson): NotificationRecipient[] {
+  return lesson.inscriptions.map((inscription) => toRecipient(inscription.player));
 }
 
-function classStudents(booking: Booking): NotificationRecipient[] {
-  return booking.classStudents.map((student) => toRecipient(student.player));
-}
-
-/** Avisa a los alumnos de cada clase que se canceló porque el profesor dejó de dar clases (HU-42). */
-export async function notifyClassesCancelled(bookingIds: number[]): Promise<void> {
+/** Avisa a los alumnos que la clase se dio de baja y se cancelaron sus próximos turnos. */
+export async function notifyLessonCancelled(lessonId: number): Promise<void> {
   try {
-    for (const bookingId of bookingIds) {
-      const booking = await findClass(bookingId);
-      if (!booking) continue;
+    const dataSource = await getDataSource();
+    const lesson = await dataSource.getRepository<Lesson>("Lesson").findOne({
+      where: { id: lessonId },
+      relations: { teacher: true, inscriptions: { player: { account: true } } },
+    });
+    if (!lesson) return;
 
-      await send(classStudents(booking), (recipient) =>
-        classCancelledNotice(recipient.names, fullName(booking.booker), noticeBookingOf(booking)),
-      );
-    }
+    await send(lessonStudents(lesson), (recipient) => lessonCancelledNotice(recipient.names, fullName(lesson.teacher)));
   } catch (error) {
-    console.error("notifyClassesCancelled", error);
+    console.error("notifyLessonCancelled", error);
   }
 }
 
 /** Avisa a los alumnos que el profesor canceló la clase (HU-47). No hace nada si el turno no es una clase. */
 export async function notifyClassCancelledByTeacher(bookingId: number): Promise<void> {
   try {
-    const booking = await findClass(bookingId);
-    if (!booking || booking.classCapacity === null) return;
+    const dataSource = await getDataSource();
+    const booking = await dataSource.getRepository<Booking>("Booking").findOne({
+      where: { id: bookingId },
+      relations: { court: true, booker: true, lesson: { inscriptions: { player: { account: true } } } },
+    });
+    if (!booking?.lesson) return;
 
-    await send(classStudents(booking), (recipient) =>
+    await send(lessonStudents(booking.lesson), (recipient) =>
       classCancelledByTeacherNotice(recipient.names, fullName(booking.booker), noticeBookingOf(booking)),
     );
   } catch (error) {

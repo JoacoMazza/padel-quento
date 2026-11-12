@@ -85,7 +85,7 @@ describe("authorize (CredentialsProvider)", () => {
     });
     expect(findOne).toHaveBeenCalledWith({
       where: { email: "a@test.com" },
-      relations: { admin: true, player: { teacher: true } },
+      relations: { admin: true, player: { lessons: true } },
     });
   });
 
@@ -111,13 +111,13 @@ describe("authorize (CredentialsProvider)", () => {
     });
   });
 
-  it("indica si el jugador es un profesor activo (HU-42)", async () => {
+  it("indica si el jugador es profesor: tiene una clase activa (HU-42)", async () => {
     const teacherAccount = (isActive: boolean) => ({
       id: 9,
       email: "p@test.com",
       passwordHash: "hash",
       admin: null,
-      player: { id: 3, names: "Lucía", lastnames: "Profe", teacher: { id: 1, isActive } },
+      player: { id: 3, names: "Lucía", lastnames: "Profe", lessons: [{ id: 1, isActive }] },
     });
     vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
 

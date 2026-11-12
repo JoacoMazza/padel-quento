@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, GraduationCap, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
-import { TeachersPanel } from "@/app/admin/teachers-panel";
-import { getTeachersAdmin } from "@/src/actions/teacher";
+import { LessonsPanel } from "@/app/admin/lessons-panel";
+import { getLessonsAdmin } from "@/src/actions/lesson";
 import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
@@ -32,7 +32,7 @@ const SECTIONS = [
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true, ownerOnly: true },
   { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true, ownerOnly: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true, ownerOnly: false },
-  { id: "teachers", label: "Profesores", icon: GraduationCap, available: true, ownerOnly: false },
+  { id: "lessons", label: "Clases", icon: GraduationCap, available: true, ownerOnly: false },
   { id: "team", label: "Equipo", icon: UserCog, available: true, ownerOnly: true },
 ] as const;
 
@@ -228,9 +228,9 @@ function UsersSection() {
   return state.status === "ready" ? <UsersTable players={state.data} /> : <SectionStatus state={state} />;
 }
 
-function TeachersSection() {
-  const state = useSectionData(getTeachersAdmin);
-  return state.status === "ready" ? <TeachersPanel teachers={state.data} /> : <SectionStatus state={state} />;
+function LessonsSection() {
+  const state = useSectionData(getLessonsAdmin);
+  return state.status === "ready" ? <LessonsPanel lessons={state.data} /> : <SectionStatus state={state} />;
 }
 
 function TeamSection() {
@@ -369,9 +369,9 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
             <UsersSection />
           </div>
         ) : null}
-        {visitedSections.includes("teachers") ? (
-          <div hidden={activeSection !== "teachers"}>
-            <TeachersSection />
+        {visitedSections.includes("lessons") ? (
+          <div hidden={activeSection !== "lessons"}>
+            <LessonsSection />
           </div>
         ) : null}
         {visitedSections.includes("team") ? (

@@ -8,24 +8,22 @@ export type HeaderActiveTab =
   | "/"
   | "/bookings"
   | "/open-matches"
+  | "/lessons"
   | "/my-bookings"
   | "/profile"
   | "/teacher"
-  | "/teacher/book"
   | "/admin";
 
 const NAV_ITEMS = [
   { href: "/", label: "Inicio", guest: true },
   { href: "/bookings", label: "Turnos", guest: true },
   { href: "/open-matches", label: "Partidos abiertos", guest: true },
+  { href: "/lessons", label: "Clases", guest: true },
   { href: "/my-bookings", label: "Mis reservas", guest: false },
 ];
 
-/** Secciones del profesor (HU-42 y HU-43): solo para jugadores con el rol de profesor activo. */
-const TEACHER_NAV_ITEMS = [
-  { href: "/teacher", label: "Mis clases", guest: false },
-  { href: "/teacher/book", label: "Reservar clase", guest: false },
-];
+/** Sección del profesor (HU-42): solo para jugadores con una clase activa. */
+const TEACHER_NAV_ITEMS = [{ href: "/teacher", label: "Mis clases", guest: false }];
 
 const LOGO_LINK_CLASS = "flex w-fit items-center gap-2.5 rounded-lg";
 

@@ -27,7 +27,7 @@ import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS, PENALTY_POINTS } from 
 import { isLateCancellation } from "@/src/domain/late-cancellation";
 import { updateBooking } from "@/src/actions/booking";
 import { closeMatch, leaveMatch } from "@/src/actions/match";
-import { leaveClass } from "@/src/actions/teacherClass";
+import { leaveLesson } from "@/src/actions/lesson";
 import { formatLongDate, formatPrice } from "@/app/bookings/slot-utils";
 import { dateToTimeLabel } from "@/src/domain/time-format";
 import {
@@ -50,7 +50,7 @@ const CONFIRM_LABELS = {
   cancel: { question: "¿Cancelar turno?", confirm: "Sí, cancelar", pending: "Cancelando…" },
   close: { question: "¿Cerrar búsqueda de jugadores?", confirm: "Sí, cerrar", pending: "Cerrando…" },
   leave: { question: "¿Darte de baja del partido?", confirm: "Sí, darme de baja", pending: "Dándote de baja…" },
-  leaveClass: { question: "¿Salir de la clase?", confirm: "Sí, salir", pending: "Saliendo…" },
+  leaveClass: { question: "¿Salir de la clase? Dejás de ir a todos sus turnos.", confirm: "Sí, salir", pending: "Saliendo…" },
   cancelClass: {
     question: "¿Cancelar la clase? Se les avisa a los alumnos.",
     confirm: "Sí, cancelar",
@@ -125,7 +125,7 @@ export function BookingRow({
   function handleLeaveClass() {
     setError(null);
     startTransition(async () => {
-      const result = await leaveClass(booking.id);
+      const result = await leaveLesson(booking.classInfo!.lessonId);
       setPendingAction(null);
       if (!result.success) {
         setError(result.error);

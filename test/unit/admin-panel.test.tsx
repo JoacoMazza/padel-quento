@@ -46,13 +46,14 @@ vi.mock("@/src/actions/outOfService", () => ({
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
-const { getTeachersAdmin } = vi.hoisted(() => ({ getTeachersAdmin: vi.fn() }));
-vi.mock("@/src/actions/teacher", () => ({
-  getTeachersAdmin,
-  createTeacher: vi.fn(),
-  assignTeacherRole: vi.fn(),
-  setTeacherActive: vi.fn(),
-  removeTeacherRole: vi.fn(),
+const { getLessonsAdmin } = vi.hoisted(() => ({ getLessonsAdmin: vi.fn() }));
+vi.mock("@/src/actions/lesson", () => ({
+  getLessonsAdmin,
+  createLesson: vi.fn(),
+  deactivateLesson: vi.fn(),
+  getLessonClassesAdmin: vi.fn(),
+  addLessonStudentAdmin: vi.fn(),
+  removeLessonStudentAdmin: vi.fn(),
 }));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
@@ -415,21 +416,32 @@ describe("AdminPanel", () => {
     expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
   });
 
-  it("un trabajador también gestiona los profesores, que se piden recién al abrir su sección (HU-42)", async () => {
-    getTeachersAdmin.mockResolvedValue({
+  it("un trabajador también gestiona las clases, que se piden recién al abrir su sección (HU-42)", async () => {
+    getLessonsAdmin.mockResolvedValue({
       success: true,
       data: [
-        { id: 1, playerId: 10, names: "Lucía", lastnames: "Profe", email: "l@test.com", phoneNumber: "221", isActive: true },
+        {
+          id: 1,
+          teacherId: 10,
+          teacherName: "Lucía Profe",
+          classCapacity: 4,
+          price: 15000,
+          fromDate: "2026-10-05",
+          toDate: "2026-10-31",
+          isActive: true,
+          schedules: [],
+          students: [],
+        },
       ],
     });
     render(<AdminPanel isOwner={false} />);
     await flush();
-    expect(getTeachersAdmin).not.toHaveBeenCalled();
+    expect(getLessonsAdmin).not.toHaveBeenCalled();
 
-    openSection("Profesores");
+    openSection("Clases");
     await flush();
 
-    expect(getTeachersAdmin).toHaveBeenCalledTimes(1);
+    expect(getLessonsAdmin).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Lucía Profe")).toBeTruthy();
   });
 

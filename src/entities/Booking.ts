@@ -1,13 +1,12 @@
 import "reflect-metadata";
-import { Check, Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
 import type { Booker } from "@/src/entities/Booker";
 import type { Court } from "@/src/entities/Court";
 import type { Match } from "@/src/entities/Match";
-import type { ClassStudent } from "@/src/entities/ClassStudent";
+import type { Lesson } from "@/src/entities/Lesson";
 
 @Entity({ name: "bookings" })
-@Check("CHK_bookings_class_capacity", `"class_capacity" BETWEEN 1 AND 8`)
 export class Booking {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -65,13 +64,11 @@ export class Booking {
   pointsAwarded!: boolean;
 
   /**
-   * Cupo de alumnos si el turno es una clase (HU-43): la reserva de un profesor
-   * (quien reservó) para dar clase. Null en cualquier otro turno.
+   * Clase a la que pertenece el turno, si es uno de sus horarios: lo reservó
+   * el profesor y lo toman los alumnos inscriptos en la clase. Null en
+   * cualquier otro turno.
    */
-  @Column({ type: "int", nullable: true, name: "class_capacity" })
-  classCapacity!: number | null;
-
-  /** Alumnos registrados en la clase (HU-44). */
-  @OneToMany("ClassStudent", "booking")
-  classStudents!: ClassStudent[];
+  @ManyToOne("Lesson", "bookings", { nullable: true })
+  @JoinColumn({ name: "lesson_id", foreignKeyConstraintName: "FK_bookings_lesson_id" })
+  lesson!: Lesson | null;
 }

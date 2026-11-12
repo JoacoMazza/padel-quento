@@ -60,16 +60,16 @@ export default async function MyBookingsPage() {
           player.id,
         ),
       isFixed: fixedDates.has(b.id),
-      // Clase (HU-47): la da quien reservó, el profesor; el resto son sus alumnos.
-      classInfo:
-        b.classCapacity !== null && b.classCapacity !== undefined
-          ? {
-              role: player && b.booker?.id === player.id ? ("teacher" as const) : ("student" as const),
-              teacherName: `${b.booker?.names ?? ""} ${b.booker?.lastnames ?? ""}`.trim(),
-              capacity: b.classCapacity,
-              studentsCount: b.classStudents?.length ?? 0,
-            }
-          : null,
+      // Turno de una clase (HU-47): la da quien reservó, el profesor; el resto son sus alumnos.
+      classInfo: b.lesson
+        ? {
+            lessonId: b.lesson.id,
+            role: player && b.booker?.id === player.id ? ("teacher" as const) : ("student" as const),
+            teacherName: `${b.booker?.names ?? ""} ${b.booker?.lastnames ?? ""}`.trim(),
+            capacity: b.lesson.classCapacity,
+            studentsCount: b.lesson.inscriptions?.length ?? 0,
+          }
+        : null,
     }));
 
   return (

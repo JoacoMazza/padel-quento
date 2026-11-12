@@ -41,12 +41,18 @@ describe("AppHeader", () => {
     expect(link.getAttribute("aria-current")).toBe("page");
   });
 
-  it("a un profesor le suma el link para reservar sus turnos de clase (HU-43)", () => {
-    render(<AppHeader active="/teacher/book" userRole={Role.PLAYER} isTeacher />);
+  it("suma el link a las clases, donde los jugadores se inscriben", () => {
+    render(<AppHeader active="/lessons" userRole={Role.PLAYER} />);
 
-    const link = screen.getAllByRole("link", { name: "Reservar clase" })[0];
-    expect(link.getAttribute("href")).toBe("/teacher/book");
+    const link = screen.getAllByRole("link", { name: "Clases" })[0];
+    expect(link.getAttribute("href")).toBe("/lessons");
     expect(link.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("al profesor ya no le ofrece reservar turnos de clase: las clases las da de alta el club", () => {
+    render(<AppHeader active="/teacher" userRole={Role.PLAYER} isTeacher />);
+
+    expect(screen.queryByRole("link", { name: "Reservar clase" })).toBeNull();
   });
 
   it("a un jugador que no es profesor no le muestra el link a las clases", () => {
@@ -144,6 +150,7 @@ describe("AppHeader", () => {
         ["Inicio", "/"],
         ["Turnos", "/bookings"],
         ["Partidos abiertos", "/open-matches"],
+        ["Clases", "/lessons"],
         ["Mis reservas", "/my-bookings"],
       ]);
       expect(within(menu).getByRole("link", { name: "Turnos" }).getAttribute("aria-current")).toBe("page");

@@ -63,7 +63,7 @@ const BOOKING_RELATIONS = {
   booker: true,
   court: true,
   match: { matchPlayers: { player: true }, chat: true },
-  classStudents: { player: true },
+  lesson: { inscriptions: { player: true } },
 } as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
@@ -111,7 +111,7 @@ export async function updateBooking(
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = await bookings.findOne({
         where: { id },
-        relations: { court: true, booker: true },
+        relations: { court: true, booker: true, lesson: true },
       });
       if (!booking) {
         throw new Error("NOT_FOUND");
@@ -137,7 +137,7 @@ export async function updateBooking(
         input.bookingState === BookingState.CANCELLED &&
         booking.bookingState !== BookingState.CANCELLED &&
         booking.booker &&
-        (booking.classCapacity ?? null) === null &&
+        !booking.lesson &&
         isLateCancellation(booking.fromDateTime)
       ) {
         lateCancellationPlayerId = booking.booker.id;

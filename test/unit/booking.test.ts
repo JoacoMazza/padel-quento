@@ -666,7 +666,7 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
-          classStudents: { player: true },
+          lesson: { inscriptions: { player: true } },
         },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
@@ -693,7 +693,7 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
-          classStudents: { player: true },
+          lesson: { inscriptions: { player: true } },
         },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });

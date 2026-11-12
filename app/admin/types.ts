@@ -57,12 +57,12 @@ export function mapBookingToAdminProp(booking: Booking, fixedBookingDateId: numb
     })),
     fixedBookingDateId,
     classInfo:
-      booking.classCapacity !== null && booking.classCapacity !== undefined
+      booking.lesson
         ? {
-            capacity: booking.classCapacity,
-            students: (booking.classStudents ?? []).map((student) => ({
-              id: student.player.id,
-              name: `${student.player.names} ${student.player.lastnames}`,
+            capacity: booking.lesson.classCapacity,
+            students: (booking.lesson.inscriptions ?? []).map((inscription) => ({
+              id: inscription.player.id,
+              name: `${inscription.player.names} ${inscription.player.lastnames}`,
             })),
           }
         : null,

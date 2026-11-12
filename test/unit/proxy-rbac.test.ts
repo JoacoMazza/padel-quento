@@ -116,8 +116,8 @@ describe("proxy RBAC and Route Protection", () => {
     });
   });
 
-  describe("Rutas visibles sin sesión (/, /bookings, /open-matches)", () => {
-    it.each(["/", "/bookings", "/open-matches", "/open-matches/12"])(
+  describe("Rutas visibles sin sesión (/, /bookings, /open-matches, /lessons)", () => {
+    it.each(["/", "/bookings", "/open-matches", "/open-matches/12", "/lessons"])(
       "un visitante puede ver %s sin que lo manden al login",
       async (pathname) => {
         vi.mocked(getToken).mockResolvedValueOnce(null);

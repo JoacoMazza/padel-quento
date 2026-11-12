@@ -26,7 +26,7 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
   beforeAll(async () => {
     // jugador normal
     await createPlayer({ email, password, names: "Login", lastnames: "Test", phoneNumber: uniquePhoneNumber() });
-    // jugador profesor (HU-42)
+    // jugador profesor (HU-42): tiene una clase activa
     const teacher = await createPlayer({
       email: emailTeacher,
       password,
@@ -35,8 +35,17 @@ describe("authorize - CredentialsProvider (integración con Postgres real)", () 
       phoneNumber: uniquePhoneNumber(),
     });
     if (!teacher.success) throw new Error("no se pudo crear el profesor de prueba");
-    const teachers = (await getDataSource()).getRepository("Teacher");
-    await teachers.save(teachers.create({ player: { id: teacher.data.id }, isActive: true }));
+    // ser profesor es tener una clase activa
+    const lessons = (await getDataSource()).getRepository("Lesson");
+    await lessons.save(
+      lessons.create({
+        teacher: { id: teacher.data.id },
+        classCapacity: 4,
+        price: 10000,
+        fromLocalDatetime: new Date("2030-01-07T10:00:00"),
+        toLocalDatetime: new Date("2030-01-07T11:00:00"),
+      }),
+    );
     // jugador bloqueado
     const blocked = await createPlayer({
       email: emailBlocked,
