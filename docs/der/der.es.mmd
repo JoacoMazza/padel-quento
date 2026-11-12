@@ -202,7 +202,7 @@ erDiagram
     reservantes ||--o{ resenas_jugadores : "evaluado_id"
     reservantes ||--o{ mensajes : "emisor_id"
     complejos ||--o{ canchas : "complejo_id"
-    canchas ||--o{ horarios : "cancha_id"
+    canchas ||--|{ horarios : "cancha_id"
     canchas ||--o{ fuera_de_servicio : "cancha_id"
     canchas ||--o{ reservas : "cancha_id"
     canchas ||--o{ reservas_fijas : "cancha_id"

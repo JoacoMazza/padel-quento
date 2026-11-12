@@ -202,7 +202,7 @@ erDiagram
     bookers ||--o{ players_reviews : "reviewed_id"
     bookers ||--o{ messages : "sender_id"
     complexes ||--o{ courts : "complex_id"
-    courts ||--o{ schedules : "court_id"
+    courts ||--|{ schedules : "court_id"
     courts ||--o{ out_of_services : "court_id"
     courts ||--o{ bookings : "court_id"
     courts ||--o{ fixed_bookings : "court_id"

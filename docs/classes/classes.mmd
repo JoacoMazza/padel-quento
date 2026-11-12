@@ -91,9 +91,9 @@ classDiagram
 
     class OutOfService {
         -description: char
-        -fromDatetime: DateTime
+        -fromDatetime: LocalDateTime
         -reason: OutOfServiceReason
-        -toDatetime: DateTime
+        -toDatetime: LocalDateTime
         +cancelAffectedBookings()
         +isActive() boolean
     }
@@ -113,17 +113,17 @@ classDiagram
     }
 
     class FixedBooking {
-        -createdAt: datetime
+        -createdAt: LocalDateTime
         -durationMinutes: int
-        -endDate: Date
+        -endDate: LocalDate
         -frequency: FixedBookingFrequency
-        -isActive: bool
-        -startDate: Date
-        -startTime: Time
+        -isActive: boolean
+        -startDate: LocalDate
+        -startTime: LocalTime
     }
 
     class FixedBookingDate {
-        -date: Date
+        -date: LocalDate
         -state: FixedBookingDateState
     }
 
@@ -186,7 +186,7 @@ classDiagram
     class ReviewLevel {
         <<enumeration>>
         lower
-        asDeclared
+        as_declared
         higher
     }
 
@@ -245,23 +245,23 @@ classDiagram
     Player -- "*" Penalty
     Player "1" -- "0..*" MatchPlayer
     Player "1" -- "0..*" Inscription
-    Player -- PlayerReview : +Reviewer
-    Player -- PlayerReview : +Reviewed
+    Player -- "0..*" PlayerReview : +reviewer
+    Player -- "0..*" PlayerReview : +reviewed
     Player -- "0..*" Message
 
     %% Matches
-    Match *-- "1..4" MatchPlayer
+    Match *-- "0..4" MatchPlayer
     Match *-- "0..1" Chat
     Chat *-- "0..*" Message
-    PlayerReview -- Match
+    PlayerReview "0..*" -- Match
     Match "0..1" -- Booking
 
     %% Bookings
     Booker -- "*" Booking
-    Booking "0..1" -- FixedBookingDate
+    Booking "0..1" -- "0..1" FixedBookingDate
     Booker -- "*" FixedBooking
     FixedBooking -- "*" FixedBookingDate
-    FixedBooking -- Court
+    FixedBooking "0..*" -- Court
 
     %% Lessons
     Player -- "0..*" Lesson : +teacher
