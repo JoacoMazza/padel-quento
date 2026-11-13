@@ -254,6 +254,14 @@ pnpm db:seed:bookings
 
 Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan finalizados y pagos (con algunas inasistencias, como penalizaciones de 0 puntos ligadas al turno) o cancelados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
 
+Además carga datos de ejemplo del resto de la app ([scripts/demo-seed.ts](scripts/demo-seed.ts)), con fechas relativas al día en que se ejecuta y en horarios que deja libres de turnos sueltos:
+
+- **Profesores y clases**: crea 2 profesores (`seed.profesor1@quento.com` y `seed.profesor2@quento.com` / `profesor123`), cada uno con una clase activa (una sin fecha de fin y otra con fecha de fin), sus horarios semanales, alumnos inscriptos (jugadores de ejemplo) y los turnos de la clase, ya dados y por venir.
+- **Turnos fijos**: uno semanal y otro quincenal de jugadores de ejemplo, tomados desde hace unas semanas, con todas sus fechas reservadas.
+- **Partidos abiertos**: con lugares libres, completos (cerrados, con chat) y ya jugados: uno de ayer que sus jugadores todavía pueden calificar y otro de hace unos días ya calificado.
+
+Para poder armar partidos abiertos, a los jugadores de ejemplo sin categoría les carga una. Los horarios que ya estén ocupados se saltean, y si los profesores de ejemplo ya existen no vuelve a cargar estos datos. Para verlos completos conviene correrlo sobre una base recién creada (`pnpm migration:run`, `pnpm db:seed` y `pnpm db:seed:bookings`).
+
 > Los seeds no crean el esquema: sobre una base sin migraciones fallan con `no existe la relación «courts»`. Correr antes `pnpm migration:run`.
 
 ## Deploy (Supabase)
@@ -360,7 +368,7 @@ pnpm migration:revert                                   # revierte la última mi
 pnpm migration:show                                     # lista migraciones aplicadas/pendientes
 pnpm db:seed                                             # desarrollo: 8 canchas con horario 09-23hs y cuentas de prueba (idempotente)
 pnpm db:seed:prod                                        # producción: 8 canchas con horario 09-23hs y el dueño de SEED_OWNER_* (idempotente)
-pnpm db:seed:bookings                                    # crea turnos de ejemplo alrededor de la fecha actual, para las métricas
+pnpm db:seed:bookings                                    # crea turnos, clases, turnos fijos y partidos abiertos de ejemplo alrededor de la fecha actual
 ```
 
 Ver [Migraciones](#4-migraciones) y [Datos de ejemplo (seed)](#5-datos-de-ejemplo-seed) para más detalle.

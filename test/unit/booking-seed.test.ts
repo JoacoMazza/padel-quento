@@ -111,6 +111,22 @@ describe("generateSeedBookings", () => {
     expect(bookings.some((b) => b.fromDateTime.toDateString() === new Date(2026, 9, 13).toDateString())).toBe(true);
   });
 
+  it("deja libres los turnos reservados para los datos de ejemplo (clases, turnos fijos y partidos)", () => {
+    const without = generateSeedBookings(input());
+    const reserved = [without[0], without[without.length - 1]].map((b) => ({
+      courtId: b.courtId,
+      fromDateTime: b.fromDateTime,
+    }));
+    const bookings = generateSeedBookings(input({ reserved }));
+    const isReserved = (b: (typeof bookings)[number]) =>
+      reserved.some((r) => r.courtId === b.courtId && r.fromDateTime.getTime() === b.fromDateTime.getTime());
+
+    expect(bookings.some(isReserved)).toBe(false);
+    // El resto de esos días se sigue generando.
+    const reservedDays = reserved.map((r) => r.fromDateTime.toDateString());
+    expect(reservedDays.every((day) => bookings.some((b) => b.fromDateTime.toDateString() === day))).toBe(true);
+  });
+
   it("correrlo de nuevo sobre lo ya generado no agrega turnos", () => {
     const existing = generateSeedBookings(input()).filter((b) => b.bookingState !== BookingState.CANCELLED);
 
