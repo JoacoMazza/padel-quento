@@ -1,21 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DataSource } from "typeorm";
+import type { DataSource } from "typeorm";
+import { migrationDataSource, migrations, migrationsBefore } from "./migration-helpers";
 import { getDataSource } from "@/src/lib/db";
-
-// The CLI loads migrations from disk; here Vite bundles them so the TS sources run as-is.
-const migrationModules = import.meta.glob<Record<string, unknown>>("../../src/migrations/*.ts", { eager: true });
-const migrations = Object.values(migrationModules).flatMap((module) =>
-  Object.values(module).filter((value): value is new () => object => typeof value === "function"),
-);
-// AddComplexes y las que la siguen (AddComplexWhatsApp y AddComplexCountry, que necesitan la tabla).
-const isComplexesMigration = (migration: new () => object) => migration.name.startsWith("AddComplex");
 
 const CHECK_DATABASE = "padel_quento_complexes_migration_check";
 
-function dataSourceFor(selected: (new () => object)[]) {
-  const url = new URL(process.env.DATABASE_URL!);
-  url.pathname = `/${CHECK_DATABASE}`;
-  return new DataSource({ type: "postgres", url: url.toString(), migrations: selected });
+function dataSourceFor(selected: typeof migrations) {
+  return migrationDataSource(CHECK_DATABASE, selected);
 }
 
 describe("migración de complejos (integración con Postgres real)", { timeout: 120000 }, () => {
@@ -27,7 +18,7 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
     await admin.query(`CREATE DATABASE ${CHECK_DATABASE}`);
 
     // Una base como la de hoy, con canchas y turnos, antes de la migración de complejos.
-    const before = dataSourceFor(migrations.filter((m) => !isComplexesMigration(m)));
+    const before = dataSourceFor(migrationsBefore("AddComplex"));
     await before.initialize();
     await before.runMigrations();
     await before.query(`INSERT INTO "courts" ("number", "state", "price") VALUES (1, 'available', 10000), (2, 'maintenance', 12000)`);
@@ -85,7 +76,8 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
     );
     expect(courts).toEqual([
       { number: 1, state: "available", price: 10000, complex: "Quento Club" },
-      { number: 2, state: "maintenance", price: 12000, complex: "Quento Club" },
+      // El estado "maintenance" ya no existe: la cancha queda disponible (ver ReduceCourtStates).
+      { number: 2, state: "available", price: 12000, complex: "Quento Club" },
     ]);
 
     const bookings = await db.query(
@@ -95,9 +87,9 @@ describe("migración de complejos (integración con Postgres real)", { timeout: 
   });
 
   it("se puede revertir sin perder las canchas", async () => {
-    await db.undoLastMigration();
-    await db.undoLastMigration();
-    await db.undoLastMigration();
+    // Las de complejos y todas las que vinieron después.
+    const applied = migrations.length - migrationsBefore("AddComplex").length;
+    for (let i = 0; i < applied; i += 1) await db.undoLastMigration();
 
     const courts = await db.query(`SELECT "number" FROM "courts" ORDER BY "number"`);
     expect(courts).toEqual([{ number: 1 }, { number: 2 }]);

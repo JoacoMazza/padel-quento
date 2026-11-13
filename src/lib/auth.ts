@@ -27,7 +27,7 @@ export const authOptions: NextAuthOptions = {
           const accounts = dataSource.getRepository<Account>("Account");
           const account = await accounts.findOne({
             where: { email },
-            relations: { admin: true, player: { teacher: true } },
+            relations: { admin: true, player: { lessons: true } },
           });
 
           if (!account) {
@@ -57,8 +57,9 @@ export const authOptions: NextAuthOptions = {
             // Solo para mostrar u ocultar secciones del panel: los permisos del dueño se
             // verifican contra la base en cada acción (ver requireOwner).
             isOwner: account.admin?.accessLevel === AdminAccessLevel.OWNER,
-            // Igual para el profesor (HU-42): sus acciones lo verifican con requireTeacher.
-            isTeacher: account.player?.teacher?.isActive === true,
+            // Igual para el profesor (HU-42), que lo es mientras tenga una clase activa:
+            // sus acciones lo verifican con requireTeacher.
+            isTeacher: account.player?.lessons?.some((lesson) => lesson.isActive) === true,
           };
         } catch (error) {
           console.error("[Auth Error] Fallo en conexión a BD o verificación de credenciales:", error);

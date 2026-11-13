@@ -23,10 +23,9 @@ export enum PlayerCategory {
   WITHOUT_CATEGORY = "without_category",
 }
 
+/** Una cancha está disponible o dada de baja; los bloqueos temporales son fuera de servicio (OutOfService). */
 export enum CourtState {
   AVAILABLE = "available",
-  OUT_OF_SERVICE = "out_of_service",
-  MAINTENANCE = "maintenance",
   CLOSED_DOWN = "closed_down",
 }
 
@@ -70,9 +69,12 @@ export enum FixedBookingDateState {
   CONFLICT = "conflict",
 }
 
+/**
+ * Un turno está reservado hasta que termina (el job de asistencia lo pasa a
+ * finalizado) o hasta que se cancela. Si se pagó va aparte (Booking.isPaid).
+ */
 export enum BookingState {
   RESERVED = "reserved",
-  AVAILABLE = "available",
-  PAID = "paid",
+  FINISHED = "finished",
   CANCELLED = "cancelled",
 }

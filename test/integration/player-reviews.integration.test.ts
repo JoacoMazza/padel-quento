@@ -95,7 +95,7 @@ describe("reseñas entre compañeros de partido (integración con Postgres real)
     const dataSource = await getDataSource();
     await dataSource
       .getRepository<MatchPlayer>("MatchPlayer")
-      .update({ match: { id: matchId }, player: { id: player.id } }, { attended: false });
+      .update({ match: { id: matchId }, player: { id: player.id } }, { attendedCount: 0 });
   }
 
   beforeAll(async () => {

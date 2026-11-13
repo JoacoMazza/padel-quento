@@ -3,53 +3,61 @@
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import {
-  addClassStudent,
+  addLessonStudent,
   getTeacherClasses,
+  getTeacherLessons,
   getTeacherStudents,
+  type LessonItem,
   type TeacherClassItem,
   type TeacherStudentItem,
 } from "@/src/actions/teacherClass";
-import { dateToTimeLabel } from "@/src/domain/time-format";
+import { scheduleLabel } from "@/app/components/lesson-labels";
 import { TeacherClassesBoard } from "@/app/teacher/teacher-classes-board";
+import { TeacherLessonsBoard } from "@/app/teacher/teacher-lessons-board";
 
-type Tab = "agenda" | "students";
+type Tab = "agenda" | "lessons" | "students";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "agenda", label: "Agenda" },
+  { id: "lessons", label: "Clases" },
   { id: "students", label: "Alumnos" },
 ];
 
 const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
-const CLASS_OPTION_FORMATTER = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short" });
 
 /**
- * Mis clases del profesor, en dos pestañas: la agenda de sus turnos de clase
- * (HU-46) y el listado de sus alumnos (HU-45), desde donde suma rápido a un
- * alumno a un próximo turno de clase. Un cambio en una actualiza la otra.
+ * Mis clases del profesor, en tres pestañas: la agenda de los turnos de sus
+ * clases (HU-46), sus clases con los alumnos inscriptos (HU-44) y el listado
+ * de sus alumnos (HU-45), desde donde inscribe rápido a un alumno en una
+ * clase. Un cambio en una actualiza las otras.
  */
 export function TeacherDashboard({
   classes: initialClasses,
+  lessons: initialLessons,
   students: initialStudents,
 }: {
   classes: TeacherClassItem[];
+  lessons: LessonItem[];
   students: TeacherStudentItem[];
 }) {
   const [tab, setTab] = useState<Tab>("agenda");
   const [classes, setClasses] = useState(initialClasses);
+  const [lessons, setLessons] = useState(initialLessons);
   const [students, setStudents] = useState(initialStudents);
-  // La agenda maneja su propio estado: se vuelve a montar con los datos nuevos tras un cambio desde el listado.
-  const [agendaVersion, setAgendaVersion] = useState(0);
+  // Las clases manejan su propio estado: se vuelven a montar con los datos nuevos tras un cambio desde el listado.
+  const [lessonsVersion, setLessonsVersion] = useState(0);
 
-  async function reloadStudents() {
-    const result = await getTeacherStudents();
-    if (result.success) setStudents(result.data);
+  async function reloadAgendaAndStudents() {
+    const [classesResult, studentsResult] = await Promise.all([getTeacherClasses(), getTeacherStudents()]);
+    if (classesResult.success) setClasses(classesResult.data);
+    if (studentsResult.success) setStudents(studentsResult.data);
   }
 
   async function reloadAll() {
-    const [classesResult] = await Promise.all([getTeacherClasses(), reloadStudents()]);
-    if (classesResult.success) {
-      setClasses(classesResult.data);
-      setAgendaVersion((version) => version + 1);
+    const [lessonsResult] = await Promise.all([getTeacherLessons(), reloadAgendaAndStudents()]);
+    if (lessonsResult.success) {
+      setLessons(lessonsResult.data);
+      setLessonsVersion((version) => version + 1);
     }
   }
 
@@ -73,12 +81,15 @@ export function TeacherDashboard({
       </div>
 
       <div role="tabpanel" id="teacher-panel-agenda" aria-labelledby="teacher-tab-agenda" hidden={tab !== "agenda"}>
-        <TeacherClassesBoard
-          key={agendaVersion}
-          classes={classes}
+        <TeacherClassesBoard classes={classes} />
+      </div>
+      <div role="tabpanel" id="teacher-panel-lessons" aria-labelledby="teacher-tab-lessons" hidden={tab !== "lessons"}>
+        <TeacherLessonsBoard
+          key={lessonsVersion}
+          lessons={lessons}
           onChanged={(updated) => {
-            setClasses(updated);
-            reloadStudents();
+            setLessons(updated);
+            reloadAgendaAndStudents();
           }}
         />
       </div>
@@ -88,7 +99,7 @@ export function TeacherDashboard({
         aria-labelledby="teacher-tab-students"
         hidden={tab !== "students"}
       >
-        {tab === "students" ? <StudentsList students={students} classes={classes} onChanged={reloadAll} /> : null}
+        {tab === "students" ? <StudentsList students={students} lessons={lessons} onChanged={reloadAll} /> : null}
       </div>
     </div>
   );
@@ -96,11 +107,11 @@ export function TeacherDashboard({
 
 function StudentsList({
   students,
-  classes,
+  lessons,
   onChanged,
 }: {
   students: TeacherStudentItem[];
-  classes: TeacherClassItem[];
+  lessons: LessonItem[];
   onChanged: () => Promise<void>;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -113,14 +124,12 @@ function StudentsList({
     );
   }
 
-  // Próximas clases con lugar, para sumar rápido a un alumno que todavía no está en ellas.
-  const openClasses = classes.filter(
-    (lesson) => !lesson.isFinished && lesson.students.length < lesson.classCapacity,
-  );
+  // Clases con lugar, para inscribir rápido a un alumno que todavía no está en ellas.
+  const openLessons = lessons.filter((lesson) => lesson.students.length < lesson.classCapacity);
 
-  async function add(classId: number, studentId: number) {
+  async function add(lessonId: number, studentId: number) {
     setError(null);
-    const result = await addClassStudent(classId, studentId);
+    const result = await addLessonStudent(lessonId, studentId);
     if (!result.success) {
       setError(result.error);
       return;
@@ -147,8 +156,8 @@ function StudentsList({
               <StudentRow
                 key={student.id}
                 student={student}
-                options={openClasses.filter((lesson) => !lesson.students.some((s) => s.id === student.id))}
-                onAdd={(classId) => add(classId, student.id)}
+                options={openLessons.filter((lesson) => !lesson.students.some((s) => s.id === student.id))}
+                onAdd={(lessonId) => add(lessonId, student.id)}
               />
             ))}
           </tbody>
@@ -164,8 +173,8 @@ function StudentRow({
   onAdd,
 }: {
   student: TeacherStudentItem;
-  options: TeacherClassItem[];
-  onAdd: (classId: number) => Promise<void>;
+  options: LessonItem[];
+  onAdd: (lessonId: number) => Promise<void>;
 }) {
   const [classId, setClassId] = useState("");
   const fullName = `${student.names} ${student.lastnames}`;
@@ -197,14 +206,11 @@ function StudentRow({
               className="field min-w-48"
             >
               <option value="">Elegí una clase</option>
-              {options.map((lesson) => {
-                const start = new Date(lesson.fromDateTime);
-                return (
-                  <option key={lesson.id} value={lesson.id}>
-                    {CLASS_OPTION_FORMATTER.format(start)} · {dateToTimeLabel(start)} · Cancha {lesson.courtNumber}
-                  </option>
-                );
-              })}
+              {options.map((lesson) => (
+                <option key={lesson.id} value={lesson.id}>
+                  {lesson.schedules.map(scheduleLabel).join(" / ")}
+                </option>
+              ))}
             </select>
             <button
               type="button"

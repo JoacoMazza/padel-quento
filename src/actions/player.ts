@@ -8,6 +8,7 @@ import { Booking } from "@/src/entities/Booking";
 import { MatchPlayer } from "@/src/entities/MatchPlayer";
 import { Penalty } from "@/src/entities/Penalty";
 import { BookingState, PlayerCategory } from "@/src/domain/enums";
+import { bookerAttended, hasNoShow } from "@/src/domain/attendance";
 import { getDataSource } from "@/src/lib/db";
 import { duplicateAccountMessage, isUniqueViolation } from "@/src/lib/db-errors";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
@@ -264,7 +265,7 @@ export async function getPlayerRecordAdmin(id: number): Promise<ActionResult<Pla
 
     const ownBookings = await dataSource.getRepository<Booking>("Booking").find({
       where: { booker: { id } },
-      relations: { court: true, match: true },
+      relations: { court: true, match: true, penalties: true },
     });
     const participations = await dataSource.getRepository<MatchPlayer>("MatchPlayer").find({
       where: { player: { id } },
@@ -275,16 +276,16 @@ export async function getPlayerRecordAdmin(id: number): Promise<ActionResult<Pla
       order: { createdAt: "DESC" },
     });
 
-    // En un partido abierto la asistencia es la del jugador dentro del partido
-    // (MatchPlayer.attended), incluso si fue quien lo creó.
+    // En un partido abierto la asistencia es la del grupo del jugador dentro del
+    // partido (hasNoShow), incluso si fue quien lo creó.
     const recordBookings = new Map<number, PlayerRecordBooking>();
     for (const participation of participations) {
       const booking = participation.match.booking;
-      recordBookings.set(booking.id, toRecordBooking(booking, true, participation.attended));
+      recordBookings.set(booking.id, toRecordBooking(booking, true, !hasNoShow(participation)));
     }
     for (const booking of ownBookings) {
       if (!recordBookings.has(booking.id)) {
-        recordBookings.set(booking.id, toRecordBooking(booking, Boolean(booking.match), booking.attended));
+        recordBookings.set(booking.id, toRecordBooking(booking, Boolean(booking.match), bookerAttended(booking)));
       }
     }
     const bookings = [...recordBookings.values()].sort((a, b) => b.fromDateTime.localeCompare(a.fromDateTime));

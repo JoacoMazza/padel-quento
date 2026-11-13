@@ -6,6 +6,12 @@ function court(overrides: Partial<CourtItem> = {}): CourtItem {
   return { id: 1, number: 1, state: CourtState.AVAILABLE, price: 18000, activeOutOfService: null, ...overrides };
 }
 
+describe("CourtState", () => {
+  it("una cancha está disponible o dada de baja: los bloqueos temporales son fuera de servicio (out_of_services)", () => {
+    expect(Object.values(CourtState)).toEqual(["available", "closed_down"]);
+  });
+});
+
 describe("summarizeCourts", () => {
   it("cuenta las canchas habilitadas y los bloqueos activos", () => {
     const summary = summarizeCourts([

@@ -62,7 +62,7 @@ describe("getAttendanceReport (integración con Postgres real)", () => {
     absentId = await createTestPlayer("Falta");
 
     const create = async (bookerId: number, fromDateTime: Date) => {
-      const result = await createBookingForPlayer({ fromDateTime, bookerId, courtId, bookingState: BookingState.PAID });
+      const result = await createBookingForPlayer({ fromDateTime, bookerId, courtId, bookingState: BookingState.FINISHED });
       if (!result.success) throw new Error(`no se pudo crear el turno: ${result.error}`);
       bookingIds.push(result.data.id);
       return result.data.id;

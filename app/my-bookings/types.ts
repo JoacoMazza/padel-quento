@@ -27,6 +27,8 @@ export type MyBookingItem = {
 };
 
 export type ClassInfo = {
+  /** Clase a la que pertenece el turno: el alumno se da de baja de la clase entera. */
+  lessonId: number;
   role: "teacher" | "student";
   teacherName: string;
   capacity: number;

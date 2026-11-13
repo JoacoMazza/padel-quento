@@ -12,6 +12,7 @@ import { getDataSource } from "@/src/lib/db";
 import { isUniqueViolation } from "@/src/lib/db-errors";
 import type { ActionResult } from "@/src/lib/action-result";
 import { getSessionPlayerId } from "@/src/lib/session-player";
+import { isPresent } from "@/src/domain/attendance";
 
 export type ReviewableTeammate = {
   playerId: number;
@@ -51,7 +52,7 @@ async function loadReviewableMatch(matchId: number, playerId: number) {
     throw new ReviewError(NOT_REVIEWABLE_MESSAGE);
   }
 
-  const attended = match.matchPlayers.filter((mp: MatchPlayer) => mp.attended);
+  const attended = match.matchPlayers.filter((mp: MatchPlayer) => isPresent(mp));
   if (!attended.some((mp) => mp.player.id === playerId)) {
     throw new ReviewError(NOT_A_PLAYER_MESSAGE);
   }

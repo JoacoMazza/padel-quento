@@ -332,6 +332,7 @@ export async function addPlayerToMatch(
       if (inviterParticipation && inviterParticipation.playersCount > 1) {
         await matchPlayers.update(inviterParticipation.id, {
           playersCount: inviterParticipation.playersCount - 1,
+          attendedCount: inviterParticipation.playersCount - 1,
         });
       } else {
         const confirmedPlayers = match.matchPlayers.reduce((sum, mp) => sum + (mp.playersCount ?? 1), 0);
@@ -346,7 +347,7 @@ export async function addPlayerToMatch(
       }
 
       await matchPlayers.save(
-        matchPlayers.create({ match: { id: match.id }, player: { id: target.id }, playersCount: 1 }),
+        matchPlayers.create({ match: { id: match.id }, player: { id: target.id }, playersCount: 1, attendedCount: 1 }),
       );
 
       // Misma regla que joinOpenMatch: la sala de chat se crea cuando el partido

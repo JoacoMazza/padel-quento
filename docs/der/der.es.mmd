@@ -47,7 +47,7 @@ erDiagram
         boolean esta_activa
         datetime fecha_creacion
         datetime fecha_hora_desde
-        datetime fecha_hora_hasta
+        datetime fecha_hora_hasta "nullable"
         decimal precio "decimal(10,2)"
     }
 
@@ -63,6 +63,7 @@ erDiagram
     penalizaciones {
         int id PK
         int jugador_id FK
+        int reserva_id FK "nullable"
         float puntaje_penalizado
         string motivo
         datetime fecha_creacion
@@ -202,7 +203,7 @@ erDiagram
     reservantes ||--o{ resenas_jugadores : "evaluado_id"
     reservantes ||--o{ mensajes : "emisor_id"
     complejos ||--o{ canchas : "complejo_id"
-    canchas ||--o{ horarios : "cancha_id"
+    canchas ||--|{ horarios : "cancha_id"
     canchas ||--o{ fuera_de_servicio : "cancha_id"
     canchas ||--o{ reservas : "cancha_id"
     canchas ||--o{ reservas_fijas : "cancha_id"
@@ -212,6 +213,7 @@ erDiagram
     clases ||--|{ horarios_clases : "clase_id"
     reservas ||--o| partidos : "reserva_id"
     reservas |o--o| fechas_reservas_fijas : "reserva_id"
+    reservas |o--o{ penalizaciones : "reserva_id"
     reservas_fijas ||--o{ fechas_reservas_fijas : "reserva_fija_id"
     partidos ||--o{ jugadores_partidos : "partido_id"
     partidos ||--o{ resenas_jugadores : "partido_id"

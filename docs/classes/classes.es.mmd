@@ -92,9 +92,9 @@ classDiagram
 
     class FueraDeServicio {
         -descripcion: char
-        -fechaHoraDesde: DateTime
+        -fechaHoraDesde: LocalDateTime
         -motivo: MotivoFueraDeServicio
-        -fechaHoraHasta: DateTime
+        -fechaHoraHasta: LocalDateTime
         +cancelarReservasAfectadas()
         +estaActivo() boolean
     }
@@ -114,17 +114,17 @@ classDiagram
     }
 
     class ReservaFija {
-        -fechaCreacion: datetime
+        -fechaCreacion: LocalDateTime
         -duracionMinutos: int
-        -fechaFin: Date
+        -fechaFin: LocalDate
         -frecuencia: FrecuenciaReservaFija
-        -estaActiva: bool
-        -fechaInicio: Date
-        -horaInicio: Time
+        -estaActiva: boolean
+        -fechaInicio: LocalDate
+        -horaInicio: LocalTime
     }
 
     class FechaReservaFija {
-        -fecha: Date
+        -fecha: LocalDate
         -estado: EstadoFechaReservaFija
     }
 
@@ -187,7 +187,7 @@ classDiagram
     class NivelResena {
         <<enumeration>>
         inferior
-        segunDeclarado
+        segun_declarado
         superior
     }
 
@@ -246,23 +246,24 @@ classDiagram
     Jugador -- "*" Penalizacion
     Jugador "1" -- "0..*" JugadorPartido
     Jugador "1" -- "0..*" Inscripcion
-    Jugador -- ResenaJugador : +evaluador
-    Jugador -- ResenaJugador : +evaluado
+    Jugador -- "0..*" ResenaJugador : +evaluador
+    Jugador -- "0..*" ResenaJugador : +evaluado
     Jugador -- "0..*" Mensaje
 
     %% Partidos
-    Partido *-- "1..4" JugadorPartido
+    Partido *-- "0..4" JugadorPartido
     Partido *-- "0..1" Chat
     Chat *-- "0..*" Mensaje
-    ResenaJugador -- Partido
+    ResenaJugador "0..*" -- Partido
     Partido "0..1" -- Reserva
 
     %% Reservas
     Reservante -- "*" Reserva
-    Reserva "0..1" -- FechaReservaFija
+    Reserva "0..1" -- "0..1" FechaReservaFija
+    Reserva "0..1" -- "*" Penalizacion
     Reservante -- "*" ReservaFija
     ReservaFija -- "*" FechaReservaFija
-    ReservaFija -- Cancha
+    ReservaFija "0..*" -- Cancha
 
     %% Clases
     Jugador -- "0..*" Clase : +profesor

@@ -2,12 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { refresh, updateBooking, closeMatch, leaveMatch, leaveClass } = vi.hoisted(() => ({
+const { refresh, updateBooking, closeMatch, leaveMatch, leaveLesson } = vi.hoisted(() => ({
   refresh: vi.fn(),
   updateBooking: vi.fn(),
   closeMatch: vi.fn(),
   leaveMatch: vi.fn(),
-  leaveClass: vi.fn(),
+  leaveLesson: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -15,7 +15,7 @@ vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }));
 vi.mock("@/src/actions/booking", () => ({ updateBooking }));
-vi.mock("@/src/actions/teacherClass", () => ({ leaveClass }));
+vi.mock("@/src/actions/lesson", () => ({ leaveLesson }));
 vi.mock("@/src/actions/match", () => ({ closeMatch, leaveMatch, addPlayerToMatch: vi.fn() }));
 vi.mock("@/app/my-bookings/review-teammates-modal", () => ({
   ReviewTeammatesModal: ({ matchId }: { matchId: number }) => <div role="dialog">Calificando el partido {matchId}</div>,
@@ -67,11 +67,11 @@ describe("BookingRow", () => {
     const studentClass = (overrides: Partial<MyBookingItem> = {}) =>
       booking({
         joinedAsParticipant: true,
-        classInfo: { role: "student", teacherName: "Lucía Profe", capacity: 4, studentsCount: 2 },
+        classInfo: { lessonId: 7, role: "student", teacherName: "Lucía Profe", capacity: 4, studentsCount: 2 },
         ...overrides,
       });
     const teacherClass = (overrides: Partial<MyBookingItem> = {}) =>
-      booking({ classInfo: { role: "teacher", teacherName: "Lucía Profe", capacity: 4, studentsCount: 1 }, ...overrides });
+      booking({ classInfo: { lessonId: 7, role: "teacher", teacherName: "Lucía Profe", capacity: 4, studentsCount: 1 }, ...overrides });
 
     it("al alumno le muestra la clase diferenciada, con el profesor y sin el precio ni la opción de cancelar el turno", () => {
       render(<BookingRow booking={studentClass()} now={NOW} />);
@@ -83,16 +83,16 @@ describe("BookingRow", () => {
       expect(screen.queryByRole("button", { name: "Cancelar turno" })).toBeNull();
     });
 
-    it("el alumno sale de la clase después de confirmar", async () => {
-      leaveClass.mockResolvedValue({ success: true, data: null });
+    it("el alumno se da de baja de la clase entera después de confirmar", async () => {
+      leaveLesson.mockResolvedValue({ success: true, data: null });
       render(<BookingRow booking={studentClass()} now={NOW} playerId={21} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Salir de la clase" }));
-      expect(screen.getByText("¿Salir de la clase?")).toBeTruthy();
+      expect(screen.getByText("¿Salir de la clase? Dejás de ir a todos sus turnos.")).toBeTruthy();
       expect(screen.queryByText(/se te descontarán/)).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Sí, salir" }));
 
-      await waitFor(() => expect(leaveClass).toHaveBeenCalledWith(10));
+      await waitFor(() => expect(leaveLesson).toHaveBeenCalledWith(7));
       await waitFor(() => expect(refresh).toHaveBeenCalled());
     });
 

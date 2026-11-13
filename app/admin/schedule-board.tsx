@@ -239,10 +239,7 @@ export function ScheduleBoard({
       return { state: "finished", booking: overlappingBooking };
     }
     if (overlappingBooking?.needPlayers) return { state: "pending", booking: overlappingBooking };
-    if (
-      overlappingBooking?.bookingState === BookingState.RESERVED ||
-      overlappingBooking?.bookingState === BookingState.PAID
-    ) {
+    if (overlappingBooking) {
       const state = overlappingBooking.classInfo ? "class" : overlappingBooking.fixedBookingDateId ? "fixed" : "reserved";
       return { state, booking: overlappingBooking };
     }

@@ -115,7 +115,7 @@ describe("court actions (integración con Postgres real)", () => {
 
   it("lista las canchas creadas", async () => {
     const number = uniqueCourtNumber();
-    await createCourt({ number, state: CourtState.MAINTENANCE, price: 10000 });
+    await createCourt({ number, state: CourtState.CLOSED_DOWN, price: 10000 });
 
     const result = await getCourts();
 
@@ -194,22 +194,21 @@ describe("court actions (integración con Postgres real)", () => {
       expect(await updateCourt(closed.data.id, { state: CourtState.AVAILABLE })).toEqual({ success: false, error: OWNER_ONLY });
     });
 
-    it("puede pasar una cancha a mantenimiento y volverla a habilitar", async () => {
+    it("puede editar una cancha disponible sin cambiarle el estado", async () => {
       const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
       signInAs(staffEmail);
 
-      const maintenance = await updateCourt(court.data.id, { state: CourtState.MAINTENANCE });
-      const available = await updateCourt(court.data.id, { state: CourtState.AVAILABLE });
+      const number = uniqueCourtNumber();
+      const available = await updateCourt(court.data.id, { state: CourtState.AVAILABLE, number });
 
-      expect(maintenance.success && maintenance.data.state).toBe(CourtState.MAINTENANCE);
-      expect(available.success && available.data.state).toBe(CourtState.AVAILABLE);
+      expect(available.success && available.data).toMatchObject({ state: CourtState.AVAILABLE, number });
     });
 
     it("puede mandar el mismo precio que ya tiene la cancha al editar otra cosa", async () => {
       const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
       signInAs(staffEmail);
 
-      const result = await updateCourt(court.data.id, { state: CourtState.MAINTENANCE, price: 10000 });
+      const result = await updateCourt(court.data.id, { number: uniqueCourtNumber(), price: 10000 });
 
       expect(result.success).toBe(true);
     });

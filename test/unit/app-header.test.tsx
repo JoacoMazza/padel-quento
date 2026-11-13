@@ -25,28 +25,37 @@ describe("AppHeader", () => {
     const links = screen.getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")]);
     expect(links).toEqual(
       expect.arrayContaining([
-        ["Inicio", "/"],
         ["Turnos", "/bookings"],
         ["Partidos abiertos", "/open-matches"],
-        ["Mis reservas", "/my-bookings"],
+        ["Clases", "/lessons"],
       ]),
     );
   });
 
-  it("a un profesor le suma el link a sus clases (HU-42)", () => {
-    render(<AppHeader active="/teacher" userRole={Role.PLAYER} isTeacher />);
+  it("Mis turnos y Mis clases van en el menú de la cuenta, no en la navegación", () => {
+    render(<AppHeader active="/" userName="Ana" userRole={Role.PLAYER} isTeacher />);
 
-    const link = screen.getAllByRole("link", { name: "Mis clases" })[0];
-    expect(link.getAttribute("href")).toBe("/teacher");
+    expect(screen.queryByRole("link", { name: "Mis turnos" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Mis clases" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ana/ }));
+
+    expect(screen.getByRole("link", { name: "Mis turnos" }).getAttribute("href")).toBe("/my-bookings");
+    expect(screen.getByRole("link", { name: "Mis clases" }).getAttribute("href")).toBe("/teacher");
+  });
+
+  it("suma el link a las clases, donde los jugadores se inscriben", () => {
+    render(<AppHeader active="/lessons" userRole={Role.PLAYER} />);
+
+    const link = screen.getAllByRole("link", { name: "Clases" })[0];
+    expect(link.getAttribute("href")).toBe("/lessons");
     expect(link.getAttribute("aria-current")).toBe("page");
   });
 
-  it("a un profesor le suma el link para reservar sus turnos de clase (HU-43)", () => {
-    render(<AppHeader active="/teacher/book" userRole={Role.PLAYER} isTeacher />);
+  it("al profesor ya no le ofrece reservar turnos de clase: las clases las da de alta el club", () => {
+    render(<AppHeader active="/teacher" userRole={Role.PLAYER} isTeacher />);
 
-    const link = screen.getAllByRole("link", { name: "Reservar clase" })[0];
-    expect(link.getAttribute("href")).toBe("/teacher/book");
-    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("link", { name: "Reservar clase" })).toBeNull();
   });
 
   it("a un jugador que no es profesor no le muestra el link a las clases", () => {
@@ -141,10 +150,9 @@ describe("AppHeader", () => {
       const menu = screen.getByRole("navigation", { name: "Menú principal" });
       const links = within(menu).getAllByRole("link");
       expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
-        ["Inicio", "/"],
         ["Turnos", "/bookings"],
         ["Partidos abiertos", "/open-matches"],
-        ["Mis reservas", "/my-bookings"],
+        ["Clases", "/lessons"],
       ]);
       expect(within(menu).getByRole("link", { name: "Turnos" }).getAttribute("aria-current")).toBe("page");
       expect(screen.getByRole("button", { name: "Cerrar menú" }).getAttribute("aria-expanded")).toBe("true");
@@ -196,7 +204,7 @@ describe("AppHeader", () => {
       fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
 
       const menu = screen.getByRole("navigation", { name: "Menú principal" });
-      expect(within(menu).queryByRole("link", { name: "Mis reservas" })).toBeNull();
+      expect(within(menu).queryByRole("link", { name: "Mis turnos" })).toBeNull();
       expect(within(menu).getByRole("link", { name: "Turnos" })).toBeTruthy();
     });
 
@@ -216,10 +224,10 @@ describe("AppHeader", () => {
       expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull();
     });
 
-    it("no muestra el link a Mis reservas, pero sí los que se pueden ver sin sesión", () => {
+    it("no muestra el link a Mis turnos, pero sí los que se pueden ver sin sesión", () => {
       render(<AppHeader active="/bookings" guest />);
 
-      expect(screen.queryByRole("link", { name: "Mis reservas" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Mis turnos" })).toBeNull();
       expect(screen.getByRole("link", { name: "Turnos" }).getAttribute("href")).toBe("/bookings");
       expect(screen.getByRole("link", { name: "Partidos abiertos" }).getAttribute("href")).toBe("/open-matches");
     });

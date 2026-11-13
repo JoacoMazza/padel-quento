@@ -5,6 +5,7 @@ import { occurrenceStart, todayISO } from "@/src/domain/fixed-booking";
 vi.mock("@/src/jobs/open-match-expiration", () => ({ startOpenMatchExpirationJob: vi.fn() }));
 vi.mock("@/src/jobs/attendance-points", () => ({ startAttendancePointsJob: vi.fn() }));
 vi.mock("@/src/jobs/fixed-booking-extension", () => ({ startFixedBookingExtensionJob: vi.fn() }));
+vi.mock("@/src/jobs/lesson-extension", () => ({ startLessonExtensionJob: vi.fn() }));
 
 import { register } from "@/instrumentation";
 

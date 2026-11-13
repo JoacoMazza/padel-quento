@@ -1,13 +1,13 @@
 import "reflect-metadata";
-import { Check, Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { BookingState } from "@/src/domain/enums";
 import type { Booker } from "@/src/entities/Booker";
 import type { Court } from "@/src/entities/Court";
 import type { Match } from "@/src/entities/Match";
-import type { ClassStudent } from "@/src/entities/ClassStudent";
+import type { Lesson } from "@/src/entities/Lesson";
+import type { Penalty } from "@/src/entities/Penalty";
 
 @Entity({ name: "bookings" })
-@Check("CHK_bookings_class_capacity", `"class_capacity" BETWEEN 1 AND 8`)
 export class Booking {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -32,12 +32,9 @@ export class Booking {
   })
   price!: number;
 
-  /**
-   * Quien reservó el turno, referenciado por su teléfono como en el DER
-   * (bookings.booker_phone_number -> bookers.phone_number).
-   */
-  @ManyToOne("Booker", "bookings", { onUpdate: "CASCADE" })
-  @JoinColumn({ name: "booker_phone_number", foreignKeyConstraintName: "FK_bookings_booker_phone_number", referencedColumnName: "phoneNumber" })
+  /** Quien reservó el turno (bookings.booker_id -> bookers.id). */
+  @ManyToOne("Booker", "bookings")
+  @JoinColumn({ name: "booker_id", foreignKeyConstraintName: "FK_bookings_booker_id" })
   booker!: Booker;
 
   @ManyToOne("Court", "bookings")
@@ -48,30 +45,24 @@ export class Booking {
   @OneToOne("Match", "booking")
   match?: Match;
 
-  /**
-   * Asistencia de quien reservó el turno. Solo aplica cuando el turno
-   * NO tiene un partido abierto asociado (ver MatchPlayer.attended para ese caso).
-   * Arranca en true: el administrador solo interviene para marcar la ausencia.
-   */
-  @Column({ type: "boolean", default: true, name: "attended" })
-  attended!: boolean;
+  @Column({ type: "boolean", default: false, name: "is_paid" })
+  isPaid!: boolean;
 
   /**
-   * true una vez que el job de puntos por asistencia (ver
-   * src/jobs/attendance-points.ts) ya procesó este turno, para no acreditar
-   * los puntos dos veces.
+   * Movimientos de puntos que originó el turno: la asistencia que acreditó el
+   * job y las inasistencias que marcó el administrador (ver
+   * src/actions/attendance.ts). En un turno sin partido abierto, quien
+   * reservó asistió salvo que tenga una inasistencia (ver bookerAttended).
    */
-  @Column({ type: "boolean", default: false, name: "points_awarded" })
-  pointsAwarded!: boolean;
+  @OneToMany("Penalty", "booking")
+  penalties?: Penalty[];
 
   /**
-   * Cupo de alumnos si el turno es una clase (HU-43): la reserva de un profesor
-   * (quien reservó) para dar clase. Null en cualquier otro turno.
+   * Clase a la que pertenece el turno, si es uno de sus horarios: lo reservó
+   * el profesor y lo toman los alumnos inscriptos en la clase. Null en
+   * cualquier otro turno.
    */
-  @Column({ type: "int", nullable: true, name: "class_capacity" })
-  classCapacity!: number | null;
-
-  /** Alumnos registrados en la clase (HU-44). */
-  @OneToMany("ClassStudent", "booking")
-  classStudents!: ClassStudent[];
+  @ManyToOne("Lesson", "bookings", { nullable: true })
+  @JoinColumn({ name: "lesson_id", foreignKeyConstraintName: "FK_bookings_lesson_id" })
+  lesson!: Lesson | null;
 }

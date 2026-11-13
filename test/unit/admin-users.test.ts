@@ -36,6 +36,7 @@ const NO_REVIEWS = vi.hoisted(() => ({
 // ── imports bajo test ─────────────────────────────────────────────────────────
 import { getServerSession } from "next-auth/next";
 import { BookingState, Role } from "@/src/domain/enums";
+import { NO_SHOW_PENALTY_REASON } from "@/src/domain/attendance";
 import { getPlayersAdmin, getPlayerRecordAdmin, blockPlayer, unblockPlayer } from "@/src/actions/player";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -230,7 +231,7 @@ describe("admin player actions", () => {
           fromDateTime: new Date("2026-10-01T10:00:00Z"),
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
-          attended: false,
+          penalties: [{ reason: NO_SHOW_PENALTY_REASON }],
           court: { number: 3 },
           match: null,
         },
@@ -239,7 +240,7 @@ describe("admin player actions", () => {
           fromDateTime: new Date("2026-10-05T10:00:00Z"),
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
-          attended: true,
+          penalties: [],
           court: { number: 1 },
           match: { id: 20 },
         },
@@ -247,27 +248,29 @@ describe("admin player actions", () => {
       // Participaciones en partidos abiertos: el propio (asistió) y uno ajeno (faltó).
       find.mockResolvedValueOnce([
         {
-          attended: true,
+          playersCount: 1,
+          attendedCount: 1,
           match: {
             booking: {
               id: 2,
               fromDateTime: new Date("2026-10-05T10:00:00Z"),
               durationMinutes: 90,
               bookingState: BookingState.RESERVED,
-              attended: true,
+              penalties: [],
               court: { number: 1 },
             },
           },
         },
         {
-          attended: false,
+          playersCount: 1,
+          attendedCount: 0,
           match: {
             booking: {
               id: 4,
               fromDateTime: new Date("2026-10-08T18:00:00Z"),
               durationMinutes: 60,
-              bookingState: BookingState.PAID,
-              attended: true,
+              bookingState: BookingState.FINISHED,
+              penalties: [],
               court: { number: 2 },
             },
           },
@@ -299,7 +302,7 @@ describe("admin player actions", () => {
               fromDateTime: "2026-10-08T18:00:00.000Z",
               durationMinutes: 60,
               courtNumber: 2,
-              bookingState: BookingState.PAID,
+              bookingState: BookingState.FINISHED,
               isOpenMatch: true,
               attended: false,
             },
@@ -342,7 +345,7 @@ describe("admin player actions", () => {
           fromDateTime: new Date("2026-10-01T10:00:00Z"),
           durationMinutes: 90,
           bookingState: BookingState.CANCELLED,
-          attended: false,
+          penalties: [{ reason: NO_SHOW_PENALTY_REASON }],
           court: { number: 3 },
           match: null,
         },

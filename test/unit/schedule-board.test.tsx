@@ -163,11 +163,14 @@ describe("ScheduleBoard - turnos fijos", () => {
     const lesson = {
       ...bookingAt(7, 18),
       booker: { id: 3, names: "Lucía", lastnames: "Profe" },
-      classCapacity: 4,
-      classStudents: [
-        { id: 1, player: { id: 21, names: "Ana", lastnames: "Alumna" } },
-        { id: 2, player: { id: 22, names: "Bruno", lastnames: "Alumno" } },
-      ],
+      lesson: {
+        id: 1,
+        classCapacity: 4,
+        inscriptions: [
+          { id: 1, player: { id: 21, names: "Ana", lastnames: "Alumna" } },
+          { id: 2, player: { id: 22, names: "Bruno", lastnames: "Alumno" } },
+        ],
+      },
     };
     getScheduleBoardData.mockResolvedValue({ ...BOARD, data: { ...BOARD.data, bookings: [lesson, bookingAt(6, 10)] } });
 

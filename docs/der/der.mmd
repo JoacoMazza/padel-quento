@@ -47,7 +47,7 @@ erDiagram
         boolean is_active
         datetime created_at
         datetime from_local_datetime
-        datetime to_local_datetime
+        datetime to_local_datetime "nullable"
         decimal price "decimal(10,2)"
     }
 
@@ -63,6 +63,7 @@ erDiagram
     penalties {
         int id PK
         int player_id FK
+        int booking_id FK "nullable"
         float penalized_scoring
         string reason
         datetime created_at
@@ -202,7 +203,7 @@ erDiagram
     bookers ||--o{ players_reviews : "reviewed_id"
     bookers ||--o{ messages : "sender_id"
     complexes ||--o{ courts : "complex_id"
-    courts ||--o{ schedules : "court_id"
+    courts ||--|{ schedules : "court_id"
     courts ||--o{ out_of_services : "court_id"
     courts ||--o{ bookings : "court_id"
     courts ||--o{ fixed_bookings : "court_id"
@@ -212,6 +213,7 @@ erDiagram
     lessons ||--|{ lesson_schedules : "lesson_id"
     bookings ||--o| matches : "booking_id"
     bookings |o--o| fixed_booking_dates : "booking_id"
+    bookings |o--o{ penalties : "booking_id"
     fixed_bookings ||--o{ fixed_booking_dates : "fixed_booking_id"
     matches ||--o{ match_players : "match_id"
     matches ||--o{ players_reviews : "match_id"

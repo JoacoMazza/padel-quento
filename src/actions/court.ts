@@ -105,7 +105,7 @@ export async function updateCourt(
     }
 
     // Cambiar el precio y dar de baja (o volver a habilitar) una cancha es solo
-    // para el dueño; el resto de los estados los maneja cualquier admin.
+    // para el dueño; el resto de los datos los edita cualquier admin.
     const changesPrice = input.price !== undefined && input.price !== court.price;
     const changesClosedDown =
       input.state !== undefined &&

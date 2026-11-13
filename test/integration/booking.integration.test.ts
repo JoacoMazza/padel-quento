@@ -85,32 +85,33 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("lista las reservas con quien reservó y cancha cargados", async () => {
-    await createBookingForPlayer({
+    const booking = await createBookingForPlayer({
       fromDateTime: uniqueFromDateTime(),
       bookerId,
       courtId,
-      bookingState: BookingState.PAID,
+      bookingState: BookingState.FINISHED,
     });
+    if (!booking.success) throw new Error("expected success");
 
     const result = await getBookings();
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    const created = result.data.find((b) => b.bookingState === BookingState.PAID);
+    // Se busca por id: la DB de test es compartida y otros archivos también crean reservas FINISHED.
+    const created = result.data.find((b) => b.id === booking.data.id);
     expect(created?.booker).toMatchObject({ id: bookerId, phoneNumber: bookerPhoneNumber });
     expect(created?.court).toMatchObject({ id: courtId });
   });
 
-  it("registra el turno sobre el booker, referenciado por su teléfono", async () => {
+  it("registra el turno sobre el booker, referenciado por su id", async () => {
     const created = await createBookingForPlayer({ fromDateTime: uniqueFromDateTime(), bookerId, courtId });
     if (!created.success) throw new Error("expected success");
 
     const dataSource = await getDataSource();
-    const rows: { booker_phone_number: string }[] = await dataSource.query(
-      `SELECT booker_phone_number FROM bookings WHERE id = $1`,
-      [created.data.id],
-    );
-    expect(rows[0].booker_phone_number).toBe(bookerPhoneNumber);
+    const rows: { booker_id: number }[] = await dataSource.query(`SELECT booker_id FROM bookings WHERE id = $1`, [
+      created.data.id,
+    ]);
+    expect(rows[0].booker_id).toBe(bookerId);
   });
 
   it.each([
@@ -164,7 +165,7 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("devuelve error al actualizar una reserva inexistente", async () => {
-    const result = await updateBooking(999_999_999, { bookingState: BookingState.PAID });
+    const result = await updateBooking(999_999_999, { bookingState: BookingState.FINISHED });
 
     expect(result).toEqual({ success: false, error: "La reserva no existe." });
   });
@@ -550,11 +551,11 @@ describe("booking actions (integración con Postgres real)", () => {
       const created = await createBookingForPlayer({ fromDateTime, bookerId, courtId });
       if (!created.success) throw new Error("expected success");
 
-      const result = await updateBooking(created.data.id, { bookingState: BookingState.PAID });
+      const result = await updateBooking(created.data.id, { fromDateTime });
 
       expect(result).toEqual({
         success: true,
-        data: expect.objectContaining({ bookingState: BookingState.PAID }),
+        data: expect.objectContaining({ bookingState: BookingState.RESERVED }),
       });
     });
 

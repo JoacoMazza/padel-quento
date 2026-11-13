@@ -22,8 +22,8 @@ function isPublicPath(pathname: string) {
 }
 
 /**
- * Pantallas que se pueden ver sin sesión (landing, turnos y partidos abiertos):
- * el login se pide recién al reservar o sumarse a un partido. A diferencia de
+ * Pantallas que se pueden ver sin sesión (landing, turnos, partidos abiertos y
+ * clases): el login se pide recién al reservar, sumarse a un partido o inscribirse. A diferencia de
  * las rutas de autenticación, el admin con sesión igual vuelve a su panel.
  */
 function isGuestVisiblePath(pathname: string) {
@@ -31,7 +31,8 @@ function isGuestVisiblePath(pathname: string) {
     pathname === "/" ||
     pathname === "/bookings" ||
     pathname === "/open-matches" ||
-    pathname.startsWith("/open-matches/")
+    pathname.startsWith("/open-matches/") ||
+    pathname === "/lessons"
   );
 }
 

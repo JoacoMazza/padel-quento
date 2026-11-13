@@ -80,7 +80,7 @@ describe("getOccupancyReportData (integración con Postgres real)", () => {
       bookingIds[key] = result.data.id;
     };
     await create("reserved", at(8), BookingState.RESERVED);
-    await create("paid", at(10), BookingState.PAID);
+    await create("paid", at(10), BookingState.FINISHED);
     await create("cancelled", at(12), BookingState.CANCELLED);
     await create("outOfRange", at(10, 2), BookingState.RESERVED);
 
