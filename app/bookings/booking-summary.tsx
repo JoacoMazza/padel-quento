@@ -57,7 +57,7 @@ export function BookingSummary({
 
       <SummaryCourt courtNumber={selectedSlot.courtNumber} location={selectedSlot.location} />
 
-      <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
+      <div className="grid grid-cols-2 gap-2.5 py-4 border-b border-line">
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />
         <SummaryField
           label="Horario"
@@ -65,23 +65,24 @@ export function BookingSummary({
         />
       </div>
 
-      {/* El padding va en un div: el navegador ubica el legend sobre el borde superior del fieldset e ignora su padding. */}
-      <div className="border-b border-white/10 py-5">
+      <div className="border-b border-line py-4">
         <fieldset className="space-y-2">
-          <legend className="mb-2 text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Modalidad</legend>
+          <legend className="mb-2 text-[10px] font-bold tracking-[0.12em] text-foreground/45 uppercase">
+            Modalidad
+          </legend>
           <ModeOption
             checked={!isOpenMatch}
             onChange={() => onIsOpenMatchChange(false)}
             icon={<Users className="h-4 w-4" />}
             title="Cancha completa"
-            description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores`}
+            description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores confirmados`}
           />
           <ModeOption
             checked={isOpenMatch}
             onChange={() => onIsOpenMatchChange(true)}
             icon={<UserPlus className="h-4 w-4" />}
             title="Buscar jugadores"
-            description="Abrí el partido para que se sume gente"
+            description="Abrí el partido para que la comunidad se sume"
           />
           {missingCategory ? (
             <div className="pt-2">
@@ -100,18 +101,18 @@ export function BookingSummary({
         </fieldset>
       </div>
 
-      <div className="pt-5">
+      <div className="pt-4">
         <SummaryTotal price={selectedSlot.price} />
       </div>
-      <p className="mt-3 text-xs text-white/45">
-        Cancelación sin cargo hasta {LATE_CANCELLATION_HOURS} h antes. El pago se abona en la recepción del club.
+      <p className="mt-2.5 text-xs text-foreground/50 text-center">
+        Cancelación sin cargo hasta {LATE_CANCELLATION_HOURS} h antes. Se abona en la recepción del club.
       </p>
 
       <button
         type="button"
         disabled={isPending || missingCategory}
         onClick={onConfirm}
-        className="btn btn-primary btn-lg mt-5 w-full"
+        className="btn btn-primary btn-lg mt-4 w-full font-bold shadow-sm hover:shadow-md transition-all"
       >
         {isPending ? "Confirmando…" : "Reservar turno"}
         {!isPending ? <ArrowRight className="h-5 w-5" /> : null}
@@ -119,6 +120,7 @@ export function BookingSummary({
     </SummaryPanel>
   );
 }
+
 function ModeOption({
   checked,
   onChange,
@@ -134,17 +136,25 @@ function ModeOption({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 transition-colors ${
-        checked ? "bg-primary/15 ring-primary" : "bg-white/5 ring-white/10 hover:ring-white/25"
+      className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 border transition-all ${
+        checked
+          ? "border-primary/80 bg-primary-light/40 text-foreground ring-1 ring-primary/30 shadow-xs"
+          : "border-line bg-background/50 hover:bg-card hover:border-foreground/30 text-foreground/75"
       }`}
     >
-      <input type="radio" name="booking-mode" checked={checked} onChange={onChange} className="mt-1 accent-primary" />
+      <input
+        type="radio"
+        name="booking-mode"
+        checked={checked}
+        onChange={onChange}
+        className="mt-1 accent-primary"
+      />
       <span className="flex flex-col gap-0.5">
-        <span className="flex items-center gap-1.5 text-sm font-semibold">
-          {icon}
+        <span className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-foreground">
+          <span className={checked ? "text-primary" : "text-foreground/60"}>{icon}</span>
           {title}
         </span>
-        <span className="text-xs text-white/55">{description}</span>
+        <span className="text-xs text-foreground/55">{description}</span>
       </span>
     </label>
   );

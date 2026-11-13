@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { CalendarDays } from "lucide-react";
+import { CalendarModal } from "@/app/bookings/calendar-modal";
 
 export type DayOption = {
   iso: string;
@@ -41,67 +45,75 @@ export function DayStrip({
   todayISO: string;
   onSelect: (iso: string) => void;
 }) {
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const isOtherDate = !days.some((d) => d.iso === selectedISO);
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {days.map((day) => {
-          const isSelected = day.iso === selectedISO;
-          return (
-            <button
-              key={day.iso}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => onSelect(day.iso)}
-              className={`flex w-32 shrink-0 cursor-pointer flex-col items-start rounded-xl border px-4 py-3 text-left transition-colors ${
-                isSelected ? "border-ink bg-ink text-white" : "border-line bg-card hover:border-foreground/30"
-              }`}
-            >
-              <span className={`text-[10px] font-semibold tracking-wider uppercase ${isSelected ? "text-white/60" : "text-foreground/45"}`}>
-                {day.caption}
-              </span>
-              <span className="text-sm font-bold">{day.label}</span>
-              <span
-                className={`text-xs ${
-                  !day.hasSchedule || day.free === 0
-                    ? isSelected
-                      ? "text-red-300"
-                      : "text-primary"
-                    : isSelected
-                      ? "text-white/60"
-                      : "text-foreground/50"
+    <>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+          {days.map((day) => {
+            const isSelected = day.iso === selectedISO;
+            return (
+              <button
+                key={day.iso}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => onSelect(day.iso)}
+                className={`group flex w-28 sm:w-32 shrink-0 cursor-pointer flex-col items-start rounded-2xl border px-3 py-2.5 sm:p-3 text-left transition-all ${
+                  isSelected
+                    ? "border-2 border-primary bg-background shadow-xs ring-2 ring-primary/10"
+                    : "border-line bg-card hover:border-foreground/30 hover:bg-background/40"
                 }`}
               >
-                {!day.hasSchedule ? "Cerrado" : day.free === 0 ? "Agotado" : `${day.free} libre${day.free === 1 ? "" : "s"}`}
-              </span>
-            </button>
-          );
-        })}
+                <span
+                  className={`text-[10px] font-bold tracking-wider uppercase ${
+                    isSelected ? "text-primary font-extrabold" : "text-foreground/45"
+                  }`}
+                >
+                  {day.caption}
+                </span>
+                <span className="text-sm font-bold tracking-tight text-foreground">{day.label}</span>
+                <span
+                  className={`mt-0.5 text-xs font-semibold ${
+                    !day.hasSchedule || day.free === 0
+                      ? "text-primary"
+                      : isSelected
+                        ? "text-primary"
+                        : "text-foreground/50"
+                  }`}
+                >
+                  {!day.hasSchedule
+                    ? "Cerrado"
+                    : day.free === 0
+                      ? "Agotado"
+                      : `${day.free} libre${day.free === 1 ? "" : "s"}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCalendarOpen(true)}
+          className={`btn btn-outline shrink-0 gap-2 border-line text-xs font-semibold ${
+            isOtherDate ? "border-2 border-primary bg-background text-foreground font-bold" : ""
+          }`}
+          title="Abrir calendario completo"
+        >
+          <CalendarDays className={`h-4 w-4 ${isOtherDate ? "text-white" : "text-primary"}`} />
+          <span>{isOtherDate ? "Fecha elegida" : "Elegir otra fecha"}</span>
+        </button>
       </div>
 
-      <label
-        className={`btn btn-outline relative shrink-0 ${isOtherDate ? "border-ink" : ""}`}
-        title="Elegir otra fecha"
-      >
-        <CalendarDays className="h-4 w-4 text-primary" />
-        Elegir otra fecha
-        <input
-          type="date"
-          aria-label="Elegir otra fecha"
-          value={selectedISO}
-          min={todayISO}
-          onClick={(event) => {
-            event.currentTarget.showPicker?.();
-          }}
-          onChange={(event) => {
-            const value = event.target.value;
-            if (!value || value < todayISO) return;
-            onSelect(value);
-          }}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </label>
-    </div>
+      <CalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        selectedISO={selectedISO}
+        todayISO={todayISO}
+        onSelect={onSelect}
+      />
+    </>
   );
 }

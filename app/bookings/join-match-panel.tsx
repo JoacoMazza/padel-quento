@@ -52,36 +52,36 @@ export function JoinMatchPanel({
 
       <SummaryCourt courtNumber={selectedMatch.courtNumber} location={selectedMatch.location} />
 
-      <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
+      <div className="grid grid-cols-2 gap-2.5 py-4 border-b border-line">
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />
         <SummaryField label="Horario" value={timeRange} />
       </div>
 
-      <div className="flex items-center justify-between border-b border-white/10 py-5">
+      <div className="flex items-center justify-between border-b border-line py-4">
         <div>
-          <p className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Jugadores anotados</p>
-          <p className="mt-0.5 text-sm font-semibold">
-            {selectedMatch.confirmedPlayers} de {OPEN_MATCH_MAX_PLAYERS}
+          <p className="text-[10px] font-bold tracking-[0.12em] text-foreground/45 uppercase">Jugadores anotados</p>
+          <p className="mt-0.5 text-sm font-bold text-foreground">
+            {selectedMatch.confirmedPlayers} de {OPEN_MATCH_MAX_PLAYERS} confirmados
           </p>
         </div>
         <PlayerDots confirmed={selectedMatch.confirmedPlayers} tone="primary" />
       </div>
 
-      <div className="pt-5">
+      <div className="pt-4">
         <SummaryTotal price={selectedMatch.price} />
       </div>
 
       {alreadyJoined ? (
-        <p className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-success/15 px-4 py-3 text-sm font-semibold text-emerald-300">
+        <p className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-success-light border border-success/20 px-4 py-3 text-xs font-bold text-success">
           <CircleCheck className="h-4 w-4" />
           Ya formás parte de este partido.
         </p>
       ) : !hasCategory ? (
-        <div className="mt-5">
+        <div className="mt-4">
           <MissingCategoryNotice message="Para sumarte a un partido abierto necesitás cargar tu categoría." />
         </div>
       ) : (
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-3">
           {remainingSpots > 1 ? (
             <GroupSizePicker
               question="¿Cuántos jugadores se suman (contándote a vos)?"
@@ -90,20 +90,26 @@ export function JoinMatchPanel({
               onChange={onGroupSizeChange}
             />
           ) : null}
-          <button type="button" disabled={isPending} onClick={onConfirm} className="btn btn-primary btn-lg w-full">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onConfirm}
+            className="btn btn-primary btn-lg w-full font-bold shadow-sm hover:shadow-md transition-all"
+          >
             <UserPlus className="h-5 w-5" />
             {isPending ? "Sumándote…" : "Sumarme al partido"}
           </button>
         </div>
       )}
 
-      <Link
-        href={`/open-matches/${selectedMatch.bookingId}`}
-        className="mt-4 flex items-center justify-center gap-1.5 text-xs font-semibold text-white/60 transition-colors hover:text-white"
-      >
-        Ver detalle del partido
-        <ArrowRight className="h-3.5 w-3.5" />
-      </Link>
+      <div className="mt-4 border-t border-line pt-3 text-center">
+        <Link
+          href={`/matches/${selectedMatch.bookingId}`}
+          className="text-xs font-bold text-foreground/60 hover:text-primary transition-colors"
+        >
+          Ver detalle completo del partido →
+        </Link>
+      </div>
     </SummaryPanel>
   );
 }

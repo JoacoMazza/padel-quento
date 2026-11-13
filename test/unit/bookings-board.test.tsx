@@ -40,6 +40,7 @@ function renderBoard(props: Partial<React.ComponentProps<typeof BookingsBoard>> 
       playerId={7}
       isGuest={false}
       hasCategory
+      defaultView="grid"
       {...props}
       courts={courts}
       schedules={schedules}
@@ -129,6 +130,7 @@ describe("BookingsBoard", () => {
         playerId={7}
         isGuest={false}
         hasCategory
+        defaultView="grid"
         courts={courts}
         schedules={schedules}
         bookings={[]}
@@ -364,5 +366,45 @@ describe("BookingsBoard", () => {
     renderBoard({ initialSelection: { date: "2026-10-12", courtId: 1, time: "07:00" } });
 
     expect(screen.queryByRole("button", { name: /Reservar turno/ })).toBeNull();
+  });
+
+  describe("vista cronológica por horario (TimeSlotList)", () => {
+    it("muestra los turnos en formato de lista por horario", () => {
+      render(
+        <BookingsBoard
+          playerId={7}
+          isGuest={false}
+          hasCategory
+          defaultView="list"
+          courts={courts}
+          schedules={schedules}
+          bookings={[openMatch]}
+          outOfServices={[]}
+        />,
+      );
+
+      expect(screen.getByText("Tarde")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
+    });
+
+    it("permite filtrar por canchas completas o partidos abiertos", () => {
+      render(
+        <BookingsBoard
+          playerId={7}
+          isGuest={false}
+          hasCategory
+          defaultView="list"
+          courts={courts}
+          schedules={schedules}
+          bookings={[openMatch]}
+          outOfServices={[]}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /Partidos abiertos/ }));
+      expect(screen.queryByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
+    });
   });
 });
