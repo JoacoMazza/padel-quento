@@ -85,18 +85,20 @@ describe("booking actions (integración con Postgres real)", () => {
   });
 
   it("lista las reservas con quien reservó y cancha cargados", async () => {
-    await createBookingForPlayer({
+    const booking = await createBookingForPlayer({
       fromDateTime: uniqueFromDateTime(),
       bookerId,
       courtId,
       bookingState: BookingState.FINISHED,
     });
+    if (!booking.success) throw new Error("expected success");
 
     const result = await getBookings();
 
     expect(result.success).toBe(true);
     if (!result.success) throw new Error("expected success");
-    const created = result.data.find((b) => b.bookingState === BookingState.FINISHED);
+    // Se busca por id: la DB de test es compartida y otros archivos también crean reservas FINISHED.
+    const created = result.data.find((b) => b.id === booking.data.id);
     expect(created?.booker).toMatchObject({ id: bookerId, phoneNumber: bookerPhoneNumber });
     expect(created?.court).toMatchObject({ id: courtId });
   });
