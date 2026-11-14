@@ -1,9 +1,6 @@
 import { ArrowRight, UserPlus, Users } from "lucide-react";
 import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import {
-  SLOT_DURATION_MINUTES,
-  formatLongDate,
-} from "@/app/bookings/slot-utils";
+import { formatLongDate } from "@/app/bookings/slot-utils";
 import {
   GroupSizePicker,
   SummaryCourt,
@@ -22,10 +19,10 @@ export function BookingSummary({
   selectedSlot,
   feedback,
   isPending,
-  isOpenMatch,
+  isOpenMatch = false,
   onIsOpenMatchChange,
-  hasCategory,
-  openMatchGroupSize,
+  hasCategory = true,
+  openMatchGroupSize = 1,
   onOpenMatchGroupSizeChange,
   onConfirm,
   onClose,
@@ -34,12 +31,11 @@ export function BookingSummary({
   selectedSlot: SelectedSlot;
   feedback: { type: "error" | "success"; message: string } | null;
   isPending: boolean;
-  isOpenMatch: boolean;
-  onIsOpenMatchChange: (value: boolean) => void;
-  /** Sin categoría cargada no puede crear un partido abierto (sí reservar la cancha completa). */
-  hasCategory: boolean;
-  openMatchGroupSize: number;
-  onOpenMatchGroupSizeChange: (value: number) => void;
+  isOpenMatch?: boolean;
+  onIsOpenMatchChange?: (value: boolean) => void;
+  hasCategory?: boolean;
+  openMatchGroupSize?: number;
+  onOpenMatchGroupSizeChange?: (value: number) => void;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -61,7 +57,7 @@ export function BookingSummary({
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />
         <SummaryField
           label="Horario"
-          value={`${dateToTimeLabel(selectedSlot.start)} · ${SLOT_DURATION_MINUTES} min`}
+          value={`${dateToTimeLabel(selectedSlot.start)} · ${dateToTimeLabel(selectedSlot.end)}`}
         />
       </div>
 
@@ -72,14 +68,14 @@ export function BookingSummary({
           </legend>
           <ModeOption
             checked={!isOpenMatch}
-            onChange={() => onIsOpenMatchChange(false)}
+            onChange={() => onIsOpenMatchChange?.(false)}
             icon={<Users className="h-4 w-4" />}
             title="Cancha completa"
             description={`Ya son ${OPEN_MATCH_MAX_PLAYERS} jugadores confirmados`}
           />
           <ModeOption
             checked={isOpenMatch}
-            onChange={() => onIsOpenMatchChange(true)}
+            onChange={() => onIsOpenMatchChange?.(true)}
             icon={<UserPlus className="h-4 w-4" />}
             title="Buscar jugadores"
             description="Abrí el partido para que la comunidad se sume"
@@ -94,7 +90,7 @@ export function BookingSummary({
                 question="¿Cuántos jugadores confirmados hay (contándote a vos)?"
                 options={openMatchGroupSizeOptions}
                 value={openMatchGroupSize}
-                onChange={onOpenMatchGroupSizeChange}
+                onChange={onOpenMatchGroupSizeChange ?? (() => {})}
               />
             </div>
           ) : null}
@@ -112,10 +108,10 @@ export function BookingSummary({
         type="button"
         disabled={isPending || missingCategory}
         onClick={onConfirm}
-        className="btn btn-primary btn-lg mt-4 w-full font-bold shadow-sm hover:shadow-md transition-all"
+        className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3.5 px-6 text-sm font-bold text-white shadow-xs transition-all hover:bg-black active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isPending ? "Confirmando…" : "Reservar turno"}
-        {!isPending ? <ArrowRight className="h-5 w-5" /> : null}
+        <span>{isPending ? "Confirmando…" : "Reservar turno"}</span>
+        {!isPending ? <ArrowRight className="h-4 w-4" /> : null}
       </button>
     </SummaryPanel>
   );

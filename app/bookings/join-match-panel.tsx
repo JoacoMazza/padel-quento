@@ -42,7 +42,7 @@ export function JoinMatchPanel({
 }) {
   const remainingSpots = OPEN_MATCH_MAX_PLAYERS - selectedMatch.confirmedPlayers;
   const groupSizeOptions = Array.from({ length: remainingSpots }, (_, i) => i + 1);
-  const timeRange = `${dateToTimeLabel(selectedMatch.start)} – ${dateToTimeLabel(selectedMatch.end)}`;
+  const timeRange = `${dateToTimeLabel(selectedMatch.start)} · ${dateToTimeLabel(selectedMatch.end)}`;
 
   return (
     <SummaryPanel label="Partido abierto">
@@ -94,10 +94,10 @@ export function JoinMatchPanel({
             type="button"
             disabled={isPending}
             onClick={onConfirm}
-            className="btn btn-primary btn-lg w-full font-bold shadow-sm hover:shadow-md transition-all"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3.5 px-6 text-sm font-bold text-white shadow-xs transition-all hover:bg-black active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <UserPlus className="h-5 w-5" />
-            {isPending ? "Sumándote…" : "Sumarme al partido"}
+            <UserPlus className="h-4 w-4" />
+            <span>{isPending ? "Sumándote…" : "Sumarme al partido"}</span>
           </button>
         </div>
       )}

@@ -383,7 +383,7 @@ describe("BookingsBoard", () => {
         />,
       );
 
-      expect(screen.getByText("Tarde")).toBeTruthy();
+      expect(screen.getByText("Horario")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
     });
