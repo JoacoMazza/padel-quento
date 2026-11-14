@@ -4,16 +4,20 @@ import type { ComplexLocation } from "@/src/domain/complex";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { formatPrice } from "@/app/bookings/slot-utils";
 
-/** Piezas del panel oscuro de resumen que comparten BookingSummary y JoinMatchPanel. */
+/** Piezas del panel de resumen que comparten BookingSummary y JoinMatchPanel. */
 
-/** Columna lateral oscura con el resumen del turno elegido; acompaña el scroll en desktop. */
+/** Columna lateral estilizada como ticket/resumen de reserva; acompaña el scroll en desktop. */
 export function SummaryPanel({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <aside aria-label={label} className="card-dark h-fit p-6 lg:sticky lg:top-22">
+    <aside
+      aria-label={label}
+      className="card h-fit rounded-3xl border border-line bg-card p-5 sm:p-6 shadow-xl shadow-black/5 lg:sticky lg:top-22 text-foreground"
+    >
       {children}
     </aside>
   );
 }
+
 export function SummaryHeader({
   title,
   onClose,
@@ -22,37 +26,41 @@ export function SummaryHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-5">
-      <span className="label-caps text-white/50">{title}</span>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar"
-          className="flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-lg bg-white/10 p-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 pointer-coarse:size-11"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+    <div className="flex items-center justify-between gap-3 border-b border-line pb-3.5">
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-primary" />
+        <span className="label-caps font-bold text-foreground/60">{title}</span>
       </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Cerrar"
+        className="icon-btn pointer-coarse:size-11 hover:bg-background"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
+
 /** La cancha elegida y el complejo donde está, con link a su ubicación. */
 export function SummaryCourt({ courtNumber, location }: { courtNumber: number; location?: ComplexLocation }) {
   return (
-    <div className="flex items-center gap-4 border-b border-white/10 py-5">
-      <CourtTag number={courtNumber} size="lg" tone="light" />
+    <div className="flex items-center gap-3.5 border-b border-line py-3.5">
+      <CourtTag number={courtNumber} size="md" tone="dark" />
       <div>
-        <p className="text-2xl font-extrabold tracking-tight">Cancha {courtNumber}</p>
+        <p className="font-display text-lg sm:text-xl font-extrabold tracking-tight text-foreground">
+          Cancha {courtNumber}
+        </p>
         {location ? (
           <a
             href={location.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
             title="Ver ubicación en Google Maps"
-            className="flex items-center gap-1 text-xs text-white/50 transition-colors hover:text-white"
+            className="flex items-center gap-1 text-xs font-medium text-foreground/55 transition-colors hover:text-primary"
           >
-            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <MapPin className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
             {location.name} · {location.address}, {location.city}
           </a>
         ) : null}
@@ -63,9 +71,9 @@ export function SummaryCourt({ courtNumber, location }: { courtNumber: number; l
 
 export function SummaryField({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+    <div className="rounded-xl bg-background/80 p-2.5 sm:p-3 border border-line/60">
+      <p className="text-[10px] font-bold tracking-[0.12em] text-foreground/45 uppercase">{label}</p>
+      <p className="mt-0.5 text-xs sm:text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
@@ -73,12 +81,14 @@ export function SummaryField({ label, value }: { label: string; value: string })
 /** Total de la cancha y lo que le toca pagar a cada jugador si se divide entre los cuatro. */
 export function SummaryTotal({ price }: { price: number }) {
   return (
-    <div>
-      <div className="flex items-end justify-between gap-3">
-        <span className="text-sm text-white/60">Total cancha</span>
-        <span className="text-4xl font-extrabold tracking-tight">{formatPrice(price)}</span>
+    <div className="rounded-2xl bg-background/80 p-3.5 sm:p-4 border border-line">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/55">Total a abonar</span>
+        <span className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+          {formatPrice(price)}
+        </span>
       </div>
-      <p className="mt-1 text-right text-xs font-light text-white/60">
+      <p className="mt-1 text-right text-xs font-semibold text-foreground/50">
         {formatPrice(Math.round(price / OPEN_MATCH_MAX_PLAYERS))} por jugador
       </p>
     </div>
@@ -90,8 +100,10 @@ export function SummaryFeedback({ feedback }: { feedback: { type: "error" | "suc
   return (
     <p
       role="alert"
-      className={`mt-4 rounded-xl px-3.5 py-2.5 text-sm font-medium ${
-        feedback.type === "error" ? "bg-primary/15 text-red-200" : "bg-success/15 text-emerald-300"
+      className={`my-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold ${
+        feedback.type === "error"
+          ? "border border-danger/20 bg-danger-light text-danger"
+          : "border border-success/20 bg-success-light text-success"
       }`}
     >
       {feedback.message}
@@ -112,8 +124,8 @@ export function GroupSizePicker({
   onChange: (value: number) => void;
 }) {
   return (
-    <div>
-      <p className="mb-2 text-xs font-medium text-white/60">{question}</p>
+    <div className="mt-3">
+      <p className="mb-2 text-xs font-semibold text-foreground/70">{question}</p>
       <div className="grid grid-cols-3 gap-2">
         {options.map((size) => (
           <button
@@ -122,11 +134,13 @@ export function GroupSizePicker({
             aria-label={`${size} jugador${size === 1 ? "" : "es"}`}
             aria-pressed={value === size}
             onClick={() => onChange(size)}
-            className={`h-10 cursor-pointer rounded-lg text-sm font-semibold transition-colors pointer-coarse:h-11 ${
-              value === size ? "bg-white text-ink" : "bg-white/5 text-white ring-1 ring-white/10 hover:bg-white/10"
+            className={`h-10 cursor-pointer rounded-xl text-xs font-bold transition-all pointer-coarse:h-11 ${
+              value === size
+                ? "bg-primary text-white font-bold shadow-xs ring-1 ring-primary"
+                : "border border-line bg-card text-foreground/80 hover:border-foreground/30 hover:bg-background"
             }`}
           >
-            {size}
+            {size} {size === 1 ? "jugador" : "jugadores"}
           </button>
         ))}
       </div>

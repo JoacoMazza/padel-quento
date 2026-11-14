@@ -2,16 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Users, Zap } from "lucide-react";
-import { LATE_CANCELLATION_HOURS, OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
+import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
 import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { AvailabilityGrid } from "@/app/bookings/availability-grid";
+import { BookingSearchBar, type TimeFilterValue } from "@/app/bookings/booking-search-bar";
 import { BookingSummary } from "@/app/bookings/booking-summary";
-import { DayStrip, dayCaption, dayLabel, type DayOption } from "@/app/bookings/day-strip";
 import { JoinMatchPanel } from "@/app/bookings/join-match-panel";
+import { TimeSlotList } from "@/app/bookings/time-slot-list";
 import {
   SLOT_DURATION_MINUTES,
   buildCourtSlots,
+  formatLongDate,
   getInitialBoardDate,
   minutesToTimeLabel,
   parseISODate,
@@ -27,10 +28,6 @@ import type {
   SelectedSlot,
   Slot,
 } from "@/app/bookings/types";
-
-/** Cantidad de días que se muestran en la tira de fechas, empezando por hoy. */
-const DAY_STRIP_LENGTH = 5;
-
 
 /** Turno que se había elegido antes de ir a iniciar sesión (llega en la URL de /bookings). */
 export type InitialSelection = { date: string; courtId: number; time: string; isOpenMatch?: boolean };
@@ -68,12 +65,12 @@ function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp
   };
 }
 
-/** "Mié 14 Oct". */
 export function BookingsBoard({
   playerId,
   isGuest,
   initialSelection,
   hasCategory,
+  defaultView,
   courts,
   schedules,
   bookings,
@@ -85,6 +82,8 @@ export function BookingsBoard({
   initialSelection?: InitialSelection;
   /** Si el jugador logueado cargó su categoría: la requieren los partidos abiertos. */
   hasCategory: boolean;
+  /** Vista inicial del tablero: "list" (por defecto) o "grid". */
+  defaultView?: "list" | "grid";
   courts: CourtProp[];
   schedules: ScheduleProp[];
   bookings: BookingProp[];
@@ -92,6 +91,8 @@ export function BookingsBoard({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [timeFilter, setTimeFilter] = useState<TimeFilterValue>("all");
+
   // El turno elegido antes de iniciar sesión vuelve seleccionado, si sigue disponible.
   const [initialPick] = useState(() => {
     const court = initialSelection && courts.find((c) => c.id === initialSelection.courtId);
@@ -109,6 +110,7 @@ export function BookingsBoard({
     if (slot?.status === "open") return { date: initialSelection.date, openMatch: toSelectedOpenMatch(court, slot, bookings) };
     return null;
   });
+
   const [dateInput, setDateInput] = useState(
     () => initialPick?.date ?? toISODate(getInitialBoardDate(courts, schedules, new Date())),
   );
@@ -122,9 +124,9 @@ export function BookingsBoard({
     null,
   );
 
-  // Debajo de lg el resumen queda debajo de la grilla, fuera de la vista: al elegir
-  // un turno o un partido se lleva la vista hasta él.
+  const resultsRef = useRef<HTMLDivElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!selectedSlot && !selectedOpenMatch) return;
     if (window.matchMedia?.("(min-width: 64rem)").matches) return;
@@ -132,9 +134,7 @@ export function BookingsBoard({
   }, [selectedSlot, selectedOpenMatch]);
 
   const selectedDate = useMemo(() => parseISODate(dateInput), [dateInput]);
-
   const now = new Date();
-  const todayISODate = toISODate(now);
 
   const visibleCourts = useMemo(
     () => (courtFilter === "all" ? courts : courts.filter((c) => String(c.id) === courtFilter)),
@@ -147,7 +147,75 @@ export function BookingsBoard({
       slots: buildCourtSlots({ court, schedules, bookings, outOfServices, date, now, playerId }),
     }));
 
-  // El turno elegido (para reservar o para sumarse) se marca sobre los turnos calculados.
+  // Solo los horarios que efectivamente tienen turnos disponibles para reservar en la fecha y canchas seleccionadas
+  const availableClubTimes = useMemo(() => {
+    const courtsToCheck = courtFilter === "all" ? courts : courts.filter((c) => String(c.id) === courtFilter);
+    const dayCourtSlots = slotsForDay(selectedDate, courtsToCheck);
+
+    const timeMap = new Map<string, number>();
+
+    for (const { slots } of dayCourtSlots) {
+      for (const slot of slots) {
+        if (slot.status === "available") {
+          const timeLabel = minutesToTimeLabel(slot.minutesOfDay);
+          timeMap.set(timeLabel, (timeMap.get(timeLabel) ?? 0) + 1);
+        }
+      }
+    }
+
+    const sortedTimes = [...timeMap.keys()].sort((a, b) => a.localeCompare(b));
+    return sortedTimes.map((time) => ({
+      time,
+      availableCount: timeMap.get(time) ?? 0,
+    }));
+  }, [selectedDate, courts, courtFilter, schedules, bookings, outOfServices, now, playerId]);
+
+  // Canchas disponibles para reservar en la fecha seleccionada, filtradas dinámicamente si hay un horario seleccionado
+  const availableCourts = useMemo(() => {
+    const allSlots = slotsForDay(selectedDate, courts);
+
+    return courts.filter((court) => {
+      const courtData = allSlots.find((c) => c.court.id === court.id);
+      if (!courtData) return false;
+
+      if (timeFilter === "all") {
+        return courtData.slots.some(
+          (s) =>
+            s.status === "available" ||
+            (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === s.start.getTime()),
+        );
+      } else {
+        const slotAtTime = courtData.slots.find((s) => minutesToTimeLabel(s.minutesOfDay) === timeFilter);
+        if (!slotAtTime) return false;
+        return (
+          slotAtTime.status === "available" ||
+          (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slotAtTime.start.getTime())
+        );
+      }
+    });
+  }, [selectedDate, courts, timeFilter, schedules, bookings, outOfServices, now, playerId, selectedSlot]);
+
+  // Si cambia la fecha o la cancha y el horario seleccionado ya no tiene disponibilidad, volvemos a "all"
+  useEffect(() => {
+    if (timeFilter !== "all" && availableClubTimes.length > 0) {
+      const isStillAvailable = availableClubTimes.some((t) => t.time === timeFilter);
+      if (!isStillAvailable) {
+        setTimeFilter("all");
+      }
+    }
+  }, [availableClubTimes, timeFilter]);
+
+  // Si cambia el horario y la cancha seleccionada ya no está disponible en ese horario, volvemos a "all"
+  useEffect(() => {
+    if (courtFilter !== "all" && availableCourts.length > 0) {
+      const isStillAvailable = availableCourts.some((c) => String(c.id) === courtFilter);
+      if (!isStillAvailable) {
+        setCourtFilter("all");
+      }
+    }
+  }, [availableCourts, courtFilter]);
+
+  // El turno elegido se marca sobre los turnos calculados
   const courtSlots = slotsForDay(selectedDate, visibleCourts).map(({ court, slots }) => ({
     court,
     slots: slots.map((slot): Slot => {
@@ -159,19 +227,6 @@ export function BookingsBoard({
   }));
 
   const daySummary = summarizeSlots(slotsForDay(selectedDate, courts).map((c) => c.slots));
-
-  const days: DayOption[] = Array.from({ length: DAY_STRIP_LENGTH }, (_, offset) => {
-    const date = parseISODate(todayISODate);
-    date.setDate(date.getDate() + offset);
-    const slotsByCourt = slotsForDay(date, courts).map((c) => c.slots);
-    return {
-      iso: toISODate(date),
-      caption: dayCaption(date, offset),
-      label: dayLabel(date),
-      free: summarizeSlots(slotsByCourt).free,
-      hasSchedule: slotsByCourt.some((slots) => slots.length > 0),
-    };
-  });
 
   function resetSelection() {
     setSelectedSlot(null);
@@ -186,11 +241,11 @@ export function BookingsBoard({
     setFeedback(null);
   }
 
-  function handleSlotClick(court: CourtProp, slot: Slot) {
+  function handleSlotClick(court: CourtProp, slot: Slot, asOpenMatch?: boolean) {
     if (slot.status === "occupied" || slot.status === "outOfService") return;
     setFeedback(null);
 
-    // Ya elegido, el partido abierto figura como "selected": volver a tocarlo lo deselecciona.
+    // Si ya está elegido, desmarcarlo
     if (selectedOpenMatch?.courtId === court.id && selectedOpenMatch.start.getTime() === slot.start.getTime()) {
       setSelectedOpenMatch(null);
       setJoinGroupSize(1);
@@ -216,7 +271,7 @@ export function BookingsBoard({
     setSelectedOpenMatch(null);
     setJoinGroupSize(1);
     setSelectedSlot(toSelectedSlot(court, slot));
-    setIsOpenMatch(false);
+    setIsOpenMatch(asOpenMatch ?? false);
     setOpenMatchGroupSize(1);
   }
 
@@ -273,55 +328,77 @@ export function BookingsBoard({
     });
   }
 
-  return (
-    <div className="mt-8">
-      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
-        <span className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2">
-          <span className="h-2 w-2 rounded-full bg-success" />
-          Libres: <strong>{daySummary.free} turnos</strong>
-        </span>
-        <span className="flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2">
-          <span className="h-2 w-2 rounded-full bg-primary" />
-          Partidos abiertos: <strong>{daySummary.open}</strong>
-        </span>
-      </div>
+  const dateDescription = formatLongDate(selectedDate);
 
-      <p className="label-caps mb-3">Filtrar</p>
-      <DayStrip
-        days={days}
-        selectedISO={dateInput}
-        todayISO={todayISODate}
-        onSelect={(value) => {
-          setDateInput(value);
+  return (
+    <div className="mt-6">
+      {/* 1. Barra de búsqueda principal estilo flotante */}
+      <BookingSearchBar
+        selectedDateISO={dateInput}
+        onDateChange={(iso) => {
+          setDateInput(iso);
           resetSelection();
           setFeedback(null);
         }}
+        timeFilter={timeFilter}
+        onTimeChange={(val) => {
+          setTimeFilter(val);
+          resetSelection();
+        }}
+        availableTimes={availableClubTimes}
+        selectedCourtId={courtFilter}
+        onCourtChange={(val) => {
+          setCourtFilter(val);
+          resetSelection();
+        }}
+        courts={availableCourts}
+        onSearchClick={() => {
+          resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
       />
 
-      <div className="mt-4 flex items-center gap-2 overflow-x-auto pb-1">
-        {[{ id: "all", label: `Todas las canchas (${courts.length})` }, ...courts.map((c) => ({ id: String(c.id), label: `Cancha ${c.number}` }))].map(
-          (option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={courtFilter === option.id}
-              onClick={() => {
-                setCourtFilter(option.id);
-                resetSelection();
-              }}
-              className={`chip shrink-0 ${courtFilter === option.id ? "chip-active" : ""}`}
-            >
-              {option.label}
-            </button>
-          ),
-        )}
+      {/* 2. Barra de estado limpia */}
+      <div ref={resultsRef} className="scroll-mt-4 mb-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-foreground">
+              Turnos para el {dateDescription}
+            </h3>
+            <p className="text-xs text-foreground/50">
+              {daySummary.free} {daySummary.free === 1 ? "opción libre" : "opciones libres"}
+              {courtFilter !== "all" && (
+                <span className="font-semibold text-foreground">
+                  {" "}· Cancha {courts.find((c) => String(c.id) === courtFilter)?.number}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* La columna del resumen aparece solo mientras hay un turno elegido. */}
+      {/* 3. Lista de turnos y columna de resumen */}
       <div
-        className={`mt-6 grid grid-cols-1 gap-6 ${selectedSlot || selectedOpenMatch ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""}`}
+        className={`mt-4 grid grid-cols-1 gap-6 items-start ${
+          selectedSlot || selectedOpenMatch ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""
+        }`}
       >
-        <AvailabilityGrid courtSlots={courtSlots} onSlotClick={handleSlotClick} />
+        {defaultView === "grid" ? (
+          <AvailabilityGrid courtSlots={courtSlots} onSlotClick={handleSlotClick} />
+        ) : (
+          <TimeSlotList
+            courtSlots={courtSlots}
+            onSlotClick={handleSlotClick}
+            timeFilter={timeFilter}
+            selectedCourtId={courtFilter}
+            isSummaryOpen={Boolean(selectedSlot || selectedOpenMatch)}
+            isOpenMatch={isOpenMatch}
+            onIsOpenMatchChange={setIsOpenMatch}
+            onResetFilters={() => {
+              setTimeFilter("all");
+              setCourtFilter("all");
+            }}
+          />
+        )}
 
         {selectedSlot || selectedOpenMatch ? (
           <div ref={summaryRef} className="scroll-mt-20">
@@ -355,32 +432,6 @@ export function BookingsBoard({
             ) : null}
           </div>
         ) : null}
-      </div>
-
-      <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <InfoCard icon={<Zap className="h-5 w-5" />} title="Confirmación al instante">
-          Tu turno de {SLOT_DURATION_MINUTES} minutos queda reservado apenas lo confirmás.
-        </InfoCard>
-        <InfoCard icon={<Users className="h-5 w-5" />} title="Partidos abiertos">
-          ¿Te faltan jugadores? Abrí el partido y la comunidad completa los {OPEN_MATCH_MAX_PLAYERS} lugares.
-        </InfoCard>
-        <InfoCard icon={<ShieldCheck className="h-5 w-5" />} title="Cancelación sin cargo">
-          Hasta {LATE_CANCELLATION_HOURS} horas antes del turno, sin descuento de puntos.
-        </InfoCard>
-      </div>
-    </div>
-  );
-}
-
-function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div className="card flex items-start gap-4 p-5">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-light text-primary">
-        {icon}
-      </span>
-      <div>
-        <p className="text-sm font-bold text-foreground">{title}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-foreground/60">{children}</p>
       </div>
     </div>
   );
