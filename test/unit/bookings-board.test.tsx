@@ -148,7 +148,9 @@ describe("BookingsBoard", () => {
   it("las columnas de las canchas se achican hasta 7.5rem para que entren todas en el ancho disponible", () => {
     renderBoard();
 
-    const grid = screen.getByText("Horario").parentElement!;
+    const grid = screen
+      .getAllByText("Horario")
+      .find((el) => el.classList.contains("label-caps"))!.parentElement!;
     expect(grid.style.gridTemplateColumns).toBe("5.5rem repeat(1, minmax(7.5rem, 1fr))");
   });
 
@@ -222,12 +224,13 @@ describe("BookingsBoard", () => {
     expect(screen.getByRole("button", { name: "2 jugadores" }).className.split(" ")).toContain("pointer-coarse:h-11");
   });
 
-  it("muestra el título Filtrar antes de los botones de fecha", () => {
+  it("muestra la barra de filtros con fecha, horario y cancha", () => {
     renderBoard();
 
-    const title = screen.getByText("Filtrar");
-    const firstDay = screen.getByRole("button", { name: /Hoy/ });
-    expect(title.compareDocumentPosition(firstDay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("Fecha")).toBeTruthy();
+    expect(screen.getAllByText("Horario").length).toBeGreaterThan(0);
+    expect(screen.getByText("Cancha")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Buscar turnos/ })).toBeTruthy();
   });
 
   it("muestra el resumen del turno solo al elegir un turno disponible", () => {
@@ -369,7 +372,7 @@ describe("BookingsBoard", () => {
   });
 
   describe("vista cronológica por horario (TimeSlotList)", () => {
-    it("muestra los turnos en formato de lista por horario", () => {
+    it("muestra los turnos en formato de lista por horario excluyendo partidos abiertos de otros jugadores", () => {
       render(
         <BookingsBoard
           playerId={7}
@@ -385,10 +388,10 @@ describe("BookingsBoard", () => {
 
       expect(screen.getByText("Horario")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeNull();
     });
 
-    it("permite filtrar por canchas completas o partidos abiertos", () => {
+    it("permite seleccionar un turno y abre el resumen para reservarlo", () => {
       render(
         <BookingsBoard
           playerId={7}
@@ -402,9 +405,9 @@ describe("BookingsBoard", () => {
         />,
       );
 
-      fireEvent.click(screen.getByRole("button", { name: /Partidos abiertos/ }));
-      expect(screen.queryByRole("button", { name: "Cancha 1, 18:00, disponible" })).toBeNull();
-      expect(screen.getByRole("button", { name: "Cancha 1, 19:30, partido abierto" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Cancha 1, 18:00, disponible" }));
+      expect(screen.getByText("Turno seleccionado")).toBeTruthy();
+      expect(screen.getByRole("complementary", { name: "Resumen de tu turno" })).toBeTruthy();
     });
   });
 });

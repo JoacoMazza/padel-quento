@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { OPEN_MATCH_MAX_PLAYERS } from "@/src/domain/constants";
-import { createBooking } from "@/src/actions/booking";
+import { createBooking, joinOpenMatch } from "@/src/actions/booking";
 import { AvailabilityGrid } from "@/app/bookings/availability-grid";
 import { BookingSearchBar, type TimeFilterValue } from "@/app/bookings/booking-search-bar";
 import { BookingSummary } from "@/app/bookings/booking-summary";
+import { JoinMatchPanel } from "@/app/bookings/join-match-panel";
 import { TimeSlotList } from "@/app/bookings/time-slot-list";
 import {
   SLOT_DURATION_MINUTES,
@@ -23,6 +24,7 @@ import type {
   CourtProp,
   OutOfServiceProp,
   ScheduleProp,
+  SelectedOpenMatch,
   SelectedSlot,
   Slot,
 } from "@/app/bookings/types";
@@ -48,6 +50,21 @@ function toSelectedSlot(court: CourtProp, slot: Slot): SelectedSlot {
   };
 }
 
+function toSelectedOpenMatch(court: CourtProp, slot: Slot, bookings: BookingProp[]): SelectedOpenMatch {
+  const openBooking = bookings.find((b) => b.id === slot.bookingId);
+  return {
+    bookingId: slot.bookingId!,
+    courtId: court.id,
+    courtNumber: court.number,
+    location: court.location,
+    price: openBooking?.price ?? court.price,
+    start: slot.start,
+    end: slot.end,
+    confirmedPlayers: slot.confirmedPlayers ?? 0,
+    alreadyJoined: slot.alreadyJoined ?? false,
+  };
+}
+
 export function BookingsBoard({
   playerId,
   isGuest,
@@ -63,7 +80,7 @@ export function BookingsBoard({
   /** Visitante sin sesión: puede ver y elegir turnos, pero reservar lo manda a iniciar sesión. */
   isGuest: boolean;
   initialSelection?: InitialSelection;
-  /** Si el jugador logueado cargó su categoría. */
+  /** Si el jugador logueado cargó su categoría: la requieren los partidos abiertos. */
   hasCategory: boolean;
   /** Vista inicial del tablero: "list" (por defecto) o "grid". */
   defaultView?: "list" | "grid";
@@ -90,6 +107,7 @@ export function BookingsBoard({
       playerId,
     }).find((s) => minutesToTimeLabel(s.minutesOfDay) === initialSelection.time);
     if (slot?.status === "available") return { date: initialSelection.date, slot: toSelectedSlot(court, slot) };
+    if (slot?.status === "open") return { date: initialSelection.date, openMatch: toSelectedOpenMatch(court, slot, bookings) };
     return null;
   });
 
@@ -100,6 +118,8 @@ export function BookingsBoard({
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(initialPick?.slot ?? null);
   const [isOpenMatch, setIsOpenMatch] = useState(() => initialSelection?.isOpenMatch ?? false);
   const [openMatchGroupSize, setOpenMatchGroupSize] = useState(1);
+  const [selectedOpenMatch, setSelectedOpenMatch] = useState<SelectedOpenMatch | null>(initialPick?.openMatch ?? null);
+  const [joinGroupSize, setJoinGroupSize] = useState(1);
   const [feedback, setFeedback] = useState<{ type: "error" | "success"; message: string } | null>(
     null,
   );
@@ -108,10 +128,10 @@ export function BookingsBoard({
   const summaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!selectedSlot) return;
+    if (!selectedSlot && !selectedOpenMatch) return;
     if (window.matchMedia?.("(min-width: 64rem)").matches) return;
     summaryRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  }, [selectedSlot]);
+  }, [selectedSlot, selectedOpenMatch]);
 
   const selectedDate = useMemo(() => parseISODate(dateInput), [dateInput]);
   const now = new Date();
@@ -200,7 +220,8 @@ export function BookingsBoard({
     court,
     slots: slots.map((slot): Slot => {
       const isSelected =
-        selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime();
+        (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime()) ||
+        (selectedOpenMatch?.courtId === court.id && selectedOpenMatch.start.getTime() === slot.start.getTime());
       return isSelected ? { ...slot, status: "selected" } : slot;
     }),
   }));
@@ -211,6 +232,8 @@ export function BookingsBoard({
     setSelectedSlot(null);
     setIsOpenMatch(false);
     setOpenMatchGroupSize(1);
+    setSelectedOpenMatch(null);
+    setJoinGroupSize(1);
   }
 
   function handleSummaryClose() {
@@ -219,8 +242,24 @@ export function BookingsBoard({
   }
 
   function handleSlotClick(court: CourtProp, slot: Slot, asOpenMatch?: boolean) {
-    if (slot.status !== "available" && slot.status !== "selected") return;
+    if (slot.status === "occupied" || slot.status === "outOfService") return;
     setFeedback(null);
+
+    // Si ya está elegido, desmarcarlo
+    if (selectedOpenMatch?.courtId === court.id && selectedOpenMatch.start.getTime() === slot.start.getTime()) {
+      setSelectedOpenMatch(null);
+      setJoinGroupSize(1);
+      return;
+    }
+
+    if (slot.status === "open") {
+      setSelectedSlot(null);
+      setIsOpenMatch(false);
+      setOpenMatchGroupSize(1);
+      setJoinGroupSize(1);
+      setSelectedOpenMatch(toSelectedOpenMatch(court, slot, bookings));
+      return;
+    }
 
     if (selectedSlot?.courtId === court.id && selectedSlot.start.getTime() === slot.start.getTime()) {
       setSelectedSlot(null);
@@ -229,6 +268,8 @@ export function BookingsBoard({
       return;
     }
 
+    setSelectedOpenMatch(null);
+    setJoinGroupSize(1);
     setSelectedSlot(toSelectedSlot(court, slot));
     setIsOpenMatch(asOpenMatch ?? false);
     setOpenMatchGroupSize(1);
@@ -252,6 +293,30 @@ export function BookingsBoard({
         price: selectedSlot.price,
         groupSize,
         courtId: selectedSlot.courtId,
+      });
+
+      if (!result.success) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+
+      router.push("/my-bookings");
+    });
+  }
+
+  function handleJoinConfirm() {
+    if (!selectedOpenMatch || selectedOpenMatch.alreadyJoined) return;
+
+    if (isGuest) {
+      router.push(loginUrlFor(selectedOpenMatch.courtId, selectedOpenMatch.start));
+      return;
+    }
+
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await joinOpenMatch({
+        bookingId: selectedOpenMatch.bookingId,
+        groupSize: joinGroupSize,
       });
 
       if (!result.success) {
@@ -314,7 +379,7 @@ export function BookingsBoard({
       {/* 3. Lista de turnos y columna de resumen */}
       <div
         className={`mt-4 grid grid-cols-1 gap-6 items-start ${
-          selectedSlot ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""
+          selectedSlot || selectedOpenMatch ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""
         }`}
       >
         {defaultView === "grid" ? (
@@ -325,7 +390,7 @@ export function BookingsBoard({
             onSlotClick={handleSlotClick}
             timeFilter={timeFilter}
             selectedCourtId={courtFilter}
-            isSummaryOpen={Boolean(selectedSlot)}
+            isSummaryOpen={Boolean(selectedSlot || selectedOpenMatch)}
             isOpenMatch={isOpenMatch}
             onIsOpenMatchChange={setIsOpenMatch}
             onResetFilters={() => {
@@ -335,21 +400,36 @@ export function BookingsBoard({
           />
         )}
 
-        {selectedSlot ? (
+        {selectedSlot || selectedOpenMatch ? (
           <div ref={summaryRef} className="scroll-mt-20">
-            <BookingSummary
-              selectedDate={selectedDate}
-              selectedSlot={selectedSlot}
-              feedback={feedback}
-              isPending={isPending}
-              isOpenMatch={isOpenMatch}
-              onIsOpenMatchChange={setIsOpenMatch}
-              hasCategory={hasCategory}
-              openMatchGroupSize={openMatchGroupSize}
-              onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
-              onConfirm={handleConfirm}
-              onClose={handleSummaryClose}
-            />
+            {selectedOpenMatch ? (
+              <JoinMatchPanel
+                selectedDate={selectedDate}
+                selectedMatch={selectedOpenMatch}
+                feedback={feedback}
+                isPending={isPending}
+                alreadyJoined={selectedOpenMatch.alreadyJoined}
+                hasCategory={hasCategory}
+                groupSize={joinGroupSize}
+                onGroupSizeChange={setJoinGroupSize}
+                onConfirm={handleJoinConfirm}
+                onClose={handleSummaryClose}
+              />
+            ) : selectedSlot ? (
+              <BookingSummary
+                selectedDate={selectedDate}
+                selectedSlot={selectedSlot}
+                feedback={feedback}
+                isPending={isPending}
+                isOpenMatch={isOpenMatch}
+                onIsOpenMatchChange={setIsOpenMatch}
+                hasCategory={hasCategory}
+                openMatchGroupSize={openMatchGroupSize}
+                onOpenMatchGroupSizeChange={setOpenMatchGroupSize}
+                onConfirm={handleConfirm}
+                onClose={handleSummaryClose}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>
