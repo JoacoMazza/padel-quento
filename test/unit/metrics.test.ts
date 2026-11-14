@@ -53,7 +53,7 @@ describe("getOccupancyReportData", () => {
         id: 7,
         fromDateTime: new Date(2026, 9, 12, 18, 0),
         durationMinutes: 90,
-        bookingState: BookingState.PAID,
+        bookingState: BookingState.FINISHED,
         court: { id: 1 },
       },
     ]);

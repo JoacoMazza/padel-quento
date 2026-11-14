@@ -1,0 +1,221 @@
+---
+title: DER Padel Quento
+config:
+  layout: elk
+---
+%% Versión en español de der.mmd (renderizada a der.es.jpg).
+%% der.mmd es la fuente de verdad (nombres reales de la base): todo cambio allí debe reflejarse aquí.
+%% Claves: PK clave primaria, FK clave foránea, UK única. Las columnas que admiten nulos se marcan "nullable".
+%% Restricciones compuestas e índices:
+%%   UQ_resenas_jugadores_partido_evaluador_evaluado: UNIQUE (partido_id, evaluador_id, evaluado_id)
+%%   UQ_jugadores_partidos_partido_jugador: UNIQUE (partido_id, jugador_id)
+%%   UQ_inscripciones_clase_jugador: UNIQUE (clase_id, jugador_id)
+%%   UQ_horarios_clases_clase_dia_inicio: UNIQUE (clase_id, dia_semana, hora_inicio)
+%%   IDX_mensajes_chat_id: INDEX (chat_id)
+erDiagram
+    cuentas {
+        int id PK
+        string email UK
+        string clave_hasheada
+        boolean esta_bloqueada
+    }
+
+    administradores {
+        int id PK
+        int cuenta_id FK, UK
+        int dni
+        string nombres
+        string apellidos
+        enum nivel_acceso
+    }
+
+    reservantes {
+        int id PK
+        int cuenta_id FK, UK
+        string telefono UK
+        string tipo
+        string nombres
+        string apellidos
+        enum categoria
+        float puntaje
+    }
+
+    clases {
+        int id PK
+        int profesor_id FK
+        int cupo
+        boolean esta_activa
+        datetime fecha_creacion
+        datetime fecha_hora_desde
+        datetime fecha_hora_hasta "nullable"
+        decimal precio "decimal(10,2)"
+    }
+
+    horarios_clases {
+        int id PK
+        int clase_id FK "UQ (clase_id, dia_semana, hora_inicio)"
+        int cancha_id FK
+        enum dia_semana
+        time hora_inicio
+        time hora_fin
+    }
+
+    penalizaciones {
+        int id PK
+        int jugador_id FK
+        int reserva_id FK "nullable"
+        float puntaje_penalizado
+        string motivo
+        datetime fecha_creacion
+    }
+
+    complejos {
+        int id PK
+        string nombre
+        string direccion
+        string ciudad
+        string provincia
+        string pais
+        string codigo_postal
+        decimal latitud "decimal(9,6)"
+        decimal longitud "decimal(9,6)"
+        string url_maps "nullable"
+        string numero_whatsapp "nullable"
+        string mensaje_whatsapp "nullable"
+    }
+
+    canchas {
+        int id PK
+        int complejo_id FK
+        int numero UK
+        enum estado
+        decimal precio "decimal(10,2)"
+    }
+
+    horarios {
+        int id PK
+        int cancha_id FK
+        enum dia_semana
+        time hora_apertura
+        time hora_cierre
+    }
+
+    fuera_de_servicio {
+        int id PK
+        int cancha_id FK
+        enum motivo
+        string descripcion "nullable"
+        datetime fecha_hora_desde
+        datetime fecha_hora_hasta
+    }
+
+    reservas {
+        int id PK
+        int reservante_id FK
+        int cancha_id FK
+        int clase_id FK "nullable"
+        enum estado_reserva
+        datetime fecha_hora
+        int duracion_minutos
+        decimal precio "decimal(10,2)"
+        boolean esta_pagada
+    }
+
+    inscripciones {
+        int id PK
+        int clase_id FK "UQ (clase_id, jugador_id)"
+        int jugador_id FK
+        datetime fecha_creacion
+    }
+
+    reservas_fijas {
+        int id PK
+        int reservante_id FK
+        int cancha_id FK
+        date fecha_inicio
+        date fecha_fin "nullable"
+        time hora_inicio
+        int duracion_minutos
+        enum frecuencia
+        boolean esta_activa
+        datetime fecha_creacion
+    }
+
+    fechas_reservas_fijas {
+        int id PK
+        int reserva_fija_id FK
+        int reserva_id FK, UK "nullable"
+        date fecha
+        enum estado
+    }
+
+    partidos {
+        int id PK
+        int reserva_id FK, UK
+        boolean necesita_jugadores
+    }
+
+    jugadores_partidos {
+        int id PK
+        int jugador_id FK
+        int partido_id FK "UQ (partido_id, jugador_id)"
+        int cantidad_jugadores
+        int cantidad_asistentes
+        datetime fecha_union
+        int puntos_otorgados
+    }
+
+    resenas_jugadores {
+        int id PK
+        int partido_id FK "UQ (partido_id, evaluador_id, evaluado_id)"
+        int evaluador_id FK
+        int evaluado_id FK
+        enum nivel
+        boolean buena_actitud
+        boolean puntual
+        text comentario "nullable"
+        datetime fecha_creacion
+    }
+
+    chats {
+        int id PK
+        int partido_id FK, UK
+        datetime fecha_creacion
+    }
+
+    mensajes {
+        int id PK
+        int chat_id FK "INDEX IDX_mensajes_chat_id"
+        int emisor_id FK
+        text contenido
+        datetime fecha_envio
+    }
+
+    cuentas ||--o| administradores : "cuenta_id"
+    cuentas ||--o| reservantes : "cuenta_id"
+    reservantes ||--o{ clases : "profesor_id"
+    reservantes ||--o{ penalizaciones : "jugador_id"
+    reservantes ||--o{ reservas : "reservante_id"
+    reservantes ||--o{ reservas_fijas : "reservante_id"
+    reservantes ||--o{ inscripciones : "jugador_id"
+    reservantes ||--o{ jugadores_partidos : "jugador_id"
+    reservantes ||--o{ resenas_jugadores : "evaluador_id"
+    reservantes ||--o{ resenas_jugadores : "evaluado_id"
+    reservantes ||--o{ mensajes : "emisor_id"
+    complejos ||--o{ canchas : "complejo_id"
+    canchas ||--|{ horarios : "cancha_id"
+    canchas ||--o{ fuera_de_servicio : "cancha_id"
+    canchas ||--o{ reservas : "cancha_id"
+    canchas ||--o{ reservas_fijas : "cancha_id"
+    canchas ||--o{ horarios_clases : "cancha_id"
+    clases ||--o{ inscripciones : "clase_id"
+    clases |o--o{ reservas : "clase_id"
+    clases ||--|{ horarios_clases : "clase_id"
+    reservas ||--o| partidos : "reserva_id"
+    reservas |o--o| fechas_reservas_fijas : "reserva_id"
+    reservas |o--o{ penalizaciones : "reserva_id"
+    reservas_fijas ||--o{ fechas_reservas_fijas : "reserva_fija_id"
+    partidos ||--o{ jugadores_partidos : "partido_id"
+    partidos ||--o{ resenas_jugadores : "partido_id"
+    partidos ||--o| chats : "partido_id"
+    chats ||--o{ mensajes : "chat_id"

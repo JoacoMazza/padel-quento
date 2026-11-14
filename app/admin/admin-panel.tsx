@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, Menu, X } from "lucide-react";
+import { MapPin, BarChart3, Users, CalendarClock, CalendarPlus, Repeat, ClipboardList, UserCog, GraduationCap, Menu, X } from "lucide-react";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CourtsTable } from "@/app/admin/courts-table";
+import { LessonsPanel } from "@/app/admin/lessons-panel";
+import { getLessonsAdmin } from "@/src/actions/lesson";
+import { ComplexContactPanel } from "@/app/admin/complex-contact-panel";
 import { ScheduleBoard } from "@/app/admin/schedule-board";
 import { UsersTable } from "@/app/admin/users-table";
 import { FixedBookingsPanel, type FixedBookingPlayerOption } from "@/app/admin/fixed-bookings-panel";
@@ -14,6 +17,7 @@ import { TeamPanel } from "@/app/admin/team-panel";
 import { getTeam } from "@/src/actions/admin";
 import type { CourtItem } from "@/app/admin/court-status";
 import { getCourts } from "@/src/actions/court";
+import { toComplexLocation } from "@/src/domain/complex";
 import { getOutOfServices } from "@/src/actions/outOfService";
 import { isOutOfServiceActive } from "@/src/domain/out-of-service";
 import { getPlayersAdmin } from "@/src/actions/player";
@@ -28,6 +32,7 @@ const SECTIONS = [
   { id: "metrics", label: "Métricas del Complejo", icon: BarChart3, available: true, ownerOnly: true },
   { id: "attendance", label: "Reportes de Asistencia", icon: ClipboardList, available: true, ownerOnly: true },
   { id: "users", label: "Gestión de Usuarios", icon: Users, available: true, ownerOnly: false },
+  { id: "lessons", label: "Clases", icon: GraduationCap, available: true, ownerOnly: false },
   { id: "team", label: "Equipo", icon: UserCog, available: true, ownerOnly: true },
 ] as const;
 
@@ -83,6 +88,7 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
         state: c.state,
         price: c.price,
         activeOutOfService: active ? { id: active.id, reason: active.reason, toDateTime: active.toDateTime } : null,
+        location: c.complex ? toComplexLocation(c.complex) : undefined,
       };
     }),
   };
@@ -90,7 +96,12 @@ async function loadCourts(): Promise<ActionResult<CourtItem[]>> {
 
 function CourtsSection({ isOwner }: { isOwner: boolean }) {
   const state = useSectionData(loadCourts);
-  return state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />;
+  return (
+    <div className="space-y-6">
+      {state.status === "ready" ? <CourtsTable courts={state.data} isOwner={isOwner} /> : <SectionStatus state={state} />}
+      <ComplexContactPanel />
+    </div>
+  );
 }
 
 type FixedBookingsData = {
@@ -131,7 +142,8 @@ async function loadFixedBookings(): Promise<ActionResult<FixedBookingsData>> {
  * Turnera Global: la grilla con los botones para agendar un turno común y para
  * registrar un turno fijo junto a Actualizar y, debajo, el listado de turnos
  * fijos. Un turno común también se agenda haciendo click en una celda libre.
- * Después de cada alta o cambio se refresca la grilla para que se vea.
+ * Después de cada alta o cambio se refresca la grilla para que se vea, y al
+ * liberar una fecha desde la grilla se refresca el listado de turnos fijos.
  */
 function ScheduleSection({ isActive }: { isActive: boolean }) {
   const fixedState = useSectionData(loadFixedBookings);
@@ -140,6 +152,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
   const [bookingNotice, setBookingNotice] = useState<string | null>(null);
   const [boardRefreshKey, setBoardRefreshKey] = useState(0);
   const refreshBoard = useCallback(() => setBoardRefreshKey((key) => key + 1), []);
+  const [fixedListRefreshKey, setFixedListRefreshKey] = useState(0);
   const isReady = fixedState.status === "ready";
 
   function openBooking(draft: BookingDraft) {
@@ -161,6 +174,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
           isActive={isActive}
           refreshKey={boardRefreshKey}
           onAvailableSlotClick={isReady ? openBooking : undefined}
+          onFixedBookingDateReleased={() => setFixedListRefreshKey((key) => key + 1)}
           toolbarActions={
             <>
               <button
@@ -200,6 +214,7 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
           isCreating={isCreatingFixed}
           onCloseCreate={() => setIsCreatingFixed(false)}
           onChanged={refreshBoard}
+          refreshKey={fixedListRefreshKey}
         />
       ) : (
         <SectionStatus state={fixedState} />
@@ -211,6 +226,11 @@ function ScheduleSection({ isActive }: { isActive: boolean }) {
 function UsersSection() {
   const state = useSectionData(getPlayersAdmin);
   return state.status === "ready" ? <UsersTable players={state.data} /> : <SectionStatus state={state} />;
+}
+
+function LessonsSection() {
+  const state = useSectionData(getLessonsAdmin);
+  return state.status === "ready" ? <LessonsPanel lessons={state.data} /> : <SectionStatus state={state} />;
 }
 
 function TeamSection() {
@@ -311,7 +331,7 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-8 lg:py-10">
+      <main className="flex-1 overflow-y-auto px-6 pt-8 pb-24 lg:px-8 lg:pt-10 lg:pb-10">
         <p className="eyebrow mb-2">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Administración · Quento Club
@@ -347,6 +367,11 @@ export function AdminPanel({ isOwner }: { isOwner: boolean }) {
         {visitedSections.includes("users") ? (
           <div hidden={activeSection !== "users"}>
             <UsersSection />
+          </div>
+        ) : null}
+        {visitedSections.includes("lessons") ? (
+          <div hidden={activeSection !== "lessons"}>
+            <LessonsSection />
           </div>
         ) : null}
         {visitedSections.includes("team") ? (

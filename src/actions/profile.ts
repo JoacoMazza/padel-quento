@@ -134,6 +134,8 @@ export async function recordPointsMovement(
   amount: number,
   type: "bonus" | "penalty",
   description: string,
+  /** Turno que originó el movimiento (asistencia o inasistencia), si lo originó uno. */
+  bookingId?: number,
 ): Promise<boolean> {
   try {
     const dataSource = await getDataSource();
@@ -162,6 +164,7 @@ export async function recordPointsMovement(
         player,
         penalizedScoring: signedAmount,
         reason: description,
+        booking: bookingId === undefined ? null : { id: bookingId },
       });
       await penaltyRepo.save(penaltyRecord);
     }

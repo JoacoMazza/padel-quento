@@ -59,16 +59,16 @@ describe("generateSeedBookings", () => {
     expect(bookings.every((b) => b.courtId === 1 && b.fromDateTime.getDay() === 1)).toBe(true);
   });
 
-  it("los turnos pasados quedan pagos o cancelados y con los puntos ya procesados; los futuros, reservados", () => {
+  it("los turnos pasados quedan finalizados y pagos, o cancelados; los futuros, reservados y sin pagar", () => {
     const bookings = generateSeedBookings(input());
     const past = bookings.filter((b) => b.fromDateTime < now);
     const future = bookings.filter((b) => b.fromDateTime >= now);
 
-    expect(past.every((b) => [BookingState.PAID, BookingState.CANCELLED].includes(b.bookingState))).toBe(true);
+    expect(past.every((b) => [BookingState.FINISHED, BookingState.CANCELLED].includes(b.bookingState))).toBe(true);
     expect(past.some((b) => b.bookingState === BookingState.CANCELLED)).toBe(true);
     expect(past.some((b) => !b.attended)).toBe(true);
-    expect(past.every((b) => b.pointsAwarded)).toBe(true);
-    expect(future.every((b) => b.bookingState === BookingState.RESERVED && b.attended && !b.pointsAwarded)).toBe(true);
+    expect(past.every((b) => b.isPaid === (b.bookingState === BookingState.FINISHED))).toBe(true);
+    expect(future.every((b) => b.bookingState === BookingState.RESERVED && b.attended && !b.isPaid)).toBe(true);
   });
 
   it("concentra más demanda a la tarde-noche que a la mañana", () => {
@@ -109,6 +109,22 @@ describe("generateSeedBookings", () => {
     const sameDay = (b: (typeof bookings)[number]) => b.fromDateTime.toDateString() === new Date(2026, 9, 12).toDateString();
     expect(bookings.some(sameDay)).toBe(false);
     expect(bookings.some((b) => b.fromDateTime.toDateString() === new Date(2026, 9, 13).toDateString())).toBe(true);
+  });
+
+  it("deja libres los turnos reservados para los datos de ejemplo (clases, turnos fijos y partidos)", () => {
+    const without = generateSeedBookings(input());
+    const reserved = [without[0], without[without.length - 1]].map((b) => ({
+      courtId: b.courtId,
+      fromDateTime: b.fromDateTime,
+    }));
+    const bookings = generateSeedBookings(input({ reserved }));
+    const isReserved = (b: (typeof bookings)[number]) =>
+      reserved.some((r) => r.courtId === b.courtId && r.fromDateTime.getTime() === b.fromDateTime.getTime());
+
+    expect(bookings.some(isReserved)).toBe(false);
+    // El resto de esos días se sigue generando.
+    const reservedDays = reserved.map((r) => r.fromDateTime.toDateString());
+    expect(reservedDays.every((day) => bookings.some((b) => b.fromDateTime.toDateString() === day))).toBe(true);
   });
 
   it("correrlo de nuevo sobre lo ya generado no agrega turnos", () => {

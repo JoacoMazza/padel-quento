@@ -38,7 +38,7 @@ export async function getOccupancyReportData(range: {
     const bookings = await dataSource.getRepository<Booking>("Booking").find({
       where: {
         fromDateTime: Between(range.from, range.to),
-        bookingState: In([BookingState.RESERVED, BookingState.PAID]),
+        bookingState: In([BookingState.RESERVED, BookingState.FINISHED]),
       },
       relations: { court: true },
     });

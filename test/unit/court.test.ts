@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryFailedError } from "typeorm";
 import { CourtState, Role } from "@/src/domain/enums";
 
-const { create, save, find, findOne, merge, deleteFn, getDataSource } = vi.hoisted(() => {
+const { create, save, find, findOne, merge, getDataSource } = vi.hoisted(() => {
   const create = vi.fn((data: unknown) => data);
   const save = vi.fn(async (entity: unknown) => entity);
   const find = vi.fn();
   const findOne = vi.fn();
-  const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+  const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
   const deleteFn = vi.fn();
   const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
   const getDataSource = vi.fn(async () => ({ getRepository }));
@@ -44,27 +44,47 @@ describe("court actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
     // Por defecto, un admin (que en estos tests pasa también como dueño; ver el mock de rbac).
     signInAs(Role.ADMIN);
   });
 
   describe("createCourt", () => {
-    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado", async () => {
+    const complex = { id: 1, name: "Quento Club" };
+
+    beforeEach(() => {
+      // El complejo del club, al que se asocian las canchas nuevas.
+      findOne.mockResolvedValue(complex);
+    });
+
+    it("crea una cancha con el estado AVAILABLE por defecto y el precio indicado, en el complejo del club", async () => {
       const result = await createCourt({ number: 3, price: 10000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000 });
-      expect(result).toEqual({ success: true, data: { number: 3, state: CourtState.AVAILABLE, price: 10000 } });
+      expect(findOne).toHaveBeenCalledWith({ where: {}, order: { id: "ASC" } });
+      expect(create).toHaveBeenCalledWith({ number: 3, state: CourtState.AVAILABLE, price: 10000, complex });
+      expect(result).toEqual({
+        success: true,
+        data: { number: 3, state: CourtState.AVAILABLE, price: 10000, complex },
+      });
     });
 
     it("respeta el estado y precio indicados", async () => {
-      await createCourt({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+      await createCourt({ number: 5, state: CourtState.CLOSED_DOWN, price: 12000 });
 
-      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.MAINTENANCE, price: 12000 });
+      expect(create).toHaveBeenCalledWith({ number: 5, state: CourtState.CLOSED_DOWN, price: 12000, complex });
+    });
+
+    it("devuelve error si no hay un complejo al que asociar la cancha", async () => {
+      findOne.mockResolvedValue(null);
+
+      const result = await createCourt({ number: 3, price: 10000 });
+
+      expect(result).toEqual({ success: false, error: "No hay un complejo cargado para asociar la cancha." });
+      expect(save).not.toHaveBeenCalled();
     });
 
     it("devuelve error si el precio no se proporciona o no es mayor a 0", async () => {
-      const missingPrice = await createCourt({ number: 2 } as any);
+      const missingPrice = await createCourt({ number: 2 } as Parameters<typeof createCourt>[0]);
       expect(missingPrice).toEqual({
         success: false,
         error: "El precio de la cancha es obligatorio y debe ser mayor a 0.",
@@ -166,11 +186,11 @@ describe("court actions", () => {
     it("actualiza los campos provistos", async () => {
       findOne.mockResolvedValueOnce({ id: 1, number: 3, state: CourtState.AVAILABLE });
 
-      const result = await updateCourt(1, { state: CourtState.MAINTENANCE });
+      const result = await updateCourt(1, { number: 4 });
 
       expect(result).toEqual({
         success: true,
-        data: { id: 1, number: 3, state: CourtState.MAINTENANCE },
+        data: { id: 1, number: 4, state: CourtState.AVAILABLE },
       });
     });
 

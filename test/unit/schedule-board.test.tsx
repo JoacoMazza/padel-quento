@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 const { getScheduleBoardData } = vi.hoisted(() => ({ getScheduleBoardData: vi.fn() }));
 
@@ -159,6 +159,38 @@ describe("ScheduleBoard - turnos fijos", () => {
     expect(screen.getAllByText("Turno fijo").length).toBeGreaterThan(0);
   });
 
+  it("identifica las clases con su color y su referencia, y muestra el profesor y los alumnos (HU-48)", async () => {
+    const lesson = {
+      ...bookingAt(7, 18),
+      booker: { id: 3, names: "Lucía", lastnames: "Profe" },
+      lesson: {
+        id: 1,
+        classCapacity: 4,
+        inscriptions: [
+          { id: 1, player: { id: 21, names: "Ana", lastnames: "Alumna" } },
+          { id: 2, player: { id: 22, names: "Bruno", lastnames: "Alumno" } },
+        ],
+      },
+    };
+    getScheduleBoardData.mockResolvedValue({ ...BOARD, data: { ...BOARD.data, bookings: [lesson, bookingAt(6, 10)] } });
+
+    render(<ScheduleBoard />);
+    await advance(0);
+
+    const classCell = screen.getAllByText("Clase").find((el) => el.getAttribute("role") === "button")!;
+    const commonCell = screen.getAllByText("Reservado").find((el) => el.getAttribute("role") === "button")!;
+    expect(classCell.dataset.state).toBe("class");
+    expect(classCell.className).not.toBe(commonCell.className);
+    expect(classCell.getAttribute("title")).toBe("Clase de Lucía Profe · 2/4 alumnos");
+    expect(screen.getAllByText("Clase").some((el) => el.getAttribute("role") !== "button")).toBe(true);
+
+    fireEvent.click(classCell);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Clase de Lucía Profe")).toBeTruthy();
+    expect(within(dialog).getByText("Ana Alumna")).toBeTruthy();
+    expect(within(dialog).getByText("Bruno Alumno")).toBeTruthy();
+  });
+
   it("distingue por color los turnos fijos de los comunes, con su referencia", async () => {
     getScheduleBoardData.mockResolvedValue({
       ...BOARD,
@@ -281,6 +313,27 @@ describe("ScheduleBoard - turnos fijos", () => {
     await advance(0);
 
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+  });
+
+  it("si refreshKey cambia mientras se está actualizando, vuelve a pedir los datos al terminar", async () => {
+    let resolveFirst!: (value: typeof BOARD) => void;
+    getScheduleBoardData.mockReturnValueOnce(new Promise((resolve) => (resolveFirst = resolve)));
+    const withFixed = {
+      ...BOARD,
+      data: { ...BOARD.data, bookings: [bookingAt(5, 18)], fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }] },
+    };
+    getScheduleBoardData.mockResolvedValue(withFixed);
+    const { rerender } = render(<ScheduleBoard refreshKey={0} />);
+    await advance(0);
+
+    // Se crea un turno fijo mientras la primera carga sigue en curso.
+    rerender(<ScheduleBoard refreshKey={1} />);
+    await advance(0);
+    resolveFirst(BOARD);
+    await advance(0);
+
+    expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("Turno fijo").some((el) => el.getAttribute("role") === "button")).toBe(true);
   });
 });
 

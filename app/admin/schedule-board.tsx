@@ -22,12 +22,22 @@ import { getNextSlotChange } from "@/app/admin/schedule-refresh";
 import { getAdminBookingStatus } from "@/app/admin/admin-booking-status";
 import { dateToClockLabel } from "@/src/domain/time-format";
 
-type CellState = "available" | "reserved" | "fixed" | "pending" | "finished" | "unbooked" | "blocked" | "closed";
+type CellState =
+  | "available"
+  | "reserved"
+  | "fixed"
+  | "class"
+  | "pending"
+  | "finished"
+  | "unbooked"
+  | "blocked"
+  | "closed";
 
 const CELL_STYLES: Record<CellState, string> = {
   available: "border border-line bg-card text-success",
   reserved: "bg-ink text-white hover:bg-ink-soft",
   fixed: "bg-occupied text-white hover:bg-occupied/85",
+  class: "bg-violet-600 text-white hover:bg-violet-600/85",
   pending: "border border-primary/25 bg-primary-light text-primary hover:border-primary/60",
   finished: "bg-foreground/70 text-white hover:bg-foreground/80",
   unbooked: "bg-foreground/55 text-white/80 line-through",
@@ -39,6 +49,7 @@ const LEGEND: { state: Exclude<CellState, "closed">; label: string; swatch: stri
   { state: "available", label: "Disponible", swatch: "border border-line bg-card" },
   { state: "reserved", label: "Reservado", swatch: "bg-ink" },
   { state: "fixed", label: "Turno fijo", swatch: "bg-occupied" },
+  { state: "class", label: "Clase", swatch: "bg-violet-600" },
   { state: "pending", label: "Partido abierto", swatch: "border border-primary/40 bg-primary-light" },
   { state: "finished", label: "Finalizado", swatch: "bg-foreground/70" },
   { state: "unbooked", label: "No reservado", swatch: "bg-foreground/55" },
@@ -60,7 +71,8 @@ const EMPTY_BOARD: BoardData = { courts: [], schedules: [], bookings: [], outOfS
  * click en Actualizar: oculta en el panel conserva lo último obtenido sin seguir consultando.
  * También se refresca cuando cambia refreshKey (por ejemplo, al crear o liberar
  * un turno fijo). toolbarActions se muestra junto al botón Actualizar. Con
- * onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
+ * onFixedBookingDateReleased avisa cuando se libera una fecha de turno fijo
+ * desde el detalle de un turno. Con onAvailableSlotClick, las celdas disponibles que todavía no empezaron se
  * pueden clickear para agendar un turno en esa cancha, día y hora.
  */
 export function ScheduleBoard({
@@ -68,11 +80,13 @@ export function ScheduleBoard({
   refreshKey = 0,
   toolbarActions,
   onAvailableSlotClick,
+  onFixedBookingDateReleased,
 }: {
   isActive?: boolean;
   refreshKey?: number;
   toolbarActions?: ReactNode;
   onAvailableSlotClick?: (slot: { courtId: number; date: string; startTime: string }) => void;
+  onFixedBookingDateReleased?: () => void;
 }) {
   const [data, setData] = useState<BoardData>(EMPTY_BOARD);
   const [dateInput, setDateInput] = useState(() => toISODate(new Date()));
@@ -81,49 +95,57 @@ export function ScheduleBoard({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingProp | null>(null);
   const isFetchingRef = useRef(false);
+  // Pedido de refresco que llegó con otro en curso (por ejemplo, al crear un
+  // turno fijo): se repite al terminar para no mostrar datos de antes del cambio.
+  const pendingRefreshRef = useRef(false);
   const hasLoadedRef = useRef(false);
   const lastAttemptRef = useRef<Date | null>(null);
   const lastRefreshKeyRef = useRef(refreshKey);
 
   const refresh = useCallback(async () => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-    lastAttemptRef.current = new Date();
-    setIsRefreshing(true);
-    try {
-      const result = await getScheduleBoardData();
-      if (result.success) {
-        const fixedDates = new Map(
-          result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
-        );
-        setData({
-          courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
-          schedules: result.data.schedules.map((s) => ({
-            id: s.id,
-            dayOfWeek: s.dayOfWeek,
-            openingTime: String(s.openingTime),
-            closingTime: String(s.closingTime),
-            courtId: s.court?.id,
-          })),
-          bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
-          outOfServices: result.data.outOfServices.map((o) => ({
-            id: o.id,
-            fromDateTime: new Date(o.fromDateTime),
-            toDateTime: new Date(o.toDateTime),
-            courtId: o.court?.id,
-          })),
-        });
-        setLastUpdated(new Date());
-        setRefreshError(null);
-      } else {
-        setRefreshError(result.error);
-      }
-    } catch {
-      setRefreshError("No se pudo actualizar la turnera.");
-    } finally {
-      isFetchingRef.current = false;
-      setIsRefreshing(false);
+    if (isFetchingRef.current) {
+      pendingRefreshRef.current = true;
+      return;
     }
+    isFetchingRef.current = true;
+    setIsRefreshing(true);
+    do {
+      pendingRefreshRef.current = false;
+      lastAttemptRef.current = new Date();
+      try {
+        const result = await getScheduleBoardData();
+        if (result.success) {
+          const fixedDates = new Map(
+            result.data.fixedBookingDates.map(({ bookingId, fixedBookingDateId }) => [bookingId, fixedBookingDateId]),
+          );
+          setData({
+            courts: result.data.courts.map((c) => ({ id: c.id, number: c.number, state: c.state, price: c.price })),
+            schedules: result.data.schedules.map((s) => ({
+              id: s.id,
+              dayOfWeek: s.dayOfWeek,
+              openingTime: String(s.openingTime),
+              closingTime: String(s.closingTime),
+              courtId: s.court?.id,
+            })),
+            bookings: result.data.bookings.map((b) => mapBookingToAdminProp(b, fixedDates.get(b.id) ?? null)),
+            outOfServices: result.data.outOfServices.map((o) => ({
+              id: o.id,
+              fromDateTime: new Date(o.fromDateTime),
+              toDateTime: new Date(o.toDateTime),
+              courtId: o.court?.id,
+            })),
+          });
+          setLastUpdated(new Date());
+          setRefreshError(null);
+        } else {
+          setRefreshError(result.error);
+        }
+      } catch {
+        setRefreshError("No se pudo actualizar la turnera.");
+      }
+    } while (pendingRefreshRef.current);
+    isFetchingRef.current = false;
+    setIsRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -217,11 +239,9 @@ export function ScheduleBoard({
       return { state: "finished", booking: overlappingBooking };
     }
     if (overlappingBooking?.needPlayers) return { state: "pending", booking: overlappingBooking };
-    if (
-      overlappingBooking?.bookingState === BookingState.RESERVED ||
-      overlappingBooking?.bookingState === BookingState.PAID
-    ) {
-      return { state: overlappingBooking.fixedBookingDateId ? "fixed" : "reserved", booking: overlappingBooking };
+    if (overlappingBooking) {
+      const state = overlappingBooking.classInfo ? "class" : overlappingBooking.fixedBookingDateId ? "fixed" : "reserved";
+      return { state, booking: overlappingBooking };
     }
 
     // Horario que terminó sin que nadie lo tomara (o cuyo turno se canceló).
@@ -349,7 +369,15 @@ export function ScheduleBoard({
                           tabIndex={isClickable ? 0 : undefined}
                           data-state={state}
                           onClick={handleClick}
-                          title={booking ? "Ver y marcar asistencia" : canSchedule ? "Agendar turno" : undefined}
+                          title={
+                            booking?.classInfo
+                              ? `Clase de ${booking.bookerName} · ${booking.classInfo.students.length}/${booking.classInfo.capacity} alumnos`
+                              : booking
+                                ? "Ver y marcar asistencia"
+                                : canSchedule
+                                  ? "Agendar turno"
+                                  : undefined
+                          }
                           className={`inline-flex h-10 w-full pointer-coarse:h-11 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${CELL_STYLES[state]} ${isClickable ? "cursor-pointer" : ""} ${canSchedule ? "group hover:border-success hover:bg-success-light" : ""}`}
                         >
                           {state === "closed" ? (
@@ -400,6 +428,7 @@ export function ScheduleBoard({
           onReleased={() => {
             setSelectedBooking(null);
             refresh();
+            onFixedBookingDateReleased?.();
           }}
         />
       ) : null}

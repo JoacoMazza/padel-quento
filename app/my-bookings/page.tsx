@@ -8,10 +8,12 @@ import { getDataSource } from "@/src/lib/db";
 import { Player } from "@/src/entities/Player";
 import { getPlayerBookings } from "@/src/lib/player-bookings";
 import { canReviewMatch } from "@/src/domain/reputation";
+import { toComplexLocation } from "@/src/domain/complex";
 import { findFixedBookingDates } from "@/src/lib/fixed-booking-dates";
 import { pageMetadata } from "@/app/site-metadata";
+import { isPresent } from "@/src/domain/attendance";
 
-export const metadata = pageMetadata("Mis reservas", "/my-bookings");
+export const metadata = pageMetadata("Mis turnos", "/my-bookings");
 
 export default async function MyBookingsPage() {
   const session = await getServerSession(authOptions);
@@ -34,6 +36,7 @@ export default async function MyBookingsPage() {
       durationMinutes: b.durationMinutes,
       bookingState: b.bookingState,
       courtNumber: b.court?.number ?? 0,
+      location: b.court?.complex ? toComplexLocation(b.court.complex) : undefined,
       price: b.price ?? 10000,
       matchId: b.match?.id ?? null,
       needPlayers: b.match?.needPlayers ?? false,
@@ -53,11 +56,21 @@ export default async function MyBookingsPage() {
             fromDateTime: b.fromDateTime,
             durationMinutes: b.durationMinutes,
             bookingState: b.bookingState,
-            attendedPlayerIds: (b.match.matchPlayers ?? []).filter((mp) => mp.attended).map((mp) => mp.playerId),
+            attendedPlayerIds: (b.match.matchPlayers ?? []).filter(isPresent).map((mp) => mp.playerId),
           },
           player.id,
         ),
       isFixed: fixedDates.has(b.id),
+      // Turno de una clase (HU-47): la da quien reservó, el profesor; el resto son sus alumnos.
+      classInfo: b.lesson
+        ? {
+            lessonId: b.lesson.id,
+            role: player && b.booker?.id === player.id ? ("teacher" as const) : ("student" as const),
+            teacherName: `${b.booker?.names ?? ""} ${b.booker?.lastnames ?? ""}`.trim(),
+            capacity: b.lesson.classCapacity,
+            studentsCount: b.lesson.inscriptions?.length ?? 0,
+          }
+        : null,
     }));
 
   return (

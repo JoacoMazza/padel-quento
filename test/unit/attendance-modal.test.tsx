@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const { setBookingAttendance, setMatchPlayerAttendance } = vi.hoisted(() => ({
   setBookingAttendance: vi.fn(),
@@ -31,6 +31,7 @@ function simpleBooking(overrides: Partial<AdminBookingProp> = {}): AdminBookingP
     attended: true,
     matchPlayers: [],
     fixedBookingDateId: null,
+    classInfo: null,
     ...overrides,
   };
 }
@@ -40,8 +41,8 @@ function openMatchBooking(overrides: Partial<AdminBookingProp> = {}): AdminBooki
     needPlayers: false,
     confirmedPlayers: 4,
     matchPlayers: [
-      { id: 100, playerId: 1, playerName: "Ana Gomez", attended: true },
-      { id: 101, playerId: 2, playerName: "Luis Pérez", attended: true },
+      { id: 100, playerId: 1, playerName: "Ana Gomez", playersCount: 1, attendedCount: 1 },
+      { id: 101, playerId: 2, playerName: "Luis Pérez", playersCount: 1, attendedCount: 1 },
     ],
     ...overrides,
   });
@@ -54,6 +55,44 @@ describe("AttendanceModal", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("en una clase muestra al profesor y a los alumnos, sin marcar asistencia porque no mueve puntos (HU-48)", () => {
+    render(
+      <AttendanceModal
+        booking={simpleBooking({
+          bookerName: "Lucía Profe",
+          classInfo: {
+            capacity: 4,
+            students: [
+              { id: 21, name: "Ana Alumna" },
+              { id: 22, name: "Bruno Alumno" },
+            ],
+          },
+        })}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Clase" });
+    expect(within(dialog).getByText("Clase de Lucía Profe")).toBeTruthy();
+    expect(within(dialog).getByText("2/4 alumnos")).toBeTruthy();
+    expect(within(dialog).getByText("Ana Alumna")).toBeTruthy();
+    expect(within(dialog).getByText("Bruno Alumno")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: /Presente|Ausente/ })).toBeNull();
+  });
+
+  it("una clase sin alumnos lo dice", () => {
+    render(
+      <AttendanceModal
+        booking={simpleBooking({ bookerName: "Lucía Profe", classInfo: { capacity: 2, students: [] } })}
+        onClose={vi.fn()}
+        onUpdated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Todavía no tiene alumnos registrados.")).toBeTruthy();
   });
 
   it("muestra al jugador de un turno simple como presente por defecto", () => {
@@ -94,19 +133,50 @@ describe("AttendanceModal", () => {
   });
 
   it("marca la ausencia de un jugador puntual del partido sin tocar al resto", async () => {
-    setMatchPlayerAttendance.mockResolvedValueOnce({ success: true, data: { id: 101, attended: false } });
+    setMatchPlayerAttendance.mockResolvedValueOnce({ success: true, data: { id: 101, attendedCount: 0 } });
     const onUpdated = vi.fn();
     render(<AttendanceModal booking={openMatchBooking()} onClose={vi.fn()} onUpdated={onUpdated} />);
 
     const buttons = screen.getAllByRole("button", { name: "Presente" });
     fireEvent.click(buttons[1]);
 
-    await waitFor(() => expect(setMatchPlayerAttendance).toHaveBeenCalledWith(101, false));
+    await waitFor(() => expect(setMatchPlayerAttendance).toHaveBeenCalledWith(101, 0));
     expect(onUpdated).toHaveBeenCalledWith(
       expect.objectContaining({
         matchPlayers: [
-          { id: 100, playerId: 1, playerName: "Ana Gomez", attended: true },
-          { id: 101, playerId: 2, playerName: "Luis Pérez", attended: false },
+          { id: 100, playerId: 1, playerName: "Ana Gomez", playersCount: 1, attendedCount: 1 },
+          { id: 101, playerId: 2, playerName: "Luis Pérez", playersCount: 1, attendedCount: 0 },
+        ],
+      }),
+    );
+  });
+
+  it("a quien se sumó con acompañantes le marca cuántos de su grupo asistieron", async () => {
+    setMatchPlayerAttendance.mockResolvedValueOnce({ success: true, data: { id: 101, attendedCount: 1 } });
+    const onUpdated = vi.fn();
+    const booking = openMatchBooking({
+      matchPlayers: [
+        { id: 100, playerId: 1, playerName: "Ana Gomez", playersCount: 1, attendedCount: 1 },
+        { id: 101, playerId: 2, playerName: "Luis Pérez", playersCount: 3, attendedCount: 3 },
+      ],
+    });
+    render(<AttendanceModal booking={booking} onClose={vi.fn()} onUpdated={onUpdated} />);
+
+    const select = screen.getByLabelText("Asistentes del grupo de Luis Pérez");
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "0 de 3",
+      "1 de 3",
+      "2 de 3",
+      "3 de 3",
+    ]);
+    fireEvent.change(select, { target: { value: "1" } });
+
+    await waitFor(() => expect(setMatchPlayerAttendance).toHaveBeenCalledWith(101, 1));
+    expect(onUpdated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchPlayers: [
+          { id: 100, playerId: 1, playerName: "Ana Gomez", playersCount: 1, attendedCount: 1 },
+          { id: 101, playerId: 2, playerName: "Luis Pérez", playersCount: 3, attendedCount: 1 },
         ],
       }),
     );

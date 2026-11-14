@@ -22,8 +22,8 @@ function isPublicPath(pathname: string) {
 }
 
 /**
- * Pantallas que se pueden ver sin sesión (landing, turnos y partidos abiertos):
- * el login se pide recién al reservar o sumarse a un partido. A diferencia de
+ * Pantallas que se pueden ver sin sesión (landing, turnos, partidos abiertos y
+ * clases): el login se pide recién al reservar, sumarse a un partido o inscribirse. A diferencia de
  * las rutas de autenticación, el admin con sesión igual vuelve a su panel.
  */
 function isGuestVisiblePath(pathname: string) {
@@ -31,8 +31,13 @@ function isGuestVisiblePath(pathname: string) {
     pathname === "/" ||
     pathname === "/bookings" ||
     pathname === "/open-matches" ||
-    pathname.startsWith("/open-matches/")
+    pathname.startsWith("/open-matches/") ||
+    pathname === "/lessons"
   );
+}
+
+function isTeacherPath(pathname: string) {
+  return pathname === "/teacher" || pathname.startsWith("/teacher/");
 }
 
 function isAdminPath(pathname: string) {
@@ -71,6 +76,15 @@ export async function proxy(request: NextRequest) {
         headers: { "content-type": "text/plain; charset=utf-8" },
       });
     }
+  }
+
+  // HU-42: la sección del profesor es solo para profesores activos. El permiso
+  // real lo verifica el servidor contra la base (requireTeacher).
+  if (isTeacherPath(pathname) && !token?.isTeacher) {
+    return new NextResponse("Acceso denegado: Se requiere el rol de Profesor", {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
   }
 
   // El administrador queda encapsulado dentro del panel: cualquier ruta pública

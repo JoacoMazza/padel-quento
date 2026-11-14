@@ -20,7 +20,7 @@ export class OutOfService {
   @Column({ type: "varchar", length: 255, nullable: true })
   description!: string | null;
 
-  @ManyToOne("Court", (court: any) => court.outOfServices)
+  @ManyToOne("Court", "outOfServices")
   @JoinColumn({ name: "court_id" })
   court!: Court;
 }

@@ -11,6 +11,7 @@ import type { ActionResult } from "@/src/lib/action-result";
 import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac";
 import {
   BookingRuleError,
+  isSlotStart,
   isSlotTaken,
   isWithinSchedule,
   lockCourt,
@@ -58,6 +59,9 @@ export async function createBookingAdmin(input: CreateBookingAdminInput): Promis
       if (!isWithinSchedule(court.schedules, input.date, input.startTime, durationMinutes)) {
         throw new BookingRuleError("La cancha no está abierta en ese horario ese día.");
       }
+      if (!isSlotStart(court.schedules, input.date, input.startTime)) {
+        throw new BookingRuleError("Ese horario no corresponde a un turno de la cancha.");
+      }
 
       const booker = await resolveBookingHolder(manager, input.holder);
       if ((booker as Player).account?.isBlocked) {
@@ -78,8 +82,7 @@ export async function createBookingAdmin(input: CreateBookingAdminInput): Promis
           durationMinutes,
           bookingState: BookingState.RESERVED,
           price: court.price,
-          // La FK es booker_phone_number: TypeORM necesita el teléfono para armarla.
-          booker: { id: booker.id, phoneNumber: booker.phoneNumber },
+          booker: { id: booker.id },
           court: { id: court.id },
         }),
       );
@@ -136,5 +139,28 @@ export async function getAvailableSlotsAdmin(input: { courtId: number; date: str
     }
     console.error("getAvailableSlotsAdmin", error);
     return { success: false, error: "No se pudieron obtener los horarios libres." };
+  }
+}
+
+/** El admin marca si un turno se pagó (o lo desmarca); no le cambia el estado. */
+export async function setBookingPaid(
+  bookingId: number,
+  isPaid: boolean,
+): Promise<ActionResult<{ id: number; isPaid: boolean }>> {
+  try {
+    await requireAdmin();
+    const dataSource = await getDataSource();
+    const bookings = dataSource.getRepository<Booking>("Booking");
+    if (!(await bookings.exists({ where: { id: bookingId } }))) {
+      return { success: false, error: "El turno no existe." };
+    }
+    await bookings.update(bookingId, { isPaid });
+    return { success: true, data: { id: bookingId, isPaid } };
+  } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof UnauthorizedError) {
+      return { success: false, error: error.message };
+    }
+    console.error("setBookingPaid", error);
+    return { success: false, error: "No se pudo actualizar el pago del turno." };
   }
 }

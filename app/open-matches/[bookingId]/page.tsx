@@ -174,7 +174,7 @@ export default async function OpenMatchDetailPage({ params }: { params: Promise<
               </RuleItem>
               <RuleItem title="Puntualidad">Presentate 10 minutos antes en la recepción de Quento Club.</RuleItem>
               <RuleItem title="Aviso de baja">
-                Si no podés asistir, date de baja desde Mis reservas. Con menos de {LATE_CANCELLATION_HOURS} horas de
+                Si no podés asistir, date de baja desde Mis turnos. Con menos de {LATE_CANCELLATION_HOURS} horas de
                 anticipación se descuentan {PENALTY_POINTS} puntos.
               </RuleItem>
             </ul>

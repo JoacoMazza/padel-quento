@@ -25,7 +25,7 @@ const {
     const playerFindOne = vi.fn(async () => ({ id: 1, account: { isBlocked: false } }) as unknown);
     const bookerExistsBy = vi.fn(async () => true);
     const fixedDateExistsBy = vi.fn(async () => false);
-    const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+    const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
     const deleteFn = vi.fn();
     const getOne = vi.fn(async () => null as unknown);
     const queryFn = vi.fn(async () => undefined);
@@ -35,7 +35,7 @@ const {
     const bookerRepository = { existsBy: bookerExistsBy };
     const fixedDateRepository = { existsBy: fixedDateExistsBy };
 
-    const queryBuilder: any = {};
+    const queryBuilder: Record<string, unknown> = {};
     queryBuilder.where = vi.fn(() => queryBuilder);
     queryBuilder.andWhere = vi.fn(() => queryBuilder);
     queryBuilder.getOne = getOne;
@@ -88,7 +88,11 @@ const { notifyPlayerJoined, notifyMatchCancelledByCreator } = vi.hoisted(() => (
   notifyPlayerJoined: vi.fn(async () => {}),
   notifyMatchCancelledByCreator: vi.fn(async () => {}),
 }));
-vi.mock("@/src/lib/match-notifications", () => ({ notifyPlayerJoined, notifyMatchCancelledByCreator }));
+vi.mock("@/src/lib/match-notifications", () => ({
+  notifyPlayerJoined,
+  notifyMatchCancelledByCreator,
+  notifyClassCancelledByTeacher: vi.fn(async () => {}),
+}));
 
 import { PENALTY_POINTS } from "@/src/domain/constants";
 import {
@@ -129,7 +133,7 @@ describe("booking actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
     getOne.mockResolvedValue(null);
     playerFindOne.mockResolvedValue(bookingPlayer());
     bookerExistsBy.mockResolvedValue(true);
@@ -145,7 +149,7 @@ describe("booking actions", () => {
         durationMinutes: 90,
         bookingState: BookingState.RESERVED,
         price: 10000,
-        booker: { id: 1, phoneNumber: PHONE_NUMBER },
+        booker: { id: 1 },
         court: { id: 2 },
       });
       expect(result).toEqual({
@@ -155,7 +159,7 @@ describe("booking actions", () => {
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
           price: 10000,
-          booker: { id: 1, phoneNumber: PHONE_NUMBER },
+          booker: { id: 1 },
           court: { id: 2 },
         },
       });
@@ -184,13 +188,13 @@ describe("booking actions", () => {
       await createBookingForPlayer({
         fromDateTime,
         durationMinutes: 60,
-        bookingState: BookingState.PAID,
+        bookingState: BookingState.FINISHED,
         bookerId: 1,
         courtId: 2,
       });
 
       expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ durationMinutes: 60, bookingState: BookingState.PAID }),
+        expect.objectContaining({ durationMinutes: 60, bookingState: BookingState.FINISHED }),
       );
     });
 
@@ -246,6 +250,7 @@ describe("booking actions", () => {
         match: { id: undefined },
         player: { id: 1 },
         playersCount: 2,
+        attendedCount: 2,
       });
       expect(save).toHaveBeenCalledTimes(3);
       expect(result.success).toBe(true);
@@ -395,6 +400,7 @@ describe("booking actions", () => {
         match: { id: 20 },
         player: { id: 5 },
         playersCount: 1,
+        attendedCount: 1,
       });
       expect(save).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
@@ -444,6 +450,7 @@ describe("booking actions", () => {
         match: { id: 20 },
         player: { id: 5 },
         playersCount: 2,
+        attendedCount: 2,
       });
       expect(update).toHaveBeenCalledWith(20, { needPlayers: false });
       expect(result.success).toBe(true);
@@ -535,7 +542,7 @@ describe("booking actions", () => {
       const result = await joinOpenMatchForPlayer({ bookingId: 10, playerId: 5 });
 
       expect(result.success).toBe(true);
-      expect(create).toHaveBeenCalledWith({ match: { id: 20 }, player: { id: 5 }, playersCount: 1 });
+      expect(create).toHaveBeenCalledWith({ match: { id: 20 }, player: { id: 5 }, playersCount: 1, attendedCount: 1 });
     });
 
     it("rechaza al jugador de otra categoría que la de quien creó el partido", async () => {
@@ -662,6 +669,8 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
+          lesson: { inscriptions: { player: true } },
+          penalties: true,
         },
       });
       expect(result).toEqual({ success: true, data: [{ id: 1 }] });
@@ -688,6 +697,8 @@ describe("booking actions", () => {
           booker: true,
           court: true,
           match: { matchPlayers: { player: true }, chat: true },
+          lesson: { inscriptions: { player: true } },
+          penalties: true,
         },
       });
       expect(result).toEqual({ success: true, data: { id: 1 } });
@@ -770,7 +781,7 @@ describe("booking actions", () => {
           fromDateTime,
           durationMinutes: 90,
           bookingState: BookingState.RESERVED,
-          booker: { id: 3, phoneNumber: "2215550133" },
+          booker: { id: 3 },
           court: { id: 4 },
         },
       });
@@ -871,7 +882,7 @@ describe("booking actions", () => {
         booker: { id: 7 },
       });
 
-      await updateBooking(1, { bookingState: BookingState.PAID });
+      await updateBooking(1, { price: 9000 });
 
       expect(recordPointsMovement).not.toHaveBeenCalled();
     });
@@ -894,7 +905,7 @@ describe("booking actions", () => {
     it("devuelve error si la reserva no existe", async () => {
       findOne.mockResolvedValueOnce(null);
 
-      const result = await updateBooking(999, { bookingState: BookingState.PAID });
+      const result = await updateBooking(999, { bookingState: BookingState.FINISHED });
 
       expect(result).toEqual({ success: false, error: "La reserva no existe." });
       expect(save).not.toHaveBeenCalled();

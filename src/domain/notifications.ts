@@ -41,6 +41,29 @@ function describeBooking(booking: NoticeBooking) {
   return { day, time: dateToTimeLabel(booking.fromDateTime), court: String(booking.courtNumber) };
 }
 
+/** Clase dada de baja por el admin: se cancelaron sus próximos turnos. */
+export function lessonCancelledNotice(recipientName: string, teacherName: string): NotificationMessage {
+  return {
+    subject: `Tu clase con ${teacherName} fue dada de baja`,
+    text: `Hola ${recipientName}, la clase con ${teacherName} fue dada de baja y se cancelaron sus próximos turnos.`,
+    whatsappTemplate: { name: "quento_clase_cancelada", parameters: [recipientName, teacherName] },
+  };
+}
+
+/** Clase cancelada por el profesor (HU-47). */
+export function classCancelledByTeacherNotice(
+  recipientName: string,
+  teacherName: string,
+  booking: NoticeBooking,
+): NotificationMessage {
+  const { day, time, court } = describeBooking(booking);
+  return {
+    subject: `Tu clase del ${day} fue cancelada`,
+    text: `Hola ${recipientName}, ${teacherName} canceló la clase del ${day} a las ${time} en la cancha ${court}.`,
+    whatsappTemplate: { name: "quento_clase_cancelada_profesor", parameters: [recipientName, teacherName, day, time, court] },
+  };
+}
+
 /** Turno cancelado porque la cancha quedó fuera de servicio. */
 export function courtUnavailableNotice(recipientName: string, booking: NoticeBooking): NotificationMessage {
   const { day, time, court } = describeBooking(booking);

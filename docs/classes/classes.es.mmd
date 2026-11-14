@@ -1,0 +1,279 @@
+---
+title: Diagrama de Clases Padel Quento
+config:
+  layout: elk
+---
+%% Versión en español de classes.mmd (renderizada a classes.es.jpg).
+%% classes.mmd es la fuente de verdad: todo cambio allí debe reflejarse aquí.
+%% Convención: un extremo de asociación sin multiplicidad significa exactamente 1.
+classDiagram
+    direction TB
+
+    class Cuenta {
+        -email: char
+        -estaBloqueada: boolean
+        -claveHasheada: char
+        +bloquear()
+        +registrar()
+        +iniciarSesion()
+        +cerrarSesion()
+        +desbloquear()
+    }
+
+    class Administrador {
+        -nivelAcceso: NivelAccesoAdmin
+        -dni: int
+        -apellidos: char
+        -nombres: char
+    }
+
+    class Reservante {
+        -apellidos: char
+        -nombres: char
+        -telefono: char
+    }
+
+    class Jugador {
+        -categoria: CategoriaJugador
+        -puntaje: float
+    }
+
+    class Clase {
+        -cupo: int
+        -fechaCreacion: LocalDateTime
+        -fechaHoraDesde: LocalDateTime
+        -estaActiva: boolean
+        -precio: float
+        -fechaHoraHasta: LocalDateTime
+    }
+
+    class HorarioClase {
+        -diaSemana: DiaSemana
+        -horaFin: LocalTime
+        -horaInicio: LocalTime
+    }
+
+    class Penalizacion {
+        -fechaCreacion: LocalDateTime
+        -puntajePenalizado: float
+        -motivo: char
+        +calcularMonto() float
+    }
+
+    class Complejo {
+        -direccion: char
+        -ciudad: char
+        -pais: char
+        -latitud: float
+        -longitud: float
+        -urlMaps: char
+        -nombre: char
+        -codigoPostal: char
+        -provincia: char
+        -mensajeWhatsapp: char
+        -numeroWhatsapp: char
+    }
+
+    class Cancha {
+        -numero: int
+        -precio: float
+        -estado: EstadoCancha
+        +bloquear()
+        +verificarDisponibilidad()
+        +desbloquear()
+    }
+
+    class Horario {
+        -horaCierre: LocalTime
+        -diaSemana: DiaSemana
+        -horaApertura: LocalTime
+        +estaDentroDelHorario() boolean
+    }
+
+    class FueraDeServicio {
+        -descripcion: char
+        -fechaHoraDesde: LocalDateTime
+        -motivo: MotivoFueraDeServicio
+        -fechaHoraHasta: LocalDateTime
+        +cancelarReservasAfectadas()
+        +estaActivo() boolean
+    }
+
+    class Reserva {
+        -estadoReserva: EstadoReserva
+        -duracionMinutos: int
+        -fechaHoraDesde: LocalDateTime
+        -estaPagada: boolean
+        -precio: float
+        +cancelar()
+        +verificarDisponibilidad() int
+    }
+
+    class Inscripcion {
+        -fechaCreacion: LocalDateTime
+    }
+
+    class ReservaFija {
+        -fechaCreacion: LocalDateTime
+        -duracionMinutos: int
+        -fechaFin: LocalDate
+        -frecuencia: FrecuenciaReservaFija
+        -estaActiva: boolean
+        -fechaInicio: LocalDate
+        -horaInicio: LocalTime
+    }
+
+    class FechaReservaFija {
+        -fecha: LocalDate
+        -estado: EstadoFechaReservaFija
+    }
+
+    class Partido {
+        -necesitaJugadores: boolean
+        +agregarJugador()
+        +cancelar()
+        +verificarNecesitaJugadores()
+        +cerrar() int
+        +notificarJugadores() int
+    }
+
+    class JugadorPartido {
+        -cantidadAsistentes: int
+        -fechaUnion: LocalDateTime
+        -cantidadJugadores: int
+        -puntosOtorgados: int
+    }
+
+    class ResenaJugador {
+        -comentario: char
+        -fechaCreacion: LocalDateTime
+        -buenaActitud: boolean
+        -nivel: NivelResena
+        -puntual: boolean
+    }
+
+    class Chat {
+        -fechaCreacion: LocalDateTime
+        +agregarMensajes()
+        +cerrar()
+        +listarMensajes()
+    }
+
+    class Mensaje {
+        -contenido: char
+        -fechaEnvio: LocalDateTime
+        +enviar()
+    }
+
+    class NivelAccesoAdmin {
+        <<enumeration>>
+        propietario
+        personal
+    }
+
+    class FrecuenciaReservaFija {
+        <<enumeration>>
+        semanal
+        quincenal
+    }
+
+    class EstadoFechaReservaFija {
+        <<enumeration>>
+        reservada
+        liberada
+        conflicto
+    }
+
+    class NivelResena {
+        <<enumeration>>
+        inferior
+        segun_declarado
+        superior
+    }
+
+    class MotivoFueraDeServicio {
+        <<enumeration>>
+        mantenimiento
+        dia_libre
+        limpieza
+        otro
+    }
+
+    class EstadoCancha {
+        <<enumeration>>
+        disponible
+        clausurada
+    }
+
+    class EstadoReserva {
+        <<enumeration>>
+        reservada
+        finalizada
+        cancelada
+    }
+
+    class DiaSemana {
+        <<enumeration>>
+        lunes
+        martes
+        miercoles
+        jueves
+        viernes
+        sabado
+        domingo
+    }
+
+    class CategoriaJugador {
+        <<enumeration>>
+        1ra
+        2da
+        3ra
+        4ta
+        5ta
+        6ta
+        7ma
+        sin_categoria
+    }
+
+    %% Herencia
+    Reservante <|-- Jugador
+
+    %% Cuentas
+    Administrador "0..1" -- Cuenta
+    Cuenta -- "0..1" Jugador
+
+    %% Jugadores
+    Jugador -- "*" Penalizacion
+    Jugador "1" -- "0..*" JugadorPartido
+    Jugador "1" -- "0..*" Inscripcion
+    Jugador -- "0..*" ResenaJugador : +evaluador
+    Jugador -- "0..*" ResenaJugador : +evaluado
+    Jugador -- "0..*" Mensaje
+
+    %% Partidos
+    Partido *-- "0..4" JugadorPartido
+    Partido *-- "0..1" Chat
+    Chat *-- "0..*" Mensaje
+    ResenaJugador "0..*" -- Partido
+    Partido "0..1" -- Reserva
+
+    %% Reservas
+    Reservante -- "*" Reserva
+    Reserva "0..1" -- "0..1" FechaReservaFija
+    Reserva "0..1" -- "*" Penalizacion
+    Reservante -- "*" ReservaFija
+    ReservaFija -- "*" FechaReservaFija
+    ReservaFija "0..*" -- Cancha
+
+    %% Clases
+    Jugador -- "0..*" Clase : +profesor
+    Clase -- "*" Inscripcion
+    Clase "0..1" -- "*" Reserva
+    Clase *-- "1..*" HorarioClase
+    Cancha -- "0..*" HorarioClase
+
+    %% Canchas
+    Complejo -- "*" Cancha
+    Cancha -- "*" Reserva
+    Cancha -- "0..*" FueraDeServicio
+    Horario "1..7" -- Cancha

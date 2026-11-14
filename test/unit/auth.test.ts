@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import bcrypt from "bcrypt";
+import { Role } from "@/src/domain/enums";
 
 vi.mock("bcrypt", () => ({
   default: { compare: vi.fn() },
@@ -74,10 +75,17 @@ describe("authorize (CredentialsProvider)", () => {
 
     const result = await getAuthorize()({ email: "  A@Test.com ", password: "correcta" });
 
-    expect(result).toEqual({ id: "7", email: "a@test.com", name: "Ana Gomez", role: "admin", isOwner: true });
+    expect(result).toEqual({
+      id: "7",
+      email: "a@test.com",
+      name: "Ana Gomez",
+      role: "admin",
+      isOwner: true,
+      isTeacher: false,
+    });
     expect(findOne).toHaveBeenCalledWith({
       where: { email: "a@test.com" },
-      relations: { admin: true, player: true },
+      relations: { admin: true, player: { lessons: true } },
     });
   });
 
@@ -93,7 +101,37 @@ describe("authorize (CredentialsProvider)", () => {
 
     const result = await getAuthorize()({ email: "j@test.com", password: "correcta" });
 
-    expect(result).toEqual({ id: "8", email: "j@test.com", name: "Luis Pérez", role: "player", isOwner: false });
+    expect(result).toEqual({
+      id: "8",
+      email: "j@test.com",
+      name: "Luis Pérez",
+      role: "player",
+      isOwner: false,
+      isTeacher: false,
+    });
+  });
+
+  it("indica si el jugador es profesor: tiene una clase activa (HU-42)", async () => {
+    const teacherAccount = (isActive: boolean) => ({
+      id: 9,
+      email: "p@test.com",
+      passwordHash: "hash",
+      admin: null,
+      player: { id: 3, names: "Lucía", lastnames: "Profe", lessons: [{ id: 1, isActive }] },
+    });
+    vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+
+    findOne.mockResolvedValueOnce(teacherAccount(true));
+    expect(await getAuthorize()({ email: "p@test.com", password: "correcta" })).toMatchObject({
+      role: "player",
+      isTeacher: true,
+    });
+
+    findOne.mockResolvedValueOnce(teacherAccount(false));
+    expect(await getAuthorize()({ email: "p@test.com", password: "correcta" })).toMatchObject({
+      role: "player",
+      isTeacher: false,
+    });
   });
 
   it("devuelve null cuando el usuario tiene isBlocked = true (aunque la contraseña sea correcta)", async () => {
@@ -128,8 +166,8 @@ describe("authorize (CredentialsProvider)", () => {
 
       const token = await jwtCallback({
         token: {},
-        user: { id: "123", email: "admin@test.com", name: "Admin Test", role: "admin" as any },
-      } as any);
+        user: { id: "123", email: "admin@test.com", name: "Admin Test", role: Role.ADMIN },
+      } as never);
 
       expect(token).toMatchObject({
         id: "123",
@@ -140,14 +178,27 @@ describe("authorize (CredentialsProvider)", () => {
       });
     });
 
+    it("lleva isTeacher del login al token y a la sesión", async () => {
+      const callbacks = authOptions.callbacks!;
+
+      const token = await callbacks.jwt!({
+        token: {},
+        user: { id: "9", email: "p@test.com", name: "Lucía Profe", role: "player", isTeacher: true },
+      } as never);
+      const session = await callbacks.session!({ session: { user: {}, expires: "1" }, token } as never);
+
+      expect(token).toMatchObject({ isTeacher: true });
+      expect((session as { user: { isTeacher?: boolean } }).user.isTeacher).toBe(true);
+    });
+
     it("propaga el rol del token en la sesión", async () => {
       const sessionCallback = authOptions.callbacks?.session;
       if (!sessionCallback) throw new Error("session callback missing");
 
       const session = await sessionCallback({
-        session: { user: { email: "admin@test.com", name: "Admin" }, expires: "1" } as any,
-        token: { id: "123", email: "admin@test.com", name: "Admin", role: "admin" as any },
-      } as any);
+        session: { user: { email: "admin@test.com", name: "Admin" }, expires: "1" },
+        token: { id: "123", email: "admin@test.com", name: "Admin", role: Role.ADMIN },
+      } as never);
 
       expect(session.user).toMatchObject({
         id: "123",

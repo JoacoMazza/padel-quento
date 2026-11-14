@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  classCancelledByTeacherNotice,
+  lessonCancelledNotice,
   courtUnavailableNotice,
   fixedBookingCancelledNotice,
   fixedDateReleasedNotice,
@@ -195,5 +197,33 @@ describe("toWhatsAppNumber", () => {
 
   it("respeta el código de país de los números cargados en formato internacional", () => {
     expect(toWhatsAppNumber("+34 600 111 222")).toBe("34600111222");
+  });
+});
+
+describe("lessonCancelledNotice", () => {
+  it("avisa al alumno que se dio de baja la clase y se cancelaron sus próximos turnos", () => {
+    const notice = lessonCancelledNotice("Ana", "Lucía Profe");
+
+    expect(notice.subject).toBe("Tu clase con Lucía Profe fue dada de baja");
+    expect(notice.text).toBe(
+      "Hola Ana, la clase con Lucía Profe fue dada de baja y se cancelaron sus próximos turnos.",
+    );
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_clase_cancelada",
+      parameters: ["Ana", "Lucía Profe"],
+    });
+  });
+});
+
+describe("classCancelledByTeacherNotice", () => {
+  it("avisa al alumno que el profesor canceló la clase", () => {
+    const notice = classCancelledByTeacherNotice("Ana", "Lucía Profe", booking);
+
+    expect(notice.subject).toBe("Tu clase del sábado 17 de octubre fue cancelada");
+    expect(notice.text).toBe("Hola Ana, Lucía Profe canceló la clase del sábado 17 de octubre a las 19:30 en la cancha 3.");
+    expect(notice.whatsappTemplate).toEqual({
+      name: "quento_clase_cancelada_profesor",
+      parameters: ["Ana", "Lucía Profe", "sábado 17 de octubre", "19:30", "3"],
+    });
   });
 });

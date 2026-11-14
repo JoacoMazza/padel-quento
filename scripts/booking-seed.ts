@@ -9,6 +9,8 @@ export type GenerateSeedBookingsInput = {
   playerIds: number[];
   /** Turnos activos ya cargados: los días que tienen alguno no se tocan. */
   existing: Array<{ courtId: number; fromDateTime: Date; durationMinutes: number }>;
+  /** Turnos que se dejan libres para los datos de ejemplo (ver demo-seed.ts). */
+  reserved?: Array<{ courtId: number; fromDateTime: Date }>;
   pastDays?: number;
   futureDays?: number;
   /** Semilla del generador pseudoaleatorio: mismos datos y semilla, mismos turnos. */
@@ -22,8 +24,9 @@ export type SeedBooking = {
   durationMinutes: number;
   bookingState: BookingState;
   price: number;
+  isPaid: boolean;
+  /** false si quien reservó faltó: se siembra su inasistencia (ver seed-bookings.ts). */
   attended: boolean;
-  pointsAwarded: boolean;
 };
 
 // Date.getDay(): 0 = domingo.
@@ -80,6 +83,7 @@ export function generateSeedBookings({
   schedules,
   playerIds,
   existing,
+  reserved = [],
   pastDays = 90,
   futureDays = 30,
   seed = 42,
@@ -90,6 +94,7 @@ export function generateSeedBookings({
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const generated: SeedBooking[] = [];
   const daysWithBookings = new Set(existing.map((e) => e.fromDateTime.toDateString()));
+  const reservedSlots = new Set(reserved.map((r) => `${r.courtId}-${r.fromDateTime.getTime()}`));
 
   for (let offset = -pastDays; offset <= futureDays; offset += 1) {
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
@@ -113,6 +118,7 @@ export function generateSeedBookings({
       ) {
         const fromDateTime = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, slot);
         const start = fromDateTime.getTime();
+        if (reservedSlots.has(`${court.id}-${start}`)) continue;
         const demand = Math.min(MAX_DEMAND, slotDemand(slot, isWeekend) * courtFactor * fillFactor);
         if (random() >= demand) continue;
 
@@ -128,10 +134,10 @@ export function generateSeedBookings({
             ? BookingState.RESERVED
             : outcome < CANCELLED_RATE
               ? BookingState.CANCELLED
-              : BookingState.PAID,
+              : BookingState.FINISHED,
           price: court.price,
+          isPaid: isPast && outcome >= CANCELLED_RATE,
           attended: !isPast || outcome >= CANCELLED_RATE + NO_SHOW_RATE,
-          pointsAwarded: isPast,
         });
       }
     });

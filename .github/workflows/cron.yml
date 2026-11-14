@@ -8,7 +8,7 @@ name: Background jobs
 on:
   schedule:
     - cron: "*/10 * * * *" # open match expiration and attendance points
-    - cron: "0 */6 * * *" # fixed booking extension (same frequency as src/jobs/fixed-booking-extension.ts)
+    - cron: "0 */6 * * *" # fixed booking and lesson extension (same frequency as src/jobs/fixed-booking-extension.ts and src/jobs/lesson-extension.ts)
   workflow_dispatch:
 
 jobs:
@@ -34,9 +34,9 @@ jobs:
         if: steps.config.outputs.ready == 'true'
         run: |
           if [ "${{ github.event.schedule }}" = "0 */6 * * *" ]; then
-            jobs="fixed-booking-extension"
+            jobs="fixed-booking-extension lesson-extension"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            jobs="open-match-expiration attendance-points fixed-booking-extension"
+            jobs="open-match-expiration attendance-points fixed-booking-extension lesson-extension"
           else
             jobs="open-match-expiration attendance-points"
           fi

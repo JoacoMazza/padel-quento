@@ -97,6 +97,14 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
     expect(joined.court.id).toBe(courtId);
   });
 
+  it("trae el complejo de la cancha de cada turno, para mostrar dónde se juega", async () => {
+    const bookings = await getPlayerBookings(ana);
+
+    for (const booking of bookings) {
+      expect(booking.court.complex).toMatchObject({ name: expect.any(String), city: expect.any(String) });
+    }
+  });
+
   it("no trae turnos del resto del club", async () => {
     const bookings = await getPlayerBookings(ana);
 
@@ -150,7 +158,7 @@ describe("getPlayerBookings (integración con Postgres real)", () => {
       const carlaInMatch = await matchPlayers.findOneOrFail({
         where: { match: { booking: { id: reviewIds.notAttended } }, player: { id: carla } },
       });
-      await matchPlayers.update(carlaInMatch.id, { attended: false });
+      await matchPlayers.update(carlaInMatch.id, { attendedCount: 0 });
       // Dentro de las 48 horas, pero cancelado.
       reviewIds.cancelled = await matchEndedHoursAgo(30);
       await dataSource.getRepository<Booking>("Booking").update(reviewIds.cancelled, { bookingState: BookingState.CANCELLED });

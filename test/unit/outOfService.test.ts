@@ -12,7 +12,7 @@ const { create, save, find, findOne, merge, deleteFn, bookingsUpdate, getDataSou
   const save = vi.fn(async (entity: unknown) => entity);
   const find = vi.fn();
   const findOne = vi.fn();
-  const merge = vi.fn((entity: any, dto: any) => Object.assign(entity, dto));
+  const merge = vi.fn((entity: object, dto: object) => Object.assign(entity, dto));
   const deleteFn = vi.fn();
   const getRepository = vi.fn(() => ({ create, save, find, findOne, merge, delete: deleteFn }));
   // Query builder de la cancelación de turnos afectados: registra cada llamada encadenada.
@@ -51,7 +51,7 @@ describe("outOfService actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     create.mockImplementation((data: unknown) => data);
-    merge.mockImplementation((entity: any, dto: any) => Object.assign(entity, dto));
+    merge.mockImplementation((entity: object, dto: object) => Object.assign(entity, dto));
     save.mockImplementation(async (entity: unknown) => entity);
     for (const method of ["update", "set", "where", "andWhere", "returning"] as const) {
       bookingsUpdate[method].mockReturnValue(bookingsUpdate);

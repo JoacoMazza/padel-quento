@@ -7,9 +7,13 @@ import { Admin } from "../../src/entities/Admin";
 import { Booker } from "../../src/entities/Booker";
 import { Booking } from "../../src/entities/Booking";
 import { Chat } from "../../src/entities/Chat";
+import { Complex } from "../../src/entities/Complex";
 import { Court } from "../../src/entities/Court";
 import { FixedBooking } from "../../src/entities/FixedBooking";
 import { FixedBookingDate } from "../../src/entities/FixedBookingDate";
+import { Inscription } from "../../src/entities/Inscription";
+import { Lesson } from "../../src/entities/Lesson";
+import { LessonSchedule } from "../../src/entities/LessonSchedule";
 import { Match } from "../../src/entities/Match";
 import { MatchPlayer } from "../../src/entities/MatchPlayer";
 import { Message } from "../../src/entities/Message";
@@ -32,7 +36,7 @@ export default async function globalSetup() {
   const dataSource = new DataSource({
     type: "postgres",
     url: process.env.DATABASE_URL,
-    entities: [Account, Admin, Booker, Player, Penalty, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, FixedBooking, FixedBookingDate, PlayerReview],
+    entities: [Account, Admin, Booker, Player, Penalty, Complex, Court, Booking, Match, MatchPlayer, Chat, Message, OutOfService, Schedule, FixedBooking, FixedBookingDate, PlayerReview, Lesson, LessonSchedule, Inscription],
     synchronize: true,
     dropSchema: true,
   });

@@ -1,11 +1,14 @@
 import type { Booking } from "@/src/entities/Booking";
 import type { BookingProp } from "@/app/bookings/types";
+import { bookerAttended } from "@/src/domain/attendance";
 
 export type AdminMatchPlayerProp = {
   id: number;
   playerId: number;
   playerName: string;
-  attended: boolean;
+  /** El jugador más los que sumó, y cuántos de ellos asistieron. */
+  playersCount: number;
+  attendedCount: number;
 };
 
 /**
@@ -21,7 +24,11 @@ export type AdminBookingProp = BookingProp & {
   matchPlayers: AdminMatchPlayerProp[];
   /** Id de la fecha de turno fijo (HU-41) si el turno es parte de uno; si no, null. */
   fixedBookingDateId: number | null;
+  /** Si el turno es una clase (HU-48): su cupo y sus alumnos. El profesor es quien reservó (bookerName). */
+  classInfo: AdminClassInfo | null;
 };
+
+export type AdminClassInfo = { capacity: number; students: { id: number; name: string }[] };
 
 /**
  * Arma un AdminBookingProp a partir de la entidad Booking devuelta por
@@ -44,13 +51,24 @@ export function mapBookingToAdminProp(booking: Booking, fixedBookingDateId: numb
     ),
     bookerId: booking.booker.id,
     bookerName: `${booking.booker.names} ${booking.booker.lastnames}`,
-    attended: booking.attended,
+    attended: bookerAttended(booking),
     matchPlayers: (booking.match?.matchPlayers ?? []).map((mp) => ({
       id: mp.id,
       playerId: mp.player.id,
       playerName: `${mp.player.names} ${mp.player.lastnames}`,
-      attended: mp.attended,
+      playersCount: mp.playersCount,
+      attendedCount: mp.attendedCount,
     })),
     fixedBookingDateId,
+    classInfo:
+      booking.lesson
+        ? {
+            capacity: booking.lesson.classCapacity,
+            students: (booking.lesson.inscriptions ?? []).map((inscription) => ({
+              id: inscription.player.id,
+              name: `${inscription.player.names} ${inscription.player.lastnames}`,
+            })),
+          }
+        : null,
   };
 }

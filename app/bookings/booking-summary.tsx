@@ -55,7 +55,7 @@ export function BookingSummary({
 
       <SummaryFeedback feedback={feedback} />
 
-      <SummaryCourt courtNumber={selectedSlot.courtNumber}/>
+      <SummaryCourt courtNumber={selectedSlot.courtNumber} location={selectedSlot.location} />
 
       <div className="grid grid-cols-2 gap-4 border-b border-white/10 py-5">
         <SummaryField label="Día" value={formatLongDate(selectedDate)} />

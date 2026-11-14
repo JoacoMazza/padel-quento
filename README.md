@@ -16,19 +16,21 @@ Sistema de gestión de turnos para el complejo de pádel Quento (City Bell, La P
 
 ### Diagrama de clases
 
-![Diagrama de clases](docs/classes/class_model.png)
+![Diagrama de clases](docs/classes/classes.jpg)
 
-El diagrama fuente (editable) se encuentra en [docs/classes/class_diagram.EAP](docs/classes/class_diagram.EAP).
+El diagrama fuente (Mermaid) se encuentra en [docs/classes/classes.mmd](docs/classes/classes.mmd). Hay una versión traducida al español en [docs/classes/classes.es.mmd](docs/classes/classes.es.mmd) ([render](docs/classes/classes.es.jpg)).
 
 ### Diagrama Entidad-Relación (DER)
 
-![DER](docs/der/DER%20Padel%20Quento.png)
+![DER](docs/der/der.jpg)
 
-El diagrama fuente (editable, draw.io) se encuentra en [docs/der/DER Padel Quento.drawio](docs/der/DER%20Padel%20Quento.drawio).
+El diagrama fuente (Mermaid) se encuentra en [docs/der/der.mmd](docs/der/der.mmd). Hay una versión traducida al español en [docs/der/der.es.mmd](docs/der/der.es.mmd) ([render](docs/der/der.es.jpg)).
+
+Los diagramas se editan en los `.mmd` y se regeneran los JPG con `node .claude/skills/update-diagrams/scripts/render.mjs` (ver la skill [update-diagrams](.claude/skills/update-diagrams/SKILL.md)).
 
 Los nombres de tablas y columnas en la base de datos siguen este DER (snake_case, ej. `last_names`, `booking_state`, `court_id`). Esto es una convención **solo de la capa de persistencia**: las entidades de TypeORM exponen las mismas propiedades en camelCase de siempre (`lastnames`, `bookingState`, `court`) — el mapeo se declara explícitamente con `name` en cada `@Column`/`@JoinColumn` (ver por ejemplo [src/entities/Booking.ts](src/entities/Booking.ts)). El resto del código (actions, componentes, tests) sigue usando las propiedades TypeScript sin cambios.
 
-Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva, identificado por su teléfono: `bookings.booker_phone_number` → `bookers.phone_number`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
+Las personas se modelan en tres tablas: `accounts` guarda las credenciales de acceso (email, hash de la contraseña, bloqueo), y cada cuenta pertenece a un administrador (`admins`) o a un jugador; el rol de la sesión se deduce de cuál de los dos tiene asociado. Los turnos se registran sobre `bookers` (quien reserva: `bookings.booker_id` → `bookers.id`, igual en `fixed_bookings`). `Player` hereda de `Booker`; como TypeORM solo soporta herencia en una única tabla, los jugadores se guardan en `bookers` (columna `type = 'Player'`) junto con su `account_id`, `category` y `scoring`. Para reservar turnos hace falta ser jugador con cuenta: un booker sin cuenta no puede reservar ni sumarse a partidos.
 
 ## Estructura del proyecto
 
@@ -54,8 +56,8 @@ test/
   unit/               Tests unitarios (no requieren base de datos)
   integration/        Tests de integración (requieren Postgres levantado)
 docs/
-  classes/            Diagrama de clases (imagen + fuente editable)
-  der/                Diagrama Entidad-Relación (imagen + fuente editable)
+  classes/            Diagrama de clases (fuente Mermaid + render JPG)
+  der/                Diagrama Entidad-Relación (fuente Mermaid + render JPG)
 ```
 
 ## Reseñas y reputación de los jugadores
@@ -64,7 +66,7 @@ Después de un partido abierto, cada jugador que asistió puede calificar a sus 
 
 - La reputación se muestra en porcentajes (puntualidad, buena actitud, nivel acorde) desde las 3 reseñas, en el detalle de los partidos abiertos y en el perfil del propio jugador. Es anónima: los jugadores no ven quién dijo qué.
 - El admin ve en la ficha del jugador la reputación, alertas cuando algo baja del 70% y cada reseña con su comentario y quién la dejó. Desde ahí puede cambiarle la categoría o descontarle puntos con un motivo.
-- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `player_reviews` (una fila por reseña, una por compañero y partido).
+- Una reseña negativa le descuenta puntos de fidelidad al reseñado: `NEGATIVE_REVIEW_POINTS` (5, en `src/domain/constants.ts`) por cada aspecto negativo (mala actitud, llegar tarde, nivel más bajo o más alto que la categoría declarada), con el motivo "Reseña negativa en partido abierto" en su historial. El saldo nunca baja de 0 (RN-04). La tabla es `players_reviews` (una fila por reseña, una por compañero y partido).
 
 ## Acceso sin sesión
 
@@ -72,7 +74,7 @@ La landing (`/`), los turnos (`/bookings`) y los partidos abiertos (`/open-match
 
 - `createBooking` y `joinOpenMatch` toman el jugador de la sesión, nunca del id que manda el cliente; la lógica que recibe el id vive en [src/lib/bookings.ts](src/lib/bookings.ts) y solo se usa desde el servidor.
 - La grilla pública usa `getPublicBookings` ([src/lib/public-bookings.ts](src/lib/public-bookings.ts)), sin datos de quién reservó ni de quiénes juegan, y los partidos abiertos se muestran a los visitantes sin nombres ni chat.
-- El WhatsApp de contacto de la landing está en [app/components/club-info.ts](app/components/club-info.ts) (`CLUB_WHATSAPP_NUMBER`).
+- Todas las páginas muestran un botón flotante de WhatsApp abajo a la derecha ([app/components/whatsapp-button.tsx](app/components/whatsapp-button.tsx)), y la landing tiene su botón "Escribinos por WhatsApp". Los dos abren `wa.me` con el número y el mensaje inicial del complejo del club (ver [Complejos](#complejos)); sin número cargado no se muestran. En mobile, el footer, el login/registro y el panel de admin dejan lugar abajo para que el botón flotante no tape ningún control.
 
 ## Turnos fijos
 
@@ -82,6 +84,17 @@ Los turnos fijos (HU-41) los gestiona solo el administrador, desde la **Turnera 
 - Se reservan las fechas de los próximos 6 meses y un proceso en segundo plano ([src/jobs/fixed-booking-extension.ts](src/jobs/fixed-booking-extension.ts)) va generando las siguientes. Si una fecha ya estaba ocupada (otro turno o un bloqueo de la cancha), se saltea y el admin la ve.
 - El admin puede liberar una sola fecha (desde el listado de turnos fijos o tocando el turno en la grilla), restaurarla si el horario sigue libre, o dar de baja el turno fijo completo, que cancela todas sus fechas futuras. No se penaliza a nadie y se le avisa al titular.
 - Las tablas son `fixed_bookings` y `fixed_booking_dates` (una fila por fecha generada, con su estado y su turno).
+- Las fechas y horas se calculan en el servidor con la zona horaria del club (`America/Argentina/Buenos_Aires`, ver [src/lib/club-time-zone.ts](src/lib/club-time-zone.ts)), que se fija al arrancar en `instrumentation.ts` y en `src/lib/data-source.ts` (seeds y comandos de TypeORM), y también con la variable `TZ`: un turno fijo de las 18:00 cae a las 18:00 de City Bell aunque el servidor esté desplegado en otra zona.
+
+## Complejos
+
+Cada cancha pertenece a un complejo (`courts.complex_id`, obligatoria), que guarda su ubicación: nombre, dirección, ciudad, provincia, país, código postal, latitud, longitud y, opcional, el link a Google Maps (tabla `complexes`, entidad [src/entities/Complex.ts](src/entities/Complex.ts)).
+
+- La base valida que la latitud esté entre -90 y 90 y la longitud entre -180 y 180 (`CHK_complexes_latitude` y `CHK_complexes_longitude`).
+- Cada complejo tiene su WhatsApp de contacto (`whatsapp_number`, con código de país y como lo escribe el admin, por ejemplo "+54 9 221 604-9987", que es como se muestra; el link de wa.me usa sus dígitos. Y `whatsapp_message`, el mensaje con que se abre el chat). Lo carga cualquier administrador desde el panel (sección **Canchas**, "WhatsApp de contacto"). El botón flotante y el de la landing usan el del complejo del club; sin número no se muestran. La migración `AddComplexWhatsApp` carga el del club.
+- La migración `AddComplexes` crea el complejo del club (Quento Club, Cam. Centenario 8907, Villa Elisa) y le asigna las canchas que ya existían, sin tocar sus turnos. `AddComplexCountry` agrega el país (obligatorio) y deja los complejos existentes en Argentina.
+- Los complejos no se crean ni se editan desde el panel (salvo su WhatsApp de contacto): las canchas nuevas (alta del dueño y seeds) se asocian al complejo del club, el primero que se cargó ([src/lib/club-complex.ts](src/lib/club-complex.ts)).
+- El complejo y su ubicación se ven en la tabla de canchas del panel, en `/bookings` (arriba y en el resumen del turno elegido) y en Mis turnos. El link lleva a Google Maps; si el complejo no tiene uno cargado, se arma con la latitud y la longitud.
 
 ## Administradores: dueño y trabajador
 
@@ -90,6 +103,26 @@ Cada administrador tiene un nivel (`admins.access_level`): **dueño** (`owner`) 
 - Solo el dueño puede gestionar el equipo (sección **Equipo** del panel: alta, edición y baja de administradores), cambiar precios, dar de alta canchas o darlas de baja, y ver Métricas del Complejo y Reportes de Asistencia. El trabajador maneja la turnera, los turnos y turnos fijos, los bloqueos de canchas y los jugadores.
 - El servidor lo exige con `requireOwner()` ([src/lib/rbac.ts](src/lib/rbac.ts)), que lee el nivel de la base en cada acción: un cambio de nivel aplica en el momento. La sesión trae `isOwner` solo para mostrar u ocultar secciones.
 - El dueño no puede darse de baja ni cambiarse el nivel a sí mismo. Los administradores creados antes de este cambio quedaron como dueños; los nuevos arrancan como trabajadores.
+
+## Turnos, pagos y asistencia
+
+- Un turno (`bookings.booking_state`) está **reservado** (`reserved`), **finalizado** (`finished`) o **cancelado** (`cancelled`). El pago es aparte: `bookings.is_paid`, que solo marca un administrador (`setBookingPaid` en [src/actions/adminBooking.ts](src/actions/adminBooking.ts)) y no cambia el estado.
+- La asistencia se marca desde la Turnera Global y se guarda como penalización: una inasistencia es una penalización con motivo "Inasistencia a turno reservado" ligada a su turno (`penalties.booking_id`), que se descuenta en el momento (20 puntos por ausente, sin bajar el saldo de 0). Marcar presente de nuevo la saca y recalcula el puntaje ([src/lib/no-show-penalties.ts](src/lib/no-show-penalties.ts)).
+- En un turno simple se marca a quien reservó. En un partido abierto, cada jugador: quien vino con acompañantes tiene `match_players.attended_count` (cuántos de su grupo asistieron) y paga 20 puntos por cada ausente; cuenta como presente si asistió al menos uno.
+- Al terminar un turno reservado, un proceso en segundo plano ([src/actions/attendance.ts](src/actions/attendance.ts)) acredita 10 puntos a quien asistió (más 5 a quien se sumó al partido de otro; lo acreditado queda en `match_players.points_awarded`) y lo pasa a finalizado. Las clases se finalizan sin mover puntos.
+
+## Clases y profesores
+
+Ser profesor es un rol del jugador, no un tipo de cuenta: un jugador es profesor mientras tenga alguna clase activa asignada. No existen cuentas de profesor; sigue siendo jugador (reserva turnos, se suma a partidos).
+
+- **Alta de una clase (HU-42 y HU-43):** cualquier administrador la da de alta desde el panel (sección **Clases**, entidad [src/entities/Lesson.ts](src/entities/Lesson.ts)): elige a un jugador ya registrado como profesor, el cupo de alumnos (de 1 a 8; la base lo valida con `CHK_lessons_class_capacity`), el precio, la fecha desde y, opcional, la fecha hasta (como mucho 6 meses), y uno o más horarios semanales por cancha (`lesson_schedules`). La hora de inicio de cada horario se elige entre los turnos de la grilla de esa cancha ese día (cada 90 minutos desde la apertura, como en las reservas) y dura un turno. Se reserva a nombre del profesor, al precio de la cancha, un turno por cada fecha de esos horarios (`bookings.lesson_id`); si alguna fecha está ocupada o la cancha no está abierta, no se crea nada. Una clase sin fecha hasta (`lessons.to_local_datetime` en null) no termina: se reservan sus turnos de los próximos 6 meses y un proceso en segundo plano ([src/jobs/lesson-extension.ts](src/jobs/lesson-extension.ts)) va reservando los siguientes; los que caen en un horario ocupado se saltean. Las clases no suman ni descuentan puntos: ni por asistencia ni por cancelarlas tarde.
+- **Inscripciones (HU-44):** los alumnos se inscriben en la clase entera (tabla `inscriptions`; un alumno no puede estar dos veces en la misma clase) y van a todos sus turnos, hasta el cupo. Los inscribe el admin (botón Alumnos de cada clase), el profesor (pestaña **Clases** de "Mis clases", buscándolos por nombre o email) o el propio jugador desde `/lessons` ("Clases" en el encabezado, visible sin sesión).
+- **Agenda (HU-46):** "Mis clases" tiene tres pestañas. En **Agenda**, los próximos turnos de sus clases por fecha (cancha, horario, alumnos y lugares libres) y, aparte, los que terminaron en los últimos 7 días como "Finalizado".
+- **Alumnos (HU-45):** en **Alumnos**, todos los jugadores inscriptos en sus clases, con su email y teléfono, cuántos turnos ya terminados (no cancelados) tuvieron sus clases y la fecha del último. Desde ahí se inscribe rápido a un alumno en otra clase con lugar.
+- **Mis turnos (HU-47):** el alumno ve los turnos de sus clases marcados como "Clase", con el profesor y sin el precio, y puede salir de la clase (deja de ir a todos sus turnos). El profesor ve los que da como "Clase que das", con sus alumnos; si cancela un turno, se les avisa a los alumnos y no se lo penaliza.
+- **Panel (HU-48):** en la Turnera Global las clases tienen su propio color ("Clase" en la referencia) y al tocarlas se ve el profesor y los alumnos. En la sección **Clases**, cada clase tiene un botón para ver sus turnos (próximos y de los últimos 7 días).
+- Si el administrador da de baja una clase, se cancelan sus turnos que todavía no empezaron y se avisa a los alumnos, sin penalizar a nadie. Si era la única clase activa del profesor, deja de serlo.
+- El profesor tiene su sección en `/teacher` ("Mis clases" en el encabezado). `proxy.ts` la deja solo para quien inició sesión como profesor, y el servidor lo verifica contra la base con `requireTeacher()` ([src/lib/rbac.ts](src/lib/rbac.ts)): una baja aplica en el momento. La sesión trae `isTeacher` solo para mostrar u ocultar la sección; a quien le asignan su primera clase, el link le aparece al volver a iniciar sesión.
 
 ## Configuración del proyecto
 
@@ -124,6 +157,7 @@ Variables relevantes en `.env`:
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales usadas por `docker-compose.yml` para levantar Postgres |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Servidor SMTP para los avisos por correo (opcional) |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_TEMPLATE_LANGUAGE` | Credenciales de WhatsApp Cloud API (Meta) para los avisos por WhatsApp (opcional) |
+| `TZ` | Zona horaria del proceso (`America/Argentina/Buenos_Aires`); definirla también en el despliegue de producción |
 | `CRON_SECRET` | Secreto con el que el programador llama a `/api/cron/*` para correr los procesos en segundo plano (solo en Vercel, ver [Deploy en Vercel](#deploy-en-vercel); vacío en local) |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` / `SEED_OWNER_NAMES` / `SEED_OWNER_LASTNAMES` / `SEED_OWNER_DNI` | Dueño que crea `pnpm db:seed:prod` en producción (opcional, ver [Deploy](#deploy-supabase)) |
 
@@ -208,7 +242,7 @@ Como la app ya no sincroniza el esquema, un cambio en una entidad sin su migraci
 pnpm db:seed
 ```
 
-Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8, cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está en mantenimiento, el seed no le toca el estado).
+Es el seed de desarrollo (para producción ver [Deploy](#deploy-supabase)). Crea, si no existen, 8 canchas numeradas del 1 al 8 en el complejo del club (lo crean las migraciones, así que hay que correrlas antes), cada una con un horario de 09:00 a 23:00 los 7 días de la semana. El script es idempotente: correrlo de nuevo no duplica canchas ni horarios ya creados, y no modifica canchas u horarios que ya existan (por ejemplo, si una cancha está dada de baja, el seed no le toca el estado).
 
 También crea, si no existen, una cuenta de administrador dueño (`admin@quento.com` / `admin123`, DNI `30111222`: el DNI de los administradores es obligatorio y no se repite), una de administrador trabajador (`trabajador@quento.com` / `trabajador123`, DNI `35123456`) y una de jugador (`jugador@quento.com` / `jugador123`).
 
@@ -218,7 +252,15 @@ Para tener datos con los que revisar las métricas de ocupación del panel admin
 pnpm db:seed:bookings
 ```
 
-Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan pagos (con algunas inasistencias) o cancelados, y con los puntos de asistencia ya procesados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+Genera turnos de 90 minutos desde 90 días antes hasta 30 días después de la fecha en que se ejecuta, con más demanda a la tarde-noche y los fines de semana. Los pasados quedan finalizados y pagos (con algunas inasistencias, como penalizaciones de 0 puntos ligadas al turno) o cancelados; los futuros, reservados. Los turnos se reparten entre los jugadores de la base, y además crea, si no existen, 6 jugadores de ejemplo (`seed.jugador1@quento.com` a `seed.jugador6@quento.com` / `jugador123`). Solo completa los días que no tienen turnos cargados: correrlo de nuevo no agrega turnos, salvo en los días nuevos si cambió la fecha.
+
+Además carga datos de ejemplo del resto de la app ([scripts/demo-seed.ts](scripts/demo-seed.ts)), con fechas relativas al día en que se ejecuta y en horarios que deja libres de turnos sueltos:
+
+- **Profesores y clases**: crea 2 profesores (`seed.profesor1@quento.com` y `seed.profesor2@quento.com` / `profesor123`), cada uno con una clase activa (una sin fecha de fin y otra con fecha de fin), sus horarios semanales, alumnos inscriptos (jugadores de ejemplo) y los turnos de la clase, ya dados y por venir.
+- **Turnos fijos**: uno semanal y otro quincenal de jugadores de ejemplo, tomados desde hace unas semanas, con todas sus fechas reservadas.
+- **Partidos abiertos**: con lugares libres, completos (cerrados, con chat) y ya jugados: uno de ayer que sus jugadores todavía pueden calificar y otro de hace unos días ya calificado.
+
+Para poder armar partidos abiertos, a los jugadores de ejemplo sin categoría les carga una. Los horarios que ya estén ocupados se saltean, y si los profesores de ejemplo ya existen no vuelve a cargar estos datos. Para verlos completos conviene correrlo sobre una base recién creada (`pnpm migration:run`, `pnpm db:seed` y `pnpm db:seed:bookings`).
 
 > Los seeds no crean el esquema: sobre una base sin migraciones fallan con `no existe la relación «courts»`. Correr antes `pnpm migration:run`.
 
@@ -291,11 +333,11 @@ Las variables de la terminal tienen prioridad sobre las de `.env`.
 
 ## Deploy en Vercel
 
-Vercel es serverless: levanta la app solo cuando llega un pedido y la apaga después, así que no hay un servidor prendido para los `setInterval` de los procesos en segundo plano (vencimiento de partidos abiertos, puntos por asistencia y extensión de turnos fijos). Por eso:
+Vercel es serverless: levanta la app solo cuando llega un pedido y la apaga después, así que no hay un servidor prendido para los `setInterval` de los procesos en segundo plano (vencimiento de partidos abiertos, puntos por asistencia y extensión de turnos fijos y de clases). Por eso:
 
 - En Vercel (variable `VERCEL`, la define la plataforma) `instrumentation.ts` no los arranca.
-- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `fixed-booking-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
-- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos y los puntos, y cada 6 horas los turnos fijos. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
+- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `fixed-booking-extension`, `lesson-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
+- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos y los puntos, y cada 6 horas los turnos fijos y las clases. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
 - Cada instancia usa como mucho 2 conexiones a la base ([src/lib/db.ts](src/lib/db.ts)), para no agotar las del session pooler de Supabase.
 
 Pasos:
@@ -326,7 +368,7 @@ pnpm migration:revert                                   # revierte la última mi
 pnpm migration:show                                     # lista migraciones aplicadas/pendientes
 pnpm db:seed                                             # desarrollo: 8 canchas con horario 09-23hs y cuentas de prueba (idempotente)
 pnpm db:seed:prod                                        # producción: 8 canchas con horario 09-23hs y el dueño de SEED_OWNER_* (idempotente)
-pnpm db:seed:bookings                                    # crea turnos de ejemplo alrededor de la fecha actual, para las métricas
+pnpm db:seed:bookings                                    # crea turnos, clases, turnos fijos y partidos abiertos de ejemplo alrededor de la fecha actual
 ```
 
 Ver [Migraciones](#4-migraciones) y [Datos de ejemplo (seed)](#5-datos-de-ejemplo-seed) para más detalle.

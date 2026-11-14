@@ -24,6 +24,7 @@ vi.mock("@/src/lib/rbac", async (importOriginal) => {
 
 import { getServerSession } from "next-auth/next";
 import { BookingState, Role } from "@/src/domain/enums";
+import { NO_SHOW_PENALTY_REASON } from "@/src/domain/attendance";
 import { getAttendanceReport } from "@/src/actions/reports";
 
 function mockSession(role: Role | null) {
@@ -59,8 +60,8 @@ describe("getAttendanceReport", () => {
         id: 10,
         fromDateTime: new Date(2026, 9, 5, 18, 0),
         durationMinutes: 90,
-        bookingState: BookingState.PAID,
-        attended: true,
+        bookingState: BookingState.FINISHED,
+        penalties: [],
         booker: ana,
       },
       // Partido abierto: cuenta la asistencia de cada jugador confirmado.
@@ -69,12 +70,12 @@ describe("getAttendanceReport", () => {
         fromDateTime: new Date(2026, 9, 6, 18, 0),
         durationMinutes: 90,
         bookingState: BookingState.RESERVED,
-        attended: true,
+        penalties: [],
         booker: ana,
         match: {
           matchPlayers: [
-            { attended: true, player: ana },
-            { attended: false, player: beto },
+            { playersCount: 1, attendedCount: 1, player: ana },
+            { playersCount: 1, attendedCount: 0, player: beto },
           ],
         },
       },
@@ -84,7 +85,7 @@ describe("getAttendanceReport", () => {
         fromDateTime: new Date(2026, 9, 20, 11, 0),
         durationMinutes: 90,
         bookingState: BookingState.RESERVED,
-        attended: true,
+        penalties: [],
         booker: beto,
       },
       // Turno previo a la migración, sin quien reservó: no hay jugador al que atribuirlo.
@@ -92,8 +93,8 @@ describe("getAttendanceReport", () => {
         id: 13,
         fromDateTime: new Date(2026, 9, 7, 18, 0),
         durationMinutes: 90,
-        bookingState: BookingState.PAID,
-        attended: false,
+        bookingState: BookingState.FINISHED,
+        penalties: [{ reason: NO_SHOW_PENALTY_REASON }],
         booker: null,
       },
     ]);

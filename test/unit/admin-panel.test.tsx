@@ -10,6 +10,7 @@ const {
   getOccupancyReportData,
   getFixedBookingsAdmin,
   createFixedBooking,
+  releaseFixedBookingDate,
   getAttendanceReport,
   createBookingAdmin,
   getAvailableSlotsAdmin,
@@ -19,6 +20,7 @@ const {
   getTeam: vi.fn(),
   getAvailableSlotsAdmin: vi.fn(),
   createFixedBooking: vi.fn(),
+  releaseFixedBookingDate: vi.fn(),
   getScheduleBoardData: vi.fn(),
   getCourts: vi.fn(),
   getOutOfServices: vi.fn(),
@@ -31,12 +33,28 @@ const {
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
 vi.mock("@/src/actions/scheduleBoard", () => ({ getScheduleBoardData }));
 vi.mock("@/src/actions/court", () => ({ getCourts, updateCourt: vi.fn(), updateAllCourtsPrice: vi.fn() }));
+vi.mock("@/src/actions/complex", () => ({
+  getComplexContacts: vi.fn(async () => ({
+    success: true,
+    data: [{ id: 1, name: "Quento Club", whatsappNumber: "+54 9 221 604-9987", whatsappMessage: null }],
+  })),
+  updateComplexContact: vi.fn(),
+}));
 vi.mock("@/src/actions/outOfService", () => ({
   getOutOfServices,
   createOutOfService: vi.fn(),
   endOutOfService: vi.fn(),
 }));
 vi.mock("@/src/actions/player", () => ({ getPlayersAdmin, blockPlayer: vi.fn(), unblockPlayer: vi.fn() }));
+const { getLessonsAdmin } = vi.hoisted(() => ({ getLessonsAdmin: vi.fn() }));
+vi.mock("@/src/actions/lesson", () => ({
+  getLessonsAdmin,
+  createLesson: vi.fn(),
+  deactivateLesson: vi.fn(),
+  getLessonClassesAdmin: vi.fn(),
+  addLessonStudentAdmin: vi.fn(),
+  removeLessonStudentAdmin: vi.fn(),
+}));
 vi.mock("@/src/actions/metrics", () => ({ getOccupancyReportData }));
 vi.mock("@/src/actions/reports", () => ({ getAttendanceReport }));
 vi.mock("@/src/actions/attendance", () => ({ setBookingAttendance: vi.fn(), setMatchPlayerAttendance: vi.fn() }));
@@ -45,12 +63,12 @@ vi.mock("@/src/actions/adminBooking", () => ({ createBookingAdmin, getAvailableS
 vi.mock("@/src/actions/fixedBooking", () => ({
   getFixedBookingsAdmin,
   createFixedBooking,
-  releaseFixedBookingDate: vi.fn(),
+  releaseFixedBookingDate,
   restoreFixedBookingDate: vi.fn(),
   cancelFixedBooking: vi.fn(),
 }));
 
-import { CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
+import { BookingState, CourtState, DayOfWeek, OutOfServiceReason, PlayerCategory } from "@/src/domain/enums";
 import { AdminPanel } from "@/app/admin/admin-panel";
 import { formatPrice } from "@/app/bookings/slot-utils";
 
@@ -140,6 +158,13 @@ describe("AdminPanel", () => {
       expect(classesOf(aside.parentElement!)).toEqual(expect.arrayContaining(["flex-col", "lg:flex-row"]));
       expect(classesOf(aside)).toEqual(expect.arrayContaining(["border-b", "lg:w-64", "lg:border-r"]));
       expect(classesOf(aside)).not.toContain("w-64");
+    });
+
+    it("el contenido deja lugar abajo para que el botón de WhatsApp no tape los controles", async () => {
+      render(<AdminPanel isOwner />);
+      await flush();
+
+      expect(classesOf(screen.getByRole("main"))).toEqual(expect.arrayContaining(["pb-24", "lg:pb-10"]));
     });
 
     it("las secciones quedan detrás de un botón hamburguesa que muestra la sección actual", async () => {
@@ -308,6 +333,8 @@ describe("AdminPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Registrar turno fijo" }));
     fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-20" } });
+    await flush();
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "18:00" } });
     fireEvent.change(screen.getByLabelText("Jugador"), { target: { value: "7" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear turno fijo" }));
     await flush();
@@ -315,6 +342,46 @@ describe("AdminPanel", () => {
     expect(createFixedBooking).toHaveBeenCalledTimes(1);
     expect(getScheduleBoardData).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Turno fijo creado.")).toBeTruthy();
+  });
+
+  it("al liberar una fecha desde la grilla actualiza también el listado de turnos fijos", async () => {
+    vi.setSystemTime(new Date(2026, 9, 12, 9, 0));
+    releaseFixedBookingDate.mockResolvedValue({ success: true, data: null });
+    getScheduleBoardData.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_BOARD.data,
+        courts: [{ id: 1, number: 3, state: CourtState.AVAILABLE, price: 10000 }],
+        schedules: [
+          { id: 1, dayOfWeek: DayOfWeek.MONDAY, openingTime: "08:00:00", closingTime: "23:00:00", court: { id: 1 } },
+        ],
+        bookings: [
+          {
+            id: 5,
+            fromDateTime: new Date(2026, 9, 12, 18, 0),
+            durationMinutes: 90,
+            bookingState: BookingState.RESERVED,
+            price: 10000,
+            attended: false,
+            court: { id: 1 },
+            booker: { id: 3, names: "Grupo", lastnames: "Lunes" },
+            match: null,
+          },
+        ],
+        fixedBookingDates: [{ bookingId: 5, fixedBookingDateId: 9 }],
+      },
+    });
+    render(<AdminPanel isOwner />);
+    await flush();
+    expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getAllByText("Turno fijo").find((el) => el.getAttribute("role") === "button")!);
+    fireEvent.click(screen.getByRole("button", { name: "Liberar esta fecha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    await flush();
+
+    expect(releaseFixedBookingDate).toHaveBeenCalledWith(9);
+    expect(getFixedBookingsAdmin).toHaveBeenCalledTimes(2);
   });
 
   it("pide las métricas de ocupación recién al abrir su sección", async () => {
@@ -349,6 +416,35 @@ describe("AdminPanel", () => {
     expect(nav.queryByText("Bloqueo de Canchas")).toBeNull();
   });
 
+  it("un trabajador también gestiona las clases, que se piden recién al abrir su sección (HU-42)", async () => {
+    getLessonsAdmin.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 1,
+          teacherId: 10,
+          teacherName: "Lucía Profe",
+          classCapacity: 4,
+          price: 15000,
+          fromDate: "2026-10-05",
+          toDate: "2026-10-31",
+          isActive: true,
+          schedules: [],
+          students: [],
+        },
+      ],
+    });
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+    expect(getLessonsAdmin).not.toHaveBeenCalled();
+
+    openSection("Clases");
+    await flush();
+
+    expect(getLessonsAdmin).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Lucía Profe")).toBeTruthy();
+  });
+
   it("pide las canchas recién al abrir su sección y las muestra", async () => {
     render(<AdminPanel isOwner />);
     await flush();
@@ -361,6 +457,17 @@ describe("AdminPanel", () => {
     expect(getCourts).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Cancha 3")).toBeTruthy();
     expect(getPlayersAdmin).not.toHaveBeenCalled();
+  });
+
+  it("en la sección de canchas, también un trabajador puede cargar el WhatsApp de contacto del complejo", async () => {
+    render(<AdminPanel isOwner={false} />);
+    await flush();
+
+    openSection("Canchas");
+    await flush();
+
+    expect(screen.getByRole("heading", { name: "WhatsApp de contacto" })).toBeTruthy();
+    expect((screen.getByLabelText("Número de WhatsApp") as HTMLInputElement).value).toBe("+54 9 221 604-9987");
   });
 
   it("muestra fuera de servicio la cancha con un bloqueo activo, pero no por uno programado o vencido", async () => {

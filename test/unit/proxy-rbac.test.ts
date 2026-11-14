@@ -116,8 +116,8 @@ describe("proxy RBAC and Route Protection", () => {
     });
   });
 
-  describe("Rutas visibles sin sesión (/, /bookings, /open-matches)", () => {
-    it.each(["/", "/bookings", "/open-matches", "/open-matches/12"])(
+  describe("Rutas visibles sin sesión (/, /bookings, /open-matches, /lessons)", () => {
+    it.each(["/", "/bookings", "/open-matches", "/open-matches/12", "/lessons"])(
       "un visitante puede ver %s sin que lo manden al login",
       async (pathname) => {
         vi.mocked(getToken).mockResolvedValueOnce(null);
@@ -214,6 +214,43 @@ describe("proxy RBAC and Route Protection", () => {
       const res = await proxy(req);
 
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe("Sección del profesor (/teacher, HU-42)", () => {
+    it("sin sesión, manda a iniciar sesión", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce(null);
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe("http://localhost:3000/login?callbackUrl=%2Fteacher");
+    });
+
+    it("un jugador sin el rol de profesor recibe 403", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "j@test.com", role: Role.PLAYER, isTeacher: false });
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(403);
+      expect(await res.text()).toBe("Acceso denegado: Se requiere el rol de Profesor");
+    });
+
+    it("un administrador recibe 403", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "a@test.com", role: Role.ADMIN });
+
+      const res = await proxy(createMockRequest("/teacher/alumnos"));
+
+      expect(res.status).toBe(403);
+    });
+
+    it("un profesor entra", async () => {
+      vi.mocked(getToken).mockResolvedValueOnce({ sub: "1", email: "p@test.com", role: Role.PLAYER, isTeacher: true });
+
+      const res = await proxy(createMockRequest("/teacher"));
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
     });
   });
 });

@@ -12,6 +12,7 @@ import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/at
 import { recordPointsMovement } from "@/src/actions/profile";
 import { BookingState, Role, PlayerCategory } from "@/src/domain/enums";
 import type { MatchPlayer } from "@/src/entities/MatchPlayer";
+import type { Player } from "@/src/entities/Player";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -28,7 +29,7 @@ import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookin
 function mockAdminSession() {
   vi.mocked(getServerSession).mockResolvedValue({
     user: { email: "admin@test.com", name: "Admin", role: Role.ADMIN },
-  } as any);
+  } as never);
 }
 
 function uniqueEmail(prefix: string) {
@@ -93,7 +94,7 @@ describe("admin player actions (integración con Postgres real)", () => {
 
     // verificar directamente en la BD
     const dataSource = await getDataSource();
-    const repo = dataSource.getRepository("Player") as any;
+    const repo = dataSource.getRepository<Player>("Player");
     const player = await repo.findOne({ where: { id }, relations: { account: true } });
     expect(player?.account.isBlocked).toBe(true);
   });
@@ -120,7 +121,7 @@ describe("admin player actions (integración con Postgres real)", () => {
 
     // verificar directamente en la BD
     const dataSource = await getDataSource();
-    const repo = dataSource.getRepository("Player") as any;
+    const repo = dataSource.getRepository<Player>("Player");
     const player = await repo.findOne({ where: { id }, relations: { account: true } });
     expect(player?.account.isBlocked).toBe(false);
   });
@@ -189,7 +190,7 @@ describe("admin player actions (integración con Postgres real)", () => {
     });
     if (!matchPlayer) throw new Error("expected the player to be in the match");
     mockAdminSession();
-    await setMatchPlayerAttendance(matchPlayer.id, false);
+    await setMatchPlayerAttendance(matchPlayer.id, 0);
 
     // Turno de otro jugador en el que no participa: no debe aparecer.
     await createBookingForPlayer({
@@ -223,6 +224,8 @@ describe("admin player actions (integración con Postgres real)", () => {
     });
     expect(result.data.movements).toEqual([
       expect.objectContaining({ amount: 20, description: "Asistencia a turno reservado" }),
+      expect.objectContaining({ amount: 0, description: "Inasistencia a turno reservado" }),
+      expect.objectContaining({ amount: 0, description: "Inasistencia a turno reservado" }),
     ]);
   });
 

@@ -9,7 +9,7 @@ import { LATE_CANCELLATION_REASON, isLateCancellation } from "@/src/domain/late-
 import { getDataSource } from "@/src/lib/db";
 import { toPlain, type ActionResult } from "@/src/lib/action-result";
 import { getSessionPlayerId } from "@/src/lib/session-player";
-import { notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
+import { notifyClassCancelledByTeacher, notifyMatchCancelledByCreator } from "@/src/lib/match-notifications";
 import {
   BOOKER_NOT_FOUND_MESSAGE,
   BookerNotFoundError,
@@ -63,6 +63,9 @@ const BOOKING_RELATIONS = {
   booker: true,
   court: true,
   match: { matchPlayers: { player: true }, chat: true },
+  lesson: { inscriptions: { player: true } },
+  // Las inasistencias marcadas (ver bookerAttended).
+  penalties: true,
 } as const;
 
 export async function getBookings(): Promise<ActionResult<Booking[]>> {
@@ -110,7 +113,7 @@ export async function updateBooking(
       const bookings = manager.getRepository<Booking>("Booking");
       const booking = await bookings.findOne({
         where: { id },
-        relations: { court: true, booker: true },
+        relations: { court: true, booker: true, lesson: true },
       });
       if (!booking) {
         throw new Error("NOT_FOUND");
@@ -130,11 +133,13 @@ export async function updateBooking(
       }
 
       // Player hereda de Booker: el id de quien reservó es el de su jugador. Un
-      // turno previo a la migración puede no tener quien reservó.
+      // turno previo a la migración puede no tener quien reservó. Las clases no
+      // mueven puntos, tampoco al cancelarlas tarde.
       if (
         input.bookingState === BookingState.CANCELLED &&
         booking.bookingState !== BookingState.CANCELLED &&
         booking.booker &&
+        !booking.lesson &&
         isLateCancellation(booking.fromDateTime)
       ) {
         lateCancellationPlayerId = booking.booker.id;
@@ -165,7 +170,7 @@ export async function updateBooking(
 
       bookings.merge(booking, {
         ...rest,
-        ...(booker ? { booker: { id: booker.id, phoneNumber: booker.phoneNumber } } : {}),
+        ...(booker ? { booker: { id: booker.id } } : {}),
         ...(courtId ? { court: { id: courtId } } : {}),
       });
 
@@ -178,9 +183,11 @@ export async function updateBooking(
       await recordPointsMovement(lateCancellationPlayerId, PENALTY_POINTS, "penalty", LATE_CANCELLATION_REASON);
     }
 
-    // Si era un partido abierto, se avisa a los demás anotados (HU-19).
+    // Si era un partido abierto, se avisa a los demás anotados (HU-19); si era una
+    // clase, a sus alumnos (HU-47).
     if (cancelled) {
       await notifyMatchCancelledByCreator(id);
+      await notifyClassCancelledByTeacher(id);
     }
 
     return { success: true, data: toPlain(saved) };

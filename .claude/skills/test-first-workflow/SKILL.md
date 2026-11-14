@@ -27,4 +27,4 @@ Apply this every time a feature or fix is requested.
 
 - Code, identifiers, comments and test names in English; user-facing texts in Spanish.
 - Never delete or weaken an existing test just to make it pass; change it only if the requirement itself changed, and say so.
-- If the entity model changes, generate a migration and update the diagrams in `docs/`.
+- If the entity model changes, generate a migration and update the diagrams in `docs/` following the `update-diagrams` skill.

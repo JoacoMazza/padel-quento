@@ -7,7 +7,7 @@ import { Court } from "@/src/entities/Court";
 import { Schedule } from "@/src/entities/Schedule";
 import { getDataSource } from "@/src/lib/db";
 import { seedCourts, seedOwner } from "@/scripts/production-seed";
-import { uniqueCourtNumber } from "./helpers";
+import { ensureTestComplex, uniqueCourtNumber } from "./helpers";
 
 const SEEDED_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8];
 const ALL_DAYS = Object.values(DayOfWeek);
@@ -23,7 +23,11 @@ async function removeSeededCourts() {
 }
 
 describe("seedCourts", () => {
-  beforeEach(removeSeededCourts);
+  // Como después de las migraciones, que crean el complejo del club.
+  beforeEach(async () => {
+    await removeSeededCourts();
+    await ensureTestComplex();
+  });
   afterAll(removeSeededCourts);
 
   it("crea las 8 canchas disponibles, cada una con horario de 09:00 a 23:00 los 7 días", async () => {
@@ -43,6 +47,18 @@ describe("seedCourts", () => {
     expect(result).toEqual({ courtsCreated: 8, schedulesCreated: 8 * ALL_DAYS.length });
   });
 
+  it("crea las canchas en el complejo del club", async () => {
+    const dataSource = await getDataSource();
+    const complex = await ensureTestComplex();
+
+    await seedCourts(dataSource);
+
+    const courts = await dataSource
+      .getRepository(Court)
+      .find({ where: { number: In(SEEDED_NUMBERS) }, relations: { complex: true } });
+    expect(courts.map((c) => c.complex.id)).toEqual(SEEDED_NUMBERS.map(() => complex.id));
+  });
+
   it("es idempotente: correrlo de nuevo no duplica canchas ni horarios", async () => {
     const dataSource = await getDataSource();
     await seedCourts(dataSource);
@@ -57,7 +73,7 @@ describe("seedCourts", () => {
     const dataSource = await getDataSource();
     const other = await dataSource
       .getRepository(Court)
-      .save({ number: uniqueCourtNumber(), state: CourtState.AVAILABLE, price: 10000 });
+      .save({ number: uniqueCourtNumber(), state: CourtState.AVAILABLE, price: 10000, complex: await ensureTestComplex() });
 
     await seedCourts(dataSource);
 

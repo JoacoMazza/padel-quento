@@ -1,6 +1,10 @@
 import "reflect-metadata";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { CourtState } from "@/src/domain/enums";
+import type { Booking } from "@/src/entities/Booking";
+import type { Complex } from "@/src/entities/Complex";
+import type { OutOfService } from "@/src/entities/OutOfService";
+import type { Schedule } from "@/src/entities/Schedule";
 
 @Entity({ name: "courts" })
 export class Court {
@@ -24,12 +28,16 @@ export class Court {
   })
   price!: number;
 
-  @OneToMany("Booking", (booking: any) => booking.court)
-  bookings!: any[];
+  @ManyToOne("Complex", "courts", { nullable: false })
+  @JoinColumn({ name: "complex_id" })
+  complex!: Complex;
 
-  @OneToMany("OutOfService", (outOfService: any) => outOfService.court)
-  outOfServices!: any[];
+  @OneToMany("Booking", "court")
+  bookings!: Booking[];
 
-  @OneToMany("Schedule", (schedule: any) => schedule.court)
-  schedules!: any[];
+  @OneToMany("OutOfService", "court")
+  outOfServices!: OutOfService[];
+
+  @OneToMany("Schedule", "court")
+  schedules!: Schedule[];
 }

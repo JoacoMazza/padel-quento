@@ -57,13 +57,13 @@ function uniquePastFromDateTime() {
 function mockAdminSession() {
   vi.mocked(getServerSession).mockResolvedValue({
     user: { email: "admin@test.com", name: "Admin", role: Role.ADMIN },
-  } as any);
+  } as never);
 }
 
 function mockPlayerSession() {
   vi.mocked(getServerSession).mockResolvedValue({
     user: { email: "jugador@test.com", name: "Jugador", role: Role.PLAYER },
-  } as any);
+  } as never);
 }
 
 describe("attendance actions (integración con Postgres real)", () => {
@@ -98,9 +98,24 @@ describe("attendance actions (integración con Postgres real)", () => {
     return { id: player.data.id, bookerId: player.data.id, email };
   }
 
+  /** Movimientos de puntos ligados a un turno (penalties.booking_id), del más viejo al más nuevo. */
+  async function movementsOf(bookingId: number) {
+    const dataSource = await getDataSource();
+    const rows: { player_id: number; penalized_scoring: number; reason: string }[] = await dataSource.query(
+      `SELECT "player_id", "penalized_scoring", "reason" FROM "penalties" WHERE "booking_id" = $1 ORDER BY "id"`,
+      [bookingId],
+    );
+    return rows.map((row) => ({ playerId: row.player_id, points: Number(row.penalized_scoring), reason: row.reason }));
+  }
+
+  async function scoringOf(email: string) {
+    return (await getProfileData(email))?.scoring;
+  }
+
   describe("setBookingAttendance", () => {
-    it("marca la asistencia de un turno sin partido abierto", async () => {
+    it("marcar ausente a quien reservó le descuenta la penalización en el momento, ligada al turno", async () => {
       const player = await createTestPlayer("asistencia-simple");
+      await recordPointsMovement(player.id, 50, "bonus", "Puntos iniciales de prueba");
       const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: player.bookerId,
@@ -112,11 +127,34 @@ describe("attendance actions (integración con Postgres real)", () => {
       mockAdminSession();
       const result = await setBookingAttendance(created.data.id, false);
 
-      expect(result).toEqual({ success: true, data: expect.objectContaining({ attended: false }) });
+      expect(result).toEqual({ success: true, data: { id: created.data.id, attended: false } });
+      expect(await movementsOf(created.data.id)).toEqual([
+        { playerId: player.id, points: -PENALTY_POINTS, reason: "Inasistencia a turno reservado" },
+      ]);
+      expect(await scoringOf(player.email)).toBe(50 - PENALTY_POINTS);
+    });
 
-      const found = await getBookingById(created.data.id);
-      if (!found.success) throw new Error("expected success");
-      expect(found.data?.attended).toBe(false);
+    it("volver a marcarlo presente borra la penalización y le devuelve los puntos", async () => {
+      const player = await createTestPlayer("asistencia-corregida");
+      await recordPointsMovement(player.id, 50, "bonus", "Puntos iniciales de prueba");
+      const created = await createBookingForPlayer({
+        fromDateTime: uniqueFromDateTime(),
+        bookerId: player.bookerId,
+        courtId,
+      });
+      if (!created.success) throw new Error("expected success");
+
+      mockAdminSession();
+      await setBookingAttendance(created.data.id, false);
+      // Marcarlo ausente dos veces no lo penaliza dos veces.
+      await setBookingAttendance(created.data.id, false);
+      expect(await movementsOf(created.data.id)).toHaveLength(1);
+
+      const result = await setBookingAttendance(created.data.id, true);
+
+      expect(result).toEqual({ success: true, data: { id: created.data.id, attended: true } });
+      expect(await movementsOf(created.data.id)).toEqual([]);
+      expect(await scoringOf(player.email)).toBe(50);
     });
 
     it("devuelve error si el turno tiene un partido abierto asociado", async () => {
@@ -158,12 +196,15 @@ describe("attendance actions (integración con Postgres real)", () => {
       const result = await setBookingAttendance(created.data.id, false);
 
       expect(result.success).toBe(false);
+      expect(await movementsOf(created.data.id)).toEqual([]);
     });
   });
 
   describe("setMatchPlayerAttendance", () => {
-    it("marca la asistencia de un jugador puntual de un partido abierto", async () => {
-      const creator = await createTestPlayer("mp-creador");
+    async function openMatchWithJoiner(prefix: string) {
+      const creator = await createTestPlayer(`${prefix}-creador`);
+      const joiner = await createTestPlayer(`${prefix}-sumado`);
+      await recordPointsMovement(joiner.id, 100, "bonus", "Puntos iniciales de prueba");
       const created = await createBookingForPlayer({
         fromDateTime: uniqueFromDateTime(),
         bookerId: creator.bookerId,
@@ -171,32 +212,69 @@ describe("attendance actions (integración con Postgres real)", () => {
         groupSize: 2,
       });
       if (!created.success) throw new Error("expected success");
-
+      // Se suma con un acompañante: su grupo es de 2.
+      const joined = await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
+      if (!joined.success) throw new Error("expected success");
       const found = await getBookingById(created.data.id);
       if (!found.success || !found.data?.match) throw new Error("expected match");
-      const matchPlayerId = found.data.match.matchPlayers![0].id;
+      const joinerMatchPlayer = found.data.match.matchPlayers!.find((mp) => mp.playerId === joiner.id)!;
+      return { bookingId: created.data.id, joiner, joinerMatchPlayer };
+    }
+
+    it("de entrada asistió todo el grupo de cada jugador", async () => {
+      const { joinerMatchPlayer } = await openMatchWithJoiner("mp-inicial");
+
+      expect(joinerMatchPlayer).toMatchObject({ playersCount: 2, attendedCount: 2, pointsAwarded: 0 });
+    });
+
+    it("cada ausente del grupo penaliza a quien lo sumó, ligado al turno; corregirlo recalcula la penalización", async () => {
+      const { bookingId, joiner, joinerMatchPlayer } = await openMatchWithJoiner("mp-ausentes");
 
       mockAdminSession();
-      const result = await setMatchPlayerAttendance(matchPlayerId, false);
+      const oneAbsent = await setMatchPlayerAttendance(joinerMatchPlayer.id, 1);
+      expect(oneAbsent).toEqual({ success: true, data: { id: joinerMatchPlayer.id, attendedCount: 1 } });
+      expect(await movementsOf(bookingId)).toEqual([
+        { playerId: joiner.id, points: -PENALTY_POINTS, reason: "Inasistencia a turno reservado" },
+      ]);
 
-      expect(result).toEqual({ success: true, data: expect.objectContaining({ attended: false }) });
+      await setMatchPlayerAttendance(joinerMatchPlayer.id, 0);
+      expect(await movementsOf(bookingId)).toEqual([
+        { playerId: joiner.id, points: -2 * PENALTY_POINTS, reason: "Inasistencia a turno reservado" },
+      ]);
+      expect(await scoringOf(joiner.email)).toBe(100 - 2 * PENALTY_POINTS);
+
+      await setMatchPlayerAttendance(joinerMatchPlayer.id, 2);
+      expect(await movementsOf(bookingId)).toEqual([]);
+      expect(await scoringOf(joiner.email)).toBe(100);
+    });
+
+    it("rechaza una cantidad de asistentes fuera del grupo", async () => {
+      const { joinerMatchPlayer } = await openMatchWithJoiner("mp-fuera-de-rango");
+
+      mockAdminSession();
+      for (const count of [-1, 3, 1.5]) {
+        expect(await setMatchPlayerAttendance(joinerMatchPlayer.id, count)).toEqual({
+          success: false,
+          error: "La cantidad de asistentes tiene que ser de 0 a 2.",
+        });
+      }
     });
 
     it("devuelve error si el jugador del partido no existe", async () => {
       mockAdminSession();
-      const result = await setMatchPlayerAttendance(999_999_999, false);
+      const result = await setMatchPlayerAttendance(999_999_999, 0);
       expect(result).toEqual({ success: false, error: "El jugador no forma parte de este partido." });
     });
 
     it("devuelve error si el usuario no es admin", async () => {
       mockPlayerSession();
-      const result = await setMatchPlayerAttendance(1, false);
+      const result = await setMatchPlayerAttendance(1, 0);
       expect(result.success).toBe(false);
     });
   });
 
   describe("awardAttendancePoints", () => {
-    it("acredita los puntos al jugador de un turno simple ya finalizado", async () => {
+    it("acredita los puntos al jugador de un turno simple ya finalizado y lo da por finalizado", async () => {
       const player = await createTestPlayer("puntos-simple");
       const past = uniquePastFromDateTime();
       const created = await createBookingForPlayer({
@@ -213,13 +291,14 @@ describe("attendance actions (integración con Postgres real)", () => {
 
       const found = await getBookingById(created.data.id);
       if (!found.success) throw new Error("expected success");
-      expect(found.data?.pointsAwarded).toBe(true);
-
-      const profile = await getProfileData(player.email);
-      expect(profile?.scoring).toBe(ATTENDANCE_POINTS);
+      expect(found.data?.bookingState).toBe(BookingState.FINISHED);
+      expect(await movementsOf(created.data.id)).toEqual([
+        { playerId: player.id, points: ATTENDANCE_POINTS, reason: "Asistencia a turno reservado" },
+      ]);
+      expect(await scoringOf(player.email)).toBe(ATTENDANCE_POINTS);
     });
 
-    it("no acredita puntos y descuenta la penalización si el turno fue marcado como ausente antes de finalizar", async () => {
+    it("no acredita puntos a quien fue marcado ausente: solo queda la penalización", async () => {
       const player = await createTestPlayer("puntos-ausente");
       // Con saldo 0 no habría nada que descontar (el piso es 0).
       await recordPointsMovement(player.id, 50, "bonus", "Puntos iniciales de prueba");
@@ -241,10 +320,8 @@ describe("attendance actions (integración con Postgres real)", () => {
 
       const found = await getBookingById(created.data.id);
       if (!found.success) throw new Error("expected success");
-      expect(found.data?.pointsAwarded).toBe(true);
-
-      const profile = await getProfileData(player.email);
-      expect(profile?.scoring).toBe(50 - PENALTY_POINTS);
+      expect(found.data?.bookingState).toBe(BookingState.FINISHED);
+      expect(await scoringOf(player.email)).toBe(50 - PENALTY_POINTS);
     });
 
     it("no procesa turnos cancelados ni turnos futuros", async () => {
@@ -273,8 +350,9 @@ describe("attendance actions (integración con Postgres real)", () => {
       const foundCancelled = await getBookingById(cancelled.data.id);
       const foundFuture = await getBookingById(future.data.id);
       if (!foundCancelled.success || !foundFuture.success) throw new Error("expected success");
-      expect(foundCancelled.data?.pointsAwarded).toBe(false);
-      expect(foundFuture.data?.pointsAwarded).toBe(false);
+      expect(foundCancelled.data?.bookingState).toBe(BookingState.CANCELLED);
+      expect(foundFuture.data?.bookingState).toBe(BookingState.RESERVED);
+      expect(await scoringOf(player.email)).toBe(0);
     });
 
     it("no acredita puntos dos veces al correr el job otra vez sobre el mismo turno", async () => {
@@ -297,12 +375,10 @@ describe("attendance actions (integración con Postgres real)", () => {
       // turnos propios ya finalizados pendientes de procesar. Lo que importa
       // acá es que a ESTE jugador no se le acredite el punto dos veces.
       expect(secondRun.success).toBe(true);
-
-      const profile = await getProfileData(player.email);
-      expect(profile?.scoring).toBe(ATTENDANCE_POINTS);
+      expect(await scoringOf(player.email)).toBe(ATTENDANCE_POINTS);
     });
 
-    it("acredita puntos a los jugadores presentes del partido abierto y penaliza a los marcados ausentes", async () => {
+    it("acredita puntos a los jugadores presentes del partido abierto y guarda lo acreditado a cada uno", async () => {
       const creator = await createTestPlayer("partido-creador");
       const joiner = await createTestPlayer("partido-sumado");
       await recordPointsMovement(joiner.id, 50, "bonus", "Puntos iniciales de prueba");
@@ -320,17 +396,16 @@ describe("attendance actions (integración con Postgres real)", () => {
       });
       if (!created.success) throw new Error("expected success");
 
-      const joined = await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: joiner.id, groupSize: 2 });
+      const joined = await joinOpenMatchForPlayer({ bookingId: created.data.id, playerId: joiner.id, groupSize: 1 });
       if (!joined.success) throw new Error("expected success");
 
       const found = await getBookingById(created.data.id);
       if (!found.success || !found.data?.match) throw new Error("expected match");
-      const matchPlayers = found.data.match.matchPlayers!;
-      const joinerMatchPlayer = matchPlayers.find((mp) => mp.playerId === joiner.id);
+      const joinerMatchPlayer = found.data.match.matchPlayers!.find((mp) => mp.playerId === joiner.id);
       if (!joinerMatchPlayer) throw new Error("expected joiner match player");
 
       mockAdminSession();
-      const marked = await setMatchPlayerAttendance(joinerMatchPlayer.id, false);
+      const marked = await setMatchPlayerAttendance(joinerMatchPlayer.id, 0);
       expect(marked.success).toBe(true);
 
       vi.useFakeTimers();
@@ -342,11 +417,14 @@ describe("attendance actions (integración con Postgres real)", () => {
       // Ídem: no se afirma un "data" global exacto (ver comentario en el test
       // de idempotencia), solo que el jugador ausente es penalizado y el presente cobra.
       expect(result.success).toBe(true);
+      expect(await scoringOf(creator.email)).toBe(ATTENDANCE_POINTS);
+      expect(await scoringOf(joiner.email)).toBe(50 - PENALTY_POINTS);
 
-      const creatorProfile = await getProfileData(creator.email);
-      const joinerProfile = await getProfileData(joiner.email);
-      expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
-      expect(joinerProfile?.scoring).toBe(50 - PENALTY_POINTS);
+      const after = await getBookingById(created.data.id);
+      if (!after.success || !after.data?.match) throw new Error("expected match");
+      expect(after.data.bookingState).toBe(BookingState.FINISHED);
+      const awarded = Object.fromEntries(after.data.match.matchPlayers!.map((mp) => [mp.playerId, mp.pointsAwarded]));
+      expect(awarded).toEqual({ [creator.id]: ATTENDANCE_POINTS, [joiner.id]: 0 });
     });
 
     it("acredita el bonus extra a quien se sumó a un partido abierto y asistió, pero no al creador", async () => {
@@ -374,11 +452,8 @@ describe("attendance actions (integración con Postgres real)", () => {
       vi.useRealTimers();
 
       expect(result.success).toBe(true);
-
-      const creatorProfile = await getProfileData(creator.email);
-      const joinerProfile = await getProfileData(joiner.email);
-      expect(creatorProfile?.scoring).toBe(ATTENDANCE_POINTS);
-      expect(joinerProfile?.scoring).toBe(ATTENDANCE_POINTS + OPEN_MATCH_JOIN_BONUS_POINTS);
+      expect(await scoringOf(creator.email)).toBe(ATTENDANCE_POINTS);
+      expect(await scoringOf(joiner.email)).toBe(ATTENDANCE_POINTS + OPEN_MATCH_JOIN_BONUS_POINTS);
     });
   });
 });

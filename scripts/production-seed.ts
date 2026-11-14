@@ -4,6 +4,7 @@ import { Admin } from "@/src/entities/Admin";
 import { Court } from "@/src/entities/Court";
 import { Schedule } from "@/src/entities/Schedule";
 import { AdminAccessLevel, CourtState, DayOfWeek } from "@/src/domain/enums";
+import { findClubComplex } from "@/src/lib/club-complex";
 
 const COURT_COUNT = 8;
 const COURT_PRICE = 10000;
@@ -12,19 +13,23 @@ const CLOSING_TIME = "23:00:00";
 const ALL_DAYS = Object.values(DayOfWeek);
 
 /**
- * Crea, si no existen, las canchas 1 a 8 con horario de 09:00 a 23:00 los 7 días.
- * No modifica canchas ni horarios que ya existan.
+ * Crea, si no existen, las canchas 1 a 8 con horario de 09:00 a 23:00 los 7 días,
+ * en el complejo del club (lo crea la migración de complejos). No modifica
+ * canchas ni horarios que ya existan.
  */
 export async function seedCourts(dataSource: DataSource) {
   const courts = dataSource.getRepository(Court);
   const schedules = dataSource.getRepository(Schedule);
+
+  const complex = await findClubComplex(dataSource);
+  if (!complex) throw new Error("No hay un complejo cargado: corré las migraciones antes del seed.");
 
   let courtsCreated = 0;
   let schedulesCreated = 0;
   for (let number = 1; number <= COURT_COUNT; number++) {
     let court = await courts.findOne({ where: { number } });
     if (!court) {
-      court = await courts.save(courts.create({ number, state: CourtState.AVAILABLE, price: COURT_PRICE }));
+      court = await courts.save(courts.create({ number, state: CourtState.AVAILABLE, price: COURT_PRICE, complex }));
       courtsCreated++;
     }
 

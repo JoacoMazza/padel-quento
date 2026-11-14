@@ -12,6 +12,7 @@ import {
   type ReportPlayer,
 } from "@/src/domain/attendance-report";
 import { LATE_CANCELLATION_REASON, LATE_LEAVE_REASON } from "@/src/domain/late-cancellation";
+import { bookerAttended, hasNoShow } from "@/src/domain/attendance";
 import { getDataSource } from "@/src/lib/db";
 import type { ActionResult } from "@/src/lib/action-result";
 import { ForbiddenError, UnauthorizedError, requireOwner } from "@/src/lib/rbac";
@@ -24,8 +25,8 @@ function toReportPlayer(player: ReportPlayer): ReportPlayer {
 /**
  * Reporte de asistencia efectiva, ausencias y cancelaciones tardías en un rango
  * de fechas, para monitorear el ausentismo del complejo. Cuenta la asistencia
- * (Booking.attended o, en partidos abiertos, MatchPlayer.attended de cada
- * jugador) de los turnos activos que empiezan en el rango y ya terminaron. Las
+ * (bookerAttended o, en partidos abiertos, hasNoShow de cada jugador: le cuenta
+ * la inasistencia si faltó alguien de su grupo) de los turnos activos que empiezan en el rango y ya terminaron. Las
  * cancelaciones tardías se cuentan por las penalidades que generaron dentro del
  * rango (se registran aunque el jugador no tuviera puntos para descontar, ver
  * recordPointsMovement). Solo accesible por administradores.
@@ -42,9 +43,9 @@ export async function getAttendanceReport(range: { from: Date; to: Date }): Prom
     const bookings = await dataSource.getRepository<Booking>("Booking").find({
       where: {
         fromDateTime: Between(range.from, range.to),
-        bookingState: In([BookingState.RESERVED, BookingState.PAID]),
+        bookingState: In([BookingState.RESERVED, BookingState.FINISHED]),
       },
-      relations: { booker: true, match: { matchPlayers: { player: true } } },
+      relations: { booker: true, penalties: true, match: { matchPlayers: { player: true } } },
     });
     const lateCancellations = await dataSource.getRepository<Penalty>("Penalty").find({
       where: {
@@ -60,11 +61,11 @@ export async function getAttendanceReport(range: { from: Date; to: Date }): Prom
       if (new Date(booking.fromDateTime).getTime() + booking.durationMinutes * 60_000 > now) continue;
       if (booking.match) {
         for (const matchPlayer of booking.match.matchPlayers ?? []) {
-          attendances.push({ player: toReportPlayer(matchPlayer.player), attended: matchPlayer.attended });
+          attendances.push({ player: toReportPlayer(matchPlayer.player), attended: !hasNoShow(matchPlayer) });
         }
       } else if (booking.booker) {
         // Un turno previo a la migración puede no tener quien reservó.
-        attendances.push({ player: toReportPlayer(booking.booker), attended: booking.attended });
+        attendances.push({ player: toReportPlayer(booking.booker), attended: bookerAttended(booking) });
       }
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarX, Repeat, X, UserCheck, UserX } from "lucide-react";
+import { CalendarX, GraduationCap, Repeat, X, UserCheck, UserX } from "lucide-react";
 import { setBookingAttendance, setMatchPlayerAttendance } from "@/src/actions/attendance";
 import { releaseFixedBookingDate } from "@/src/actions/fixedBooking";
 import type { AdminBookingProp } from "@/app/admin/types";
@@ -51,6 +51,44 @@ export function AttendanceModal({
 
   const isOpenMatch = booking.matchPlayers.length > 0;
 
+  // Una clase (HU-48) no mueve puntos: se muestra quién la da y quiénes la toman, sin marcar asistencia.
+  if (booking.classInfo) {
+    const { capacity, students } = booking.classInfo;
+    return (
+      <div className="modal-backdrop">
+        <div role="dialog" aria-label="Clase" className="modal-panel">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-foreground">Clase</h2>
+            <button type="button" aria-label="Cerrar" onClick={onClose} className="icon-btn border-transparent">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-600/10 px-2.5 py-1 text-xs font-semibold text-violet-700">
+              <GraduationCap className="h-3.5 w-3.5" />
+              Clase de {booking.bookerName}
+            </span>
+            <span className="text-xs font-semibold text-foreground/60">
+              {students.length}/{capacity} alumnos
+            </span>
+          </div>
+          {students.length === 0 ? (
+            <p className="text-sm text-foreground/60">Todavía no tiene alumnos registrados.</p>
+          ) : (
+            <ul className="divide-y divide-line/60">
+              {students.map((student) => (
+                <li key={student.id} className="py-3">
+                  <PlayerName name={student.name} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-4 text-xs text-foreground/60">Las clases no suman ni descuentan puntos.</p>
+        </div>
+      </div>
+    );
+  }
+
   async function handleToggleBookingPlayer() {
     setError(null);
     setPendingId(booking.id);
@@ -63,10 +101,11 @@ export function AttendanceModal({
     onUpdated({ ...booking, attended: !booking.attended });
   }
 
-  async function handleToggleMatchPlayer(matchPlayerId: number, attended: boolean) {
+  /** Cuántos del grupo del jugador asistieron: cada ausente lo penaliza a él. */
+  async function handleMatchPlayerAttendance(matchPlayerId: number, attendedCount: number) {
     setError(null);
     setPendingId(matchPlayerId);
-    const result = await setMatchPlayerAttendance(matchPlayerId, !attended);
+    const result = await setMatchPlayerAttendance(matchPlayerId, attendedCount);
     setPendingId(null);
     if (!result.success) {
       setError(result.error);
@@ -74,15 +113,13 @@ export function AttendanceModal({
     }
     onUpdated({
       ...booking,
-      matchPlayers: booking.matchPlayers.map((mp) =>
-        mp.id === matchPlayerId ? { ...mp, attended: !attended } : mp,
-      ),
+      matchPlayers: booking.matchPlayers.map((mp) => (mp.id === matchPlayerId ? { ...mp, attendedCount } : mp)),
     });
   }
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-panel">
+      <div role="dialog" aria-label="Asistencia del turno" className="modal-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">Asistencia del turno</h2>
           <button
@@ -103,34 +140,50 @@ export function AttendanceModal({
         ) : null}
 
         <p className="mb-4 text-xs text-foreground/60">
-          Por defecto todos figuran presentes. Marcá como ausente solo a quien no haya asistido; el
-          resto acredita los puntos de fidelidad al finalizar el turno.
+          Por defecto todos figuran presentes. Marcá como ausente solo a quien no haya asistido: se le
+          descuenta la penalización en el momento. El resto acredita los puntos de fidelidad al finalizar el turno.
         </p>
 
         <ul className="divide-y divide-line/60">
           {isOpenMatch ? (
-            booking.matchPlayers.map((matchPlayer) => (
-              <li key={matchPlayer.id} className="flex items-center justify-between py-3">
-                <PlayerName name={matchPlayer.playerName} />
-                <button
-                  type="button"
-                  disabled={pendingId === matchPlayer.id}
-                  onClick={() => handleToggleMatchPlayer(matchPlayer.id, matchPlayer.attended)}
-                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    matchPlayer.attended
-                      ? "bg-success/10 text-success hover:bg-danger/10 hover:text-danger"
-                      : "bg-danger/10 text-danger hover:bg-success/10 hover:text-success"
-                  }`}
-                >
-                  {matchPlayer.attended ? (
-                    <UserCheck className="h-3.5 w-3.5" />
+            booking.matchPlayers.map((matchPlayer) => {
+              const attended = matchPlayer.attendedCount > 0;
+              return (
+                <li key={matchPlayer.id} className="flex items-center justify-between py-3">
+                  <PlayerName name={matchPlayer.playerName} />
+                  {matchPlayer.playersCount > 1 ? (
+                    // Vino con acompañantes: se marca cuántos de su grupo asistieron.
+                    <select
+                      aria-label={`Asistentes del grupo de ${matchPlayer.playerName}`}
+                      disabled={pendingId === matchPlayer.id}
+                      value={matchPlayer.attendedCount}
+                      onChange={(event) => handleMatchPlayerAttendance(matchPlayer.id, Number(event.target.value))}
+                      className="field w-auto touch-target text-xs"
+                    >
+                      {Array.from({ length: matchPlayer.playersCount + 1 }, (_, count) => (
+                        <option key={count} value={count}>
+                          {count} de {matchPlayer.playersCount}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
-                    <UserX className="h-3.5 w-3.5" />
+                    <button
+                      type="button"
+                      disabled={pendingId === matchPlayer.id}
+                      onClick={() => handleMatchPlayerAttendance(matchPlayer.id, attended ? 0 : 1)}
+                      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold touch-target transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        attended
+                          ? "bg-success/10 text-success hover:bg-danger/10 hover:text-danger"
+                          : "bg-danger/10 text-danger hover:bg-success/10 hover:text-success"
+                      }`}
+                    >
+                      {attended ? <UserCheck className="h-3.5 w-3.5" /> : <UserX className="h-3.5 w-3.5" />}
+                      {attended ? "Presente" : "Ausente"}
+                    </button>
                   )}
-                  {matchPlayer.attended ? "Presente" : "Ausente"}
-                </button>
-              </li>
-            ))
+                </li>
+              );
+            })
           ) : (
             <li className="flex items-center justify-between py-3">
               <PlayerName name={booking.bookerName} />

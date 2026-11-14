@@ -9,7 +9,7 @@ import { createSchedule } from "@/src/actions/schedule";
 import { blockPlayer, createPlayer } from "@/src/actions/player";
 import { createBookingForPlayer } from "@/src/lib/bookings";
 import { createOutOfService } from "@/src/actions/outOfService";
-import { createBookingAdmin, getAvailableSlotsAdmin } from "@/src/actions/adminBooking";
+import { createBookingAdmin, getAvailableSlotsAdmin, setBookingPaid } from "@/src/actions/adminBooking";
 import { createTestAdmin, createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 
 vi.mock("@/src/lib/notifications", () => ({ notify: vi.fn(async () => {}) }));
@@ -111,7 +111,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     const result = await createBookingAdmin({
       courtId,
       date,
-      startTime: "20:00",
+      startTime: "19:30",
       holder: { names: "Carla", lastnames: "Mostrador", phoneNumber },
     });
 
@@ -145,7 +145,7 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     });
     expect(existing.success).toBe(true);
 
-    const result = await createBookingAdmin({ courtId, date, startTime: "19:00", holder: { playerId: player.id } });
+    const result = await createBookingAdmin({ courtId, date, startTime: "18:00", holder: { playerId: player.id } });
 
     expect(result).toEqual({ success: false, error: "Ese horario ya está ocupado en esta cancha." });
   });
@@ -171,6 +171,15 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     const result = await createBookingAdmin({ courtId, date, startTime: "22:00", holder: { playerId: player.id } });
 
     expect(result).toEqual({ success: false, error: "La cancha no está abierta en ese horario ese día." });
+  });
+
+  it("no agenda en una hora que no coincide con el inicio de un turno de la cancha", async () => {
+    const courtId = await newCourt();
+
+    // La cancha abre a las 09:00: los turnos empiezan a las 09:00, 10:30, 12:00…
+    const result = await createBookingAdmin({ courtId, date, startTime: "10:00", holder: { playerId: player.id } });
+
+    expect(result).toEqual({ success: false, error: "Ese horario no corresponde a un turno de la cancha." });
   });
 
   it("no agenda en un horario que ya pasó", async () => {
@@ -238,6 +247,34 @@ describe("turnos comunes agendados por el admin (integración con Postgres real)
     expect(anonymous.success).toBe(false);
     const dataSource = await getDataSource();
     expect(await dataSource.getRepository<Booking>("Booking").count({ where: { court: { id: courtId } } })).toBe(0);
+  });
+
+  describe("pago de un turno", () => {
+    it("el admin marca un turno como pagado (o lo desmarca), sin cambiarle el estado", async () => {
+      const courtId = await newCourt();
+      const created = await createBookingAdmin({ courtId, date, startTime: "18:00", holder: { playerId: player.id } });
+      if (!created.success) throw new Error(created.error);
+
+      expect(await setBookingPaid(created.data.id, true)).toEqual({ success: true, data: { id: created.data.id, isPaid: true } });
+      expect(await bookingById(created.data.id)).toMatchObject({ isPaid: true, bookingState: BookingState.RESERVED });
+
+      await setBookingPaid(created.data.id, false);
+      expect(await bookingById(created.data.id)).toMatchObject({ isPaid: false });
+    });
+
+    it("devuelve error si el turno no existe", async () => {
+      expect(await setBookingPaid(999_999_999, true)).toEqual({ success: false, error: "El turno no existe." });
+    });
+
+    it("solo puede usarlo un administrador", async () => {
+      const courtId = await newCourt();
+      const created = await createBookingAdmin({ courtId, date, startTime: "18:00", holder: { playerId: player.id } });
+      if (!created.success) throw new Error(created.error);
+      mockSession(Role.PLAYER);
+
+      expect((await setBookingPaid(created.data.id, true)).success).toBe(false);
+      expect(await bookingById(created.data.id)).toMatchObject({ isPaid: false });
+    });
   });
 
   describe("horarios libres para el formulario", () => {

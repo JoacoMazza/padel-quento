@@ -52,10 +52,11 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
     ]);
   });
 
-  it("bookings referencia a quien reservó por booker_phone_number, no por player_id", async () => {
-    const columns = await columnsOf("bookings");
+  it.each(["bookings", "fixed_bookings"])("%s referencia a quien reservó por booker_id, no por su teléfono", async (table) => {
+    const columns = await columnsOf(table);
 
-    expect(columns).toContain("booker_phone_number");
+    expect(columns).toContain("booker_id");
+    expect(columns).not.toContain("booker_phone_number");
     expect(columns).not.toContain("player_id");
 
     const dataSource = await getDataSource();
@@ -63,9 +64,17 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
       `SELECT ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
          FROM information_schema.key_column_usage kcu
          JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = kcu.constraint_name
-        WHERE kcu.table_name = 'bookings' AND kcu.column_name = 'booker_phone_number'`,
+        WHERE kcu.table_name = $1 AND kcu.column_name = 'booker_id'`,
+      [table],
     );
-    expect(rows).toEqual([{ referenced_table: "bookers", referenced_column: "phone_number" }]);
+    expect(rows).toEqual([{ referenced_table: "bookers", referenced_column: "id" }]);
+  });
+
+  it("la tabla de calificaciones se llama players_reviews", async () => {
+    expect(await columnsOf("players_reviews")).toEqual(
+      expect.arrayContaining(["id", "match_id", "reviewer_id", "reviewed_id"]),
+    );
+    expect(await columnsOf("player_reviews")).toEqual([]);
   });
 
   it("email y phone_number son únicos con restricciones nombradas", async () => {
@@ -92,6 +101,32 @@ describe("schema alineado con el DER (integración con Postgres real)", () => {
     );
     expect(columns).not.toContain("playerId");
     expect(columns).not.toContain("createdAt");
+  });
+
+  it("bookings guarda si se pagó (is_paid); la asistencia ya no va en el turno", async () => {
+    const columns = await columnsOf("bookings");
+
+    expect(columns).toContain("is_paid");
+    expect(columns).not.toContain("attended");
+    expect(columns).not.toContain("points_awarded");
+  });
+
+  it("match_players guarda cuántos del grupo asistieron y los puntos acreditados", async () => {
+    const columns = await columnsOf("match_players");
+
+    expect(columns).toEqual(expect.arrayContaining(["players_count", "attended_count", "points_awarded"]));
+    expect(columns).not.toContain("attended");
+  });
+
+  it("penalties referencia al turno que la originó por booking_id", async () => {
+    const dataSource = await getDataSource();
+    const rows: { referenced_table: string }[] = await dataSource.query(
+      `SELECT ccu.table_name AS referenced_table
+         FROM information_schema.key_column_usage kcu
+         JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = kcu.constraint_name
+        WHERE kcu.table_name = 'penalties' AND kcu.column_name = 'booking_id'`,
+    );
+    expect(rows).toEqual([{ referenced_table: "bookings" }]);
   });
 
   it("match_players tiene la restricción única nombrada UQ_match_players_match_player", async () => {

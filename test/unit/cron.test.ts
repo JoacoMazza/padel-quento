@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cancelExpiredMatches, awardAttendancePoints, extendFixedBookings } = vi.hoisted(() => ({
+const { cancelExpiredMatches, awardAttendancePoints, extendFixedBookings, extendLessons } = vi.hoisted(() => ({
   cancelExpiredMatches: vi.fn(),
   awardAttendancePoints: vi.fn(),
   extendFixedBookings: vi.fn(),
+  extendLessons: vi.fn(),
 }));
 vi.mock("@/src/actions/match", () => ({ cancelExpiredMatches }));
 vi.mock("@/src/actions/attendance", () => ({ awardAttendancePoints }));
 vi.mock("@/src/actions/fixedBooking", () => ({ extendFixedBookings }));
+vi.mock("@/src/actions/lesson", () => ({ extendLessons }));
 
 import { runCronJob } from "@/src/lib/cron";
 
@@ -28,6 +30,7 @@ describe("runCronJob (procesos en segundo plano llamados por un programador exte
     ["open-match-expiration", cancelExpiredMatches],
     ["attendance-points", awardAttendancePoints],
     ["fixed-booking-extension", extendFixedBookings],
+    ["lesson-extension", extendLessons],
   ])("corre %s con el secreto correcto", async (job, action) => {
     action.mockResolvedValue({ success: true, data: 3 });
 

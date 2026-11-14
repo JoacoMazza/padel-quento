@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import pg from "pg";
 import { DataSource } from "typeorm";
 import * as entities from "@/src/entities";
 import { databaseSsl } from "@/src/lib/db-ssl";
@@ -16,6 +17,9 @@ function createDataSource() {
 
   return new DataSource({
     type: "postgres",
+    // TypeORM carga pg dinámicamente, y en Vercel solo se incluyen los paquetes
+    // importados en el código: sin esto falla con DriverPackageNotInstalledError.
+    driver: pg,
     url,
     ssl: databaseSsl(),
     entities: entities,

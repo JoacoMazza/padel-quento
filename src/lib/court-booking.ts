@@ -6,6 +6,7 @@ import type { Player } from "@/src/entities/Player";
 import type { Schedule } from "@/src/entities/Schedule";
 import { BookingState } from "@/src/domain/enums";
 import { dayOfWeekOfISO } from "@/src/domain/fixed-booking";
+import { SLOT_DURATION_MINUTES } from "@/app/bookings/slot-utils";
 
 /**
  * Reglas compartidas por las altas que hace el admin desde la Turnera Global:
@@ -37,6 +38,15 @@ export function isWithinSchedule(schedules: Schedule[], date: string, startTime:
     schedule !== undefined &&
     start >= toMinutes(String(schedule.openingTime)) &&
     start + durationMinutes <= toMinutes(String(schedule.closingTime))
+  );
+}
+
+/** La hora coincide con el inicio de un turno de la grilla: cada 90 minutos desde la apertura de ese día. */
+export function isSlotStart(schedules: Schedule[], date: string, startTime: string) {
+  const schedule = schedules.find((s) => s.dayOfWeek === dayOfWeekOfISO(date));
+  return (
+    schedule !== undefined &&
+    (toMinutes(startTime) - toMinutes(String(schedule.openingTime))) % SLOT_DURATION_MINUTES === 0
   );
 }
 

@@ -15,6 +15,7 @@ import { ForbiddenError, UnauthorizedError, requireAdmin } from "@/src/lib/rbac"
 import { notifyFixedBookingCancelled, notifyFixedDateReleased } from "@/src/lib/match-notifications";
 import {
   BookingRuleError,
+  isSlotStart,
   isSlotTaken,
   isWithinSchedule,
   lockCourt,
@@ -82,7 +83,7 @@ async function reserveDate(manager: EntityManager, fixed: FixedBooking, date: st
       durationMinutes: fixed.durationMinutes,
       bookingState: BookingState.RESERVED,
       price: fixed.court.price,
-      booker: { id: fixed.booker.id, phoneNumber: fixed.booker.phoneNumber },
+      booker: { id: fixed.booker.id },
       court: { id: fixed.court.id },
     }),
   );
@@ -155,6 +156,9 @@ export async function createFixedBooking(
       if (!isWithinSchedule(court.schedules, input.startDate, input.startTime, durationMinutes)) {
         throw new FixedBookingError("La cancha no está abierta en ese horario ese día.");
       }
+      if (!isSlotStart(court.schedules, input.startDate, input.startTime)) {
+        throw new FixedBookingError("Ese horario no corresponde a un turno de la cancha.");
+      }
 
       const booker = await resolveBookingHolder(manager, input.holder);
 
@@ -162,7 +166,7 @@ export async function createFixedBooking(
       const fixed = await fixedBookings.save(
         fixedBookings.create({
           court: { id: court.id },
-          booker: { id: booker.id, phoneNumber: booker.phoneNumber },
+          booker: { id: booker.id },
           startDate: input.startDate,
           endDate: input.endDate ?? null,
           startTime: input.startTime,

@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import type { Player } from "@/src/entities/Player";
+import type { Booking } from "@/src/entities/Booking";
 
 @Entity({ name: "penalties" })
 export class Penalty {
@@ -24,6 +25,11 @@ export class Penalty {
 
   @Column({ type: "varchar" })
   reason!: string;
+
+  /** Turno que originó el movimiento (asistencia o inasistencia), si lo originó uno. */
+  @ManyToOne("Booking", "penalties", { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "booking_id", foreignKeyConstraintName: "FK_penalties_booking_id" })
+  booking?: Booking | null;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
