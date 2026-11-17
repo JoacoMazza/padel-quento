@@ -63,6 +63,28 @@ describe("BookingRow", () => {
     expect(where.getAttribute("target")).toBe("_blank");
   });
 
+  describe("disposición de la card", () => {
+    it("en un partido, las acciones van en una fila propia debajo de los datos, para no aplastarlos", () => {
+      const { container } = render(
+        <BookingRow booking={booking({ matchId: 3, needPlayers: true, confirmedPlayers: 1 })} now={NOW} />,
+      );
+
+      const card = container.firstElementChild!;
+      expect(card.className).not.toContain("sm:flex-row");
+      const actions = screen.getByRole("link", { name: /Ver detalle/ }).closest(".border-t");
+      expect(actions).not.toBeNull();
+      expect(actions!.parentElement).toBe(card);
+      expect(actions!.textContent).not.toContain("Cancha 2");
+    });
+
+    it("en un turno sin partido, la acción queda al costado de los datos", () => {
+      const { container } = render(<BookingRow booking={booking()} now={NOW} />);
+
+      expect(container.firstElementChild!.className).toContain("sm:flex-row");
+      expect(container.querySelector(".border-t")).toBeNull();
+    });
+  });
+
   describe("clases (HU-47)", () => {
     const studentClass = (overrides: Partial<MyBookingItem> = {}) =>
       booking({
