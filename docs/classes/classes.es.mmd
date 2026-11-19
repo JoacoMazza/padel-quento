@@ -36,6 +36,9 @@ classDiagram
     class Jugador {
         -categoria: CategoriaJugador
         -puntaje: float
+        +sumarPuntos(puntos: int)
+        +descontarPuntos(puntos: float, motivo: char)
+        +calcularReputacion()
     }
 
     class Clase {
@@ -45,6 +48,11 @@ classDiagram
         -estaActiva: boolean
         -precio: float
         -fechaHoraHasta: LocalDateTime
+        +inscribirAlumno(jugador: Jugador)
+        +darDeBajaAlumno(jugador: Jugador)
+        +tieneCupo() boolean
+        +generarReservas()
+        +darDeBaja()
     }
 
     class HorarioClase {
@@ -106,7 +114,10 @@ classDiagram
         -estaPagada: boolean
         -precio: float
         +cancelar()
-        +verificarDisponibilidad() int
+        +lugaresDisponibles() int
+        +registrarAsistencia(presente: boolean)
+        +esCancelacionTardia() boolean
+        +finalizar()
     }
 
     class Inscripcion {
@@ -121,20 +132,26 @@ classDiagram
         -estaActiva: boolean
         -fechaInicio: LocalDate
         -horaInicio: LocalTime
+        +generarFechas()
+        +verificarConflictos()
+        +desactivar()
     }
 
     class FechaReservaFija {
         -fecha: LocalDate
         -estado: EstadoFechaReservaFija
+        +liberar()
     }
 
     class Partido {
         -necesitaJugadores: boolean
         +agregarJugador()
+        +quitarJugador(jugador: Jugador)
         +cancelar()
         +verificarNecesitaJugadores()
         +cerrar() int
         +notificarJugadores() int
+        +puedeCalificar(jugador: Jugador) boolean
     }
 
     class JugadorPartido {
@@ -142,6 +159,8 @@ classDiagram
         -fechaUnion: LocalDateTime
         -cantidadJugadores: int
         -puntosOtorgados: int
+        +registrarAsistencia(cantidad: int)
+        +calcularPuntos() int
     }
 
     class ResenaJugador {
@@ -150,6 +169,7 @@ classDiagram
         -buenaActitud: boolean
         -nivel: NivelResena
         -puntual: boolean
+        +registrar()
     }
 
     class Chat {

@@ -35,6 +35,9 @@ classDiagram
     class Player {
         -category: PlayerCategory
         -scoring: float
+        +addPoints(points: int)
+        +deductPoints(points: float, reason: char)
+        +calculateReputation()
     }
 
     class Lesson {
@@ -44,6 +47,11 @@ classDiagram
         -isActive: boolean
         -price: float
         -toLocalDatetime: LocalDateTime
+        +enrollStudent(player: Player)
+        +unenrollStudent(player: Player)
+        +hasCapacity() boolean
+        +generateBookings()
+        +deactivate()
     }
 
     class LessonSchedule {
@@ -105,7 +113,10 @@ classDiagram
         -isPaid: boolean
         -price: float
         +cancel()
-        +checkAvailability() int
+        +availableSpots() int
+        +registerAttendance(present: boolean)
+        +isLateCancellation() boolean
+        +finish()
     }
 
     class Inscription {
@@ -120,20 +131,26 @@ classDiagram
         -isActive: boolean
         -startDate: LocalDate
         -startTime: LocalTime
+        +generateDates()
+        +checkConflicts()
+        +deactivate()
     }
 
     class FixedBookingDate {
         -date: LocalDate
         -state: FixedBookingDateState
+        +release()
     }
 
     class Match {
         -needPlayers: boolean
         +addPlayer()
+        +removePlayer(player: Player)
         +cancel()
         +checkNeedsPlayers()
         +close() int
         +notifyPlayers() int
+        +canReview(player: Player) boolean
     }
 
     class MatchPlayer {
@@ -141,6 +158,8 @@ classDiagram
         -joinedAt: LocalDateTime
         -playersCount: int
         -pointsAwarded: int
+        +registerAttendance(count: int)
+        +calculatePoints() int
     }
 
     class PlayerReview {
@@ -149,6 +168,7 @@ classDiagram
         -goodAttitude: boolean
         -level: ReviewLevel
         -onTime: boolean
+        +register()
     }
 
     class Chat {
