@@ -35,9 +35,9 @@ classDiagram
 
     class Jugador {
         -categoria: CategoriaJugador
-        -puntaje: float
+        -puntaje: int
         +sumarPuntos(puntos: int)
-        +descontarPuntos(puntos: float, motivo: char)
+        +descontarPuntos(puntos: int, motivo: char)
         +calcularReputacion()
     }
 
@@ -63,9 +63,9 @@ classDiagram
 
     class Penalizacion {
         -fechaCreacion: LocalDateTime
-        -puntajePenalizado: float
+        -puntajePenalizado: int
         -motivo: char
-        +calcularMonto() float
+        +calcularMonto() int
     }
 
     class Complejo {
@@ -86,6 +86,7 @@ classDiagram
         -numero: int
         -precio: float
         -estado: EstadoCancha
+        -duracionTurnoMinutos: int
         +bloquear()
         +verificarDisponibilidad()
         +desbloquear()
@@ -113,6 +114,7 @@ classDiagram
         -fechaHoraDesde: LocalDateTime
         -estaPagada: boolean
         -precio: float
+        -asistio: boolean
         +cancelar()
         +lugaresDisponibles() int
         +registrarAsistencia(presente: boolean)
@@ -145,6 +147,7 @@ classDiagram
 
     class Partido {
         -necesitaJugadores: boolean
+        -categoria: CategoriaJugador
         +agregarJugador()
         +quitarJugador(jugador: Jugador)
         +cancelar()
