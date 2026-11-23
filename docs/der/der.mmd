@@ -11,6 +11,7 @@ config:
 %%   UQ_match_players_match_player: UNIQUE (match_id, player_id)
 %%   UQ_inscriptions_lesson_player: UNIQUE (lesson_id, player_id)
 %%   UQ_lesson_schedules_lesson_day_start: UNIQUE (lesson_id, day_of_week, start_time)
+%%   UQ_fixed_booking_dates_fixed_booking_id_date: UNIQUE (fixed_booking_id, date)
 %%   IDX_messages_chat_id: INDEX (chat_id)
 erDiagram
     accounts {
@@ -23,7 +24,7 @@ erDiagram
     admins {
         int id PK
         int account_id FK, UK
-        int dni
+        int dni UK "nullable"
         string names
         string last_names
         enum access_level
@@ -31,12 +32,12 @@ erDiagram
 
     bookers {
         int id PK
-        int account_id FK, UK
+        int account_id FK, UK "nullable"
         string phone_number UK
         string type
         string names
         string last_names
-        enum category
+        string category
         float scoring
     }
 
@@ -143,7 +144,7 @@ erDiagram
 
     fixed_booking_dates {
         int id PK
-        int fixed_booking_id FK
+        int fixed_booking_id FK "UQ (fixed_booking_id, date)"
         int booking_id FK, UK "nullable"
         date date
         enum state
@@ -192,7 +193,7 @@ erDiagram
     }
 
     accounts ||--o| admins : "account_id"
-    accounts ||--o| bookers : "account_id"
+    accounts |o--o| bookers : "account_id"
     bookers ||--o{ lessons : "teacher_id"
     bookers ||--o{ penalties : "player_id"
     bookers ||--o{ bookings : "booker_id"
