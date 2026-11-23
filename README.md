@@ -336,8 +336,8 @@ Las variables de la terminal tienen prioridad sobre las de `.env`.
 Vercel es serverless: levanta la app solo cuando llega un pedido y la apaga después, así que no hay un servidor prendido para los `setInterval` de los procesos en segundo plano (vencimiento de partidos abiertos, puntos por asistencia y extensión de turnos fijos y de clases). Por eso:
 
 - En Vercel (variable `VERCEL`, la define la plataforma) `instrumentation.ts` no los arranca.
-- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `fixed-booking-extension`, `lesson-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
-- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos y los puntos, y cada 6 horas los turnos fijos y las clases. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
+- Cada proceso tiene un endpoint, `POST /api/cron/<proceso>` (`open-match-expiration`, `attendance-points`, `chat-closure`, `fixed-booking-extension`, `lesson-extension`), que solo responde con el encabezado `Authorization: Bearer <CRON_SECRET>` ([src/lib/cron.ts](src/lib/cron.ts)).
+- Los llama el workflow [.github/workflows/cron.yml](.github/workflows/cron.yml): cada 10 minutos el vencimiento de partidos, los puntos y el cierre de los chats, y cada 6 horas los turnos fijos y las clases. GitHub puede atrasar unos minutos los workflows programados. También se puede correr a mano desde la pestaña **Actions** → **Background jobs** → **Run workflow**.
 - Cada instancia usa como mucho 2 conexiones a la base ([src/lib/db.ts](src/lib/db.ts)), para no agotar las del session pooler de Supabase.
 
 Pasos:

@@ -9,7 +9,8 @@ import { BookingState, PlayerCategory } from "@/src/domain/enums";
 import { getDataSource } from "@/src/lib/db";
 import { createPlayer } from "@/src/actions/player";
 import { getBookingById, updateBooking } from "@/src/actions/booking";
-import { getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
+import { closeFinishedChats, getChatById, getChatMessages, sendMessage } from "@/src/actions/chat";
+import type { Chat } from "@/src/entities/Chat";
 import { createTestCourt, uniqueCourtNumber, uniquePhoneNumber } from "./helpers";
 import { createBookingForPlayer, joinOpenMatchForPlayer } from "@/src/lib/bookings";
 
@@ -200,5 +201,87 @@ describe("chat actions (integración con Postgres real)", () => {
     const history = await getChatMessages(cancelledChatId);
     if (!history.success) throw new Error("expected success");
     expect(history.data.map((message) => message.content)).toEqual(["Nos vemos en la cancha"]);
+  });
+  describe("closeFinishedChats (cierre de la sala al terminar el turno)", () => {
+    async function createChat(daysAhead: number) {
+      const court = await createTestCourt({ number: uniqueCourtNumber(), price: 10000 });
+      if (!court.success) throw new Error("no se pudo crear la cancha de prueba");
+      const ana = await newPlayer("Ana");
+      const beto = await newPlayer("Beto");
+      const fromDateTime = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+      fromDateTime.setHours(9, 0, 0, 0);
+      const booking = await createBookingForPlayer({ fromDateTime, bookerId: ana.bookerId, courtId: court.data.id, groupSize: 1 });
+      if (!booking.success) throw new Error("no se pudo crear el turno de prueba");
+      const joined = await joinOpenMatchForPlayer({ bookingId: booking.data.id, playerId: beto.id });
+      if (!joined.success) throw new Error("no se pudo sumar al segundo jugador");
+      const found = await getBookingById(booking.data.id);
+      if (!found.success || !found.data?.match?.chat) throw new Error("no se creó la sala de chat");
+      return { bookingId: booking.data.id, chatId: found.data.match.chat.id };
+    }
+
+    async function isOpen(id: number) {
+      const dataSource = await getDataSource();
+      const chat = await dataSource.getRepository<Chat>("Chat").findOneByOrFail({ id });
+      return chat.isOpen;
+    }
+
+    it("la sala se crea abierta", async () => {
+      const { chatId: createdChatId } = await createChat(43);
+
+      expect(await isOpen(createdChatId)).toBe(true);
+    });
+
+    it("cierra la sala de un partido cuyo turno ya terminó y deja abierta la de uno futuro", async () => {
+      const ended = await createChat(44);
+      const upcoming = await createChat(45);
+      const dataSource = await getDataSource();
+      await dataSource
+        .getRepository("Booking")
+        .update(ended.bookingId, { fromDateTime: new Date(Date.now() - 3 * 60 * 60 * 1000) });
+
+      const result = await closeFinishedChats();
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data).toBeGreaterThanOrEqual(1);
+      expect(await isOpen(ended.chatId)).toBe(false);
+      expect(await isOpen(upcoming.chatId)).toBe(true);
+    });
+
+    it("no cierra la sala mientras el turno está en juego", async () => {
+      const playing = await createChat(46);
+      const dataSource = await getDataSource();
+      // Empezó hace 30 minutos y dura 90: todavía no terminó.
+      await dataSource
+        .getRepository("Booking")
+        .update(playing.bookingId, { fromDateTime: new Date(Date.now() - 30 * 60 * 1000) });
+
+      await closeFinishedChats();
+
+      expect(await isOpen(playing.chatId)).toBe(true);
+    });
+
+    it("cierra la sala de un turno cancelado", async () => {
+      const cancelledMatch = await createChat(47);
+      const cancelled = await updateBooking(cancelledMatch.bookingId, { bookingState: BookingState.CANCELLED });
+      expect(cancelled.success).toBe(true);
+
+      await closeFinishedChats();
+
+      expect(await isOpen(cancelledMatch.chatId)).toBe(false);
+    });
+
+    it("no vuelve a contar las salas ya cerradas", async () => {
+      const ended = await createChat(48);
+      const dataSource = await getDataSource();
+      await dataSource
+        .getRepository("Booking")
+        .update(ended.bookingId, { fromDateTime: new Date(Date.now() - 3 * 60 * 60 * 1000) });
+      await closeFinishedChats();
+
+      const secondRun = await closeFinishedChats();
+
+      expect(secondRun).toEqual({ success: true, data: 0 });
+    });
   });
 });

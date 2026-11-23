@@ -3,6 +3,7 @@ import { cancelExpiredMatches } from "@/src/actions/match";
 import { awardAttendancePoints } from "@/src/actions/attendance";
 import { extendFixedBookings } from "@/src/actions/fixedBooking";
 import { extendLessons } from "@/src/actions/lesson";
+import { closeFinishedChats } from "@/src/actions/chat";
 import type { ActionResult } from "@/src/lib/action-result";
 
 /**
@@ -16,6 +17,7 @@ const CRON_JOBS: Record<string, () => Promise<ActionResult<number>>> = {
   "attendance-points": awardAttendancePoints,
   "fixed-booking-extension": extendFixedBookings,
   "lesson-extension": extendLessons,
+  "chat-closure": closeFinishedChats,
 };
 
 export type CronResult = { status: number; body: Record<string, unknown> };

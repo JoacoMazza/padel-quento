@@ -1,21 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { startOpenMatchExpirationJob, startAttendancePointsJob, startFixedBookingExtensionJob, startLessonExtensionJob } =
+const {
+  startOpenMatchExpirationJob,
+  startAttendancePointsJob,
+  startFixedBookingExtensionJob,
+  startLessonExtensionJob,
+  startChatClosureJob,
+} =
   vi.hoisted(() => ({
     startOpenMatchExpirationJob: vi.fn(),
     startAttendancePointsJob: vi.fn(),
     startFixedBookingExtensionJob: vi.fn(),
     startLessonExtensionJob: vi.fn(),
+    startChatClosureJob: vi.fn(),
   }));
 vi.mock("@/src/jobs/open-match-expiration", () => ({ startOpenMatchExpirationJob }));
 vi.mock("@/src/jobs/attendance-points", () => ({ startAttendancePointsJob }));
 vi.mock("@/src/jobs/fixed-booking-extension", () => ({ startFixedBookingExtensionJob }));
 vi.mock("@/src/jobs/lesson-extension", () => ({ startLessonExtensionJob }));
+vi.mock("@/src/jobs/chat-closure", () => ({ startChatClosureJob }));
 
 import { register } from "@/instrumentation";
 
 const ORIGINAL_ENV = process.env;
-const jobs = [startOpenMatchExpirationJob, startAttendancePointsJob, startFixedBookingExtensionJob, startLessonExtensionJob];
+const jobs = [
+  startOpenMatchExpirationJob,
+  startAttendancePointsJob,
+  startFixedBookingExtensionJob,
+  startLessonExtensionJob,
+  startChatClosureJob,
+];
 
 describe("register (procesos en segundo plano al arrancar el servidor)", () => {
   beforeEach(() => {
@@ -28,7 +42,7 @@ describe("register (procesos en segundo plano al arrancar el servidor)", () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it("con un servidor permanente arranca los cuatro procesos", async () => {
+  it("con un servidor permanente arranca los cinco procesos", async () => {
     await register();
 
     for (const job of jobs) expect(job).toHaveBeenCalledTimes(1);

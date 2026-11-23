@@ -183,6 +183,7 @@ erDiagram
     chats {
         int id PK
         int partido_id FK, UK
+        boolean esta_abierto "default true"
         datetime fecha_creacion
     }
 

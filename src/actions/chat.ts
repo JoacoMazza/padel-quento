@@ -206,3 +206,29 @@ export async function sendMessage(chatId: number, content: string): Promise<Acti
     return { success: false, error: "No se pudo enviar el mensaje." };
   }
 }
+
+/**
+ * Cierra (isOpen = false) las salas abiertas cuyo turno ya terminó o fue
+ * cancelado. Lo corre periódicamente src/jobs/chat-closure.ts (o /api/cron en
+ * Vercel). Devuelve cuántas salas cerró.
+ */
+export async function closeFinishedChats(): Promise<ActionResult<number>> {
+  try {
+    const dataSource = await getDataSource();
+    const chats = dataSource.getRepository<Chat>("Chat");
+    const open = await chats.find({ where: { isOpen: true }, relations: { match: { booking: true } } });
+
+    const toClose = open.filter((chat) => getChatClosureReason(chat.match.booking) !== null);
+    if (toClose.length > 0) {
+      await chats.update(
+        toClose.map((chat) => chat.id),
+        { isOpen: false },
+      );
+    }
+
+    return { success: true, data: toClose.length };
+  } catch (error) {
+    console.error("closeFinishedChats", error);
+    return { success: false, error: "No se pudieron cerrar los chats finalizados." };
+  }
+}

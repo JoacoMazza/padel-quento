@@ -183,6 +183,7 @@ erDiagram
     chats {
         int id PK
         int match_id FK, UK
+        boolean is_open "default true"
         datetime created_at
     }
 
