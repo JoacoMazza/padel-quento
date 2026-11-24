@@ -272,7 +272,7 @@ classDiagram
     Jugador "1" -- "0..*" Inscripcion
     Jugador -- "0..*" ResenaJugador : +evaluador
     Jugador -- "0..*" ResenaJugador : +evaluado
-    Jugador -- "0..*" Mensaje
+    Jugador "1" -- "0..*" Mensaje : +emisor
 
     %% Partidos
     Partido *-- "0..4" JugadorPartido

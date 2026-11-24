@@ -31,13 +31,13 @@ erDiagram
 
     reservantes {
         int id PK
-        int cuenta_id FK, UK
+        int cuenta_id FK, UK "nullable"
         string telefono UK
         string tipo
         string nombres
         string apellidos
-        enum categoria
-        int puntaje
+        enum categoria "nullable"
+        int puntaje "nullable"
     }
 
     clases {
@@ -196,7 +196,7 @@ erDiagram
     }
 
     cuentas ||--o| administradores : "cuenta_id"
-    cuentas ||--o| reservantes : "cuenta_id"
+    cuentas |o--o| reservantes : "cuenta_id"
     reservantes ||--o{ clases : "profesor_id"
     reservantes ||--o{ penalizaciones : "jugador_id"
     reservantes ||--o{ reservas : "reservante_id"

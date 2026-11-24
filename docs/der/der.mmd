@@ -31,13 +31,13 @@ erDiagram
 
     bookers {
         int id PK
-        int account_id FK, UK
+        int account_id FK, UK "nullable"
         string phone_number UK
         string type
         string names
         string last_names
-        enum category
-        int scoring
+        enum category "nullable"
+        int scoring "nullable"
     }
 
     lessons {
@@ -196,7 +196,7 @@ erDiagram
     }
 
     accounts ||--o| admins : "account_id"
-    accounts ||--o| bookers : "account_id"
+    accounts |o--o| bookers : "account_id"
     bookers ||--o{ lessons : "teacher_id"
     bookers ||--o{ penalties : "player_id"
     bookers ||--o{ bookings : "booker_id"

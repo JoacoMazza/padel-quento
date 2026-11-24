@@ -271,7 +271,7 @@ classDiagram
     Player "1" -- "0..*" Inscription
     Player -- "0..*" PlayerReview : +reviewer
     Player -- "0..*" PlayerReview : +reviewed
-    Player -- "0..*" Message
+    Player "1" -- "0..*" Message : +sender
 
     %% Matches
     Match *-- "0..4" MatchPlayer
