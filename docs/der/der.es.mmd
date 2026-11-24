@@ -11,6 +11,7 @@ config:
 %%   UQ_jugadores_partidos_partido_jugador: UNIQUE (partido_id, jugador_id)
 %%   UQ_inscripciones_clase_jugador: UNIQUE (clase_id, jugador_id)
 %%   UQ_horarios_clases_clase_dia_inicio: UNIQUE (clase_id, dia_semana, hora_inicio)
+%%   UQ_fechas_reservas_fijas_reserva_fija_fecha: UNIQUE (reserva_fija_id, fecha)
 %%   IDX_mensajes_chat_id: INDEX (chat_id)
 erDiagram
     cuentas {
@@ -23,7 +24,7 @@ erDiagram
     administradores {
         int id PK
         int cuenta_id FK, UK
-        int dni
+        int dni UK "nullable"
         string nombres
         string apellidos
         enum nivel_acceso
@@ -145,7 +146,7 @@ erDiagram
 
     fechas_reservas_fijas {
         int id PK
-        int reserva_fija_id FK
+        int reserva_fija_id FK "UQ (reserva_fija_id, fecha)"
         int reserva_id FK, UK "nullable"
         date fecha
         enum estado
