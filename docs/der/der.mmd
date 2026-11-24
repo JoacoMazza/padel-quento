@@ -37,8 +37,8 @@ erDiagram
         string type
         string names
         string last_names
-        string category
-        float scoring
+        enum category "nullable"
+        int scoring "nullable"
     }
 
     lessons {
@@ -65,7 +65,7 @@ erDiagram
         int id PK
         int player_id FK
         int booking_id FK "nullable"
-        float penalized_scoring
+        int penalized_scoring
         string reason
         datetime created_at
     }
@@ -91,6 +91,7 @@ erDiagram
         int number UK
         enum state
         decimal price "decimal(10,2)"
+        int slot_duration_minutes "default 90"
     }
 
     schedules {
@@ -120,6 +121,7 @@ erDiagram
         int duration_minutes
         decimal price "decimal(10,2)"
         boolean is_paid
+        boolean attended "default true"
     }
 
     inscriptions {
@@ -154,6 +156,7 @@ erDiagram
         int id PK
         int booking_id FK, UK
         boolean need_players
+        enum category
     }
 
     match_players {
@@ -181,6 +184,7 @@ erDiagram
     chats {
         int id PK
         int match_id FK, UK
+        boolean is_open "default true"
         datetime created_at
     }
 

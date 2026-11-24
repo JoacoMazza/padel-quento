@@ -37,8 +37,8 @@ erDiagram
         string tipo
         string nombres
         string apellidos
-        string categoria
-        float puntaje
+        enum categoria "nullable"
+        int puntaje "nullable"
     }
 
     clases {
@@ -65,7 +65,7 @@ erDiagram
         int id PK
         int jugador_id FK
         int reserva_id FK "nullable"
-        float puntaje_penalizado
+        int puntaje_penalizado
         string motivo
         datetime fecha_creacion
     }
@@ -91,6 +91,7 @@ erDiagram
         int numero UK
         enum estado
         decimal precio "decimal(10,2)"
+        int duracion_turno_minutos "default 90"
     }
 
     horarios {
@@ -120,6 +121,7 @@ erDiagram
         int duracion_minutos
         decimal precio "decimal(10,2)"
         boolean esta_pagada
+        boolean asistio "default true"
     }
 
     inscripciones {
@@ -154,6 +156,7 @@ erDiagram
         int id PK
         int reserva_id FK, UK
         boolean necesita_jugadores
+        enum categoria
     }
 
     jugadores_partidos {
@@ -181,6 +184,7 @@ erDiagram
     chats {
         int id PK
         int partido_id FK, UK
+        boolean esta_abierto "default true"
         datetime fecha_creacion
     }
 

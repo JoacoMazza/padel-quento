@@ -34,9 +34,9 @@ classDiagram
 
     class Player {
         -category: PlayerCategory
-        -scoring: float
+        -scoring: int
         +addPoints(points: int)
-        +deductPoints(points: float, reason: char)
+        +deductPoints(points: int, reason: char)
         +calculateReputation()
     }
 
@@ -62,9 +62,9 @@ classDiagram
 
     class Penalty {
         -createdAt: LocalDateTime
-        -penalizedScoring: float
+        -penalizedScoring: int
         -reason: char
-        +calculateAmount() float
+        +calculateAmount() int
     }
 
     class Complex {
@@ -85,6 +85,7 @@ classDiagram
         -number: int
         -price: float
         -state: CourtState
+        -slotDurationMinutes: int
         +block()
         +checkAvailability()
         +unBlock()
@@ -112,6 +113,7 @@ classDiagram
         -fromDatetime: LocalDateTime
         -isPaid: boolean
         -price: float
+        -attended: boolean
         +cancel()
         +availableSpots() int
         +registerAttendance(present: boolean)
@@ -144,6 +146,7 @@ classDiagram
 
     class Match {
         -needPlayers: boolean
+        -category: PlayerCategory
         +addPlayer()
         +removePlayer(player: Player)
         +cancel()
@@ -172,6 +175,7 @@ classDiagram
     }
 
     class Chat {
+        -isOpen: boolean
         -createdAt: LocalDateTime
         +addMessages()
         +close()
@@ -267,7 +271,7 @@ classDiagram
     Player "1" -- "0..*" Inscription
     Player -- "0..*" PlayerReview : +reviewer
     Player -- "0..*" PlayerReview : +reviewed
-    Player -- "0..*" Message
+    Player "1" -- "0..*" Message : +sender
 
     %% Matches
     Match *-- "0..4" MatchPlayer

@@ -20,5 +20,8 @@ export async function register() {
 
     const { startLessonExtensionJob } = await import("@/src/jobs/lesson-extension");
     startLessonExtensionJob();
+
+    const { startChatClosureJob } = await import("@/src/jobs/chat-closure");
+    startChatClosureJob();
   }
 }
