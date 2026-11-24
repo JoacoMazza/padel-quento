@@ -39,6 +39,8 @@ Never edit the JPGs by hand; always change the `.mmd` and re-render. Both diagra
    ```
 
    If Mermaid reports a parse error, fix the `.mmd` and run again.
+
+   The script renders with a wide viewport (`-w 10000`) so each diagram keeps its natural size; with mermaid-cli's default 800px viewport Mermaid shrinks large diagrams to fit and the JPG loses resolution as the diagram grows. Don't remove it.
 5. **Check the result.** Open each JPG and verify every table/class, column and relation is visible and readable (labels not hidden, no missing entities). Keep `layout: elk` in the front matter; it gives the cleanest layout.
 6. **Cross-check** that the DER matches the migrations and the class diagram matches the entities (same names, enums, multiplicities). Mention any inconsistency you find instead of silently "fixing" the model.
 7. Update the README if the diagram files or their description changed, and commit the `.mmd` together with its `.jpg` (`docs:` prefix if it's a separate commit).
